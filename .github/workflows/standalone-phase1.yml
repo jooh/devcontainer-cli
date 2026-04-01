@@ -1,0 +1,33 @@
+name: Standalone Phase 1 Checks
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  standalone-phase1:
+    name: Standalone Phase 1 Evaluator
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Type-check
+        run: yarn tsc-b
+
+      - name: Run standalone Phase 1 tests
+        run: |
+          env TS_NODE_PROJECT=src/test/tsconfig.json \
+          yarn mocha -r ts-node/register --exit src/test/standalonePhase1.test.ts

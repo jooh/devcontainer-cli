@@ -103,16 +103,17 @@ This balances near-term user value with long-term maintainability.
   - Explicitly out-of-scope for MVP parity: perfect TTY UX parity for every interactive edge case and non-Linux platform-specific behavior (tracked for post-MVP hardening).
 
 ### Phase 1 — Fast standalone executable PoC (1–2 weeks)
-- [ ] Prototype Node SEA (or alternative) from existing bundle.
-- [ ] Validate command coverage:
-  - [ ] `up`
-  - [ ] `build`
-  - [ ] `exec`
-  - [ ] `read-configuration`
-  - [ ] `features` and `templates` core commands
-- [ ] Validate behavior on Docker + Docker Compose in CI-like environment.
-- [ ] Identify blockers around native addons / dynamic requires.
-- [ ] Produce size/startup benchmarks and compare to current install script approach.
+- [x] Prototype Node SEA (or alternative) from existing bundle.
+- [x] Validate command coverage:
+  - [x] `up`
+  - [x] `build`
+  - [x] `exec`
+  - [x] `read-configuration`
+  - [x] `features` and `templates` core commands
+- [x] Validate behavior on Docker + Docker Compose in CI-like environment.
+- [x] Identify blockers around native addons / dynamic requires.
+- [x] Produce size/startup benchmarks and compare to current install script approach.
+  - See `docs/standalone/phase1.md` for the completion report and benchmark summary.
 
 ### Phase 2 — Productionize short-term binary distribution (2–4 weeks)
 - [ ] Add reproducible build pipeline for standalone binary artifacts.
@@ -161,7 +162,7 @@ This balances near-term user value with long-term maintainability.
 - [ ] Binary distribution is reproducible and documented.
 
 ## Initial next actions (this week)
-- [ ] Build a minimal standalone executable PoC from current Node bundle.
-- [ ] Run top 5 commands against existing test fixtures.
-- [ ] Create a short decision memo: SEA viability vs packager alternatives.
+- [x] Build a minimal standalone executable PoC from current Node bundle.
+- [x] Run top 5 commands against existing test fixtures.
+- [x] Create a short decision memo: SEA viability vs packager alternatives.
 - [ ] Decide whether to launch Rust foundation in parallel immediately or after PoC sign-off.
