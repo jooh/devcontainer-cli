@@ -82,14 +82,25 @@ This balances near-term user value with long-term maintainability.
 ## Implementation plan (phased)
 
 ### Phase 0 — Discovery and constraints (1 week)
-- [ ] Inventory all Node-specific and native-binding dependencies (especially `node-pty`).
-- [ ] Confirm target OS/arch matrix (Linux/macOS x64+arm64; Windows expectations).
-- [ ] Define "fat binary" acceptance criteria:
-  - [ ] single file on disk?
-  - [ ] no external runtime?
-  - [ ] startup latency target?
-  - [ ] max binary size budget?
-- [ ] Define parity scope for first release (which subcommands must be supported).
+- [x] Inventory all Node-specific and native-binding dependencies (especially `node-pty`).
+  - Native bindings: `node-pty` (declared in `package.json`, loaded dynamically in `src/spec-common/commonUtils.ts` and `src/spec-shutdown/dockerUtils.ts`; highest risk for SEA/single-file portability).
+  - Node runtime coupling: CLI entrypoint remains `#!/usr/bin/env node` in `devcontainer.js`, and runtime bundle target is `dist/spec-node/devContainersSpecCLI.js` (requires embedded/provided Node runtime for standalone delivery).
+  - Node built-ins heavily used in execution paths: `child_process`, stdio TTY checks (`process.stdin.isTTY` / `process.stdout.isTTY`), and raw terminal mode handling (`setRawMode`) in command execution/injection flows.
+  - Dynamic loading concern: `loadNativeModule('node-pty')` patterns imply native addon extraction/lookup behavior must be validated for SEA-style packaging.
+- [x] Confirm target OS/arch matrix (Linux x64 for MVP; defer other platforms).
+  - Initial standalone target (Tier 1): Linux x64 only (first release scope narrowed to a single primary artifact).
+  - Deferred targets: Linux arm64 and macOS (x64/arm64) move to post-MVP once Linux x64 artifact is stable.
+  - Windows expectation for first standalone milestone: no native Windows installer artifact; keep npm-based install guidance (or WSL path).
+  - Explicit non-targets for first milestone: 32-bit ARM (`armv7l`/`armv6l`) and all non-Linux platforms.
+- [x] Define "fat binary" acceptance criteria:
+  - [x] single file on disk? **Yes** — one Linux x64 executable delivered to users.
+  - [x] no external runtime? **Yes** — no separately installed Node.js/runtime required on host.
+  - [x] startup latency target? **Target:** `devcontainer --help` cold start <= 300 ms on a typical CI Linux x64 VM.
+  - [x] max binary size budget? **Target:** <= 90 MB compressed artifact for initial Linux x64 release.
+- [x] Define parity scope for first release (which subcommands must be supported).
+  - In-scope for Linux x64 standalone MVP: `read-configuration`, `build`, `up`, `exec`, plus `features`/`templates` resolution and listing flows used by core developer workflows.
+  - Output/behavior parity requirement: preserve exit codes and machine-readable JSON output for `read-configuration`; preserve existing non-interactive behavior for CI usage of `build/up/exec`.
+  - Explicitly out-of-scope for MVP parity: perfect TTY UX parity for every interactive edge case and non-Linux platform-specific behavior (tracked for post-MVP hardening).
 
 ### Phase 1 — Fast standalone executable PoC (1–2 weeks)
 - [ ] Prototype Node SEA (or alternative) from existing bundle.
