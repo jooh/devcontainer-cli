@@ -116,11 +116,12 @@ This balances near-term user value with long-term maintainability.
   - See `docs/standalone/phase1.md` for the completion report and benchmark summary.
 
 ### Phase 2 — Productionize short-term binary distribution (2–4 weeks)
-- [ ] Add reproducible build pipeline for standalone binary artifacts.
-- [ ] Add signing/notarization strategy where needed.
-- [ ] Add smoke/integration test lane that runs packaged executable (not just `node ...`).
-- [ ] Add release docs and fallback installer path.
-- [ ] Publish experimental channel (e.g., `-standalone` artifacts).
+- [x] Add reproducible build pipeline for standalone binary artifacts.
+- [x] Add signing/notarization strategy where needed.
+- [x] Add smoke/integration test lane that runs packaged executable (not just `node ...`).
+- [x] Add release docs and fallback installer path.
+- [x] Publish experimental channel (e.g., `-standalone` artifacts).
+  - See `docs/standalone/phase2.md` for the completion report and rollout notes.
 
 ### Phase 3 — Native rewrite foundation (Rust) (2–4 weeks)
 - [ ] Create `cmd/devcontainer-native` Rust crate in repo (or sibling repo with mirrored CI).

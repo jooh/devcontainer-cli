@@ -1,0 +1,54 @@
+name: standalone-release
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  standalone-linux-x64:
+    permissions:
+      contents: read
+      id-token: write
+    runs-on: ubuntu-22.04
+    env:
+      SOURCE_DATE_EPOCH: '1704067200'
+      NODE_VERSION: '20.19.1'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build production bundle
+        run: npm run compile-prod
+
+      - name: Build standalone Linux x64 artifact
+        run: scripts/standalone/build-linux-x64.sh
+
+      - name: Standalone smoke tests
+        run: scripts/standalone/smoke.sh dist/standalone/devcontainer-linux-x64
+
+      - name: Create checksums
+        run: sha256sum dist/standalone/devcontainer-linux-x64 > dist/standalone/devcontainer-linux-x64.sha256
+
+      - name: Sign checksums with cosign (keyless)
+        run: cosign sign-blob --yes dist/standalone/devcontainer-linux-x64.sha256 --output-signature dist/standalone/devcontainer-linux-x64.sha256.sig --output-certificate dist/standalone/devcontainer-linux-x64.sha256.pem
+
+      - name: Upload standalone artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: devcontainer-linux-x64-standalone
+          path: |
+            dist/standalone/devcontainer-linux-x64
+            dist/standalone/spec-node/**
+            dist/standalone/devcontainer-linux-x64.sha256
+            dist/standalone/devcontainer-linux-x64.sha256.sig
+            dist/standalone/devcontainer-linux-x64.sha256.pem
