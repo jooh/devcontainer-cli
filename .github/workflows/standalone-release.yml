@@ -8,6 +8,9 @@ on:
 
 jobs:
   standalone-linux-x64:
+    permissions:
+      contents: read
+      id-token: write
     runs-on: ubuntu-22.04
     env:
       SOURCE_DATE_EPOCH: '1704067200'
@@ -45,6 +48,7 @@ jobs:
           name: devcontainer-linux-x64-standalone
           path: |
             dist/standalone/devcontainer-linux-x64
+            dist/standalone/spec-node/**
             dist/standalone/devcontainer-linux-x64.sha256
             dist/standalone/devcontainer-linux-x64.sha256.sig
             dist/standalone/devcontainer-linux-x64.sha256.pem

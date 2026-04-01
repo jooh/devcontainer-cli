@@ -17,7 +17,7 @@ describe('standalone phase 2 evaluator', () => {
 			packagedSmokeTests: {
 				ok: true,
 				lane: 'standalone-smoke',
-				commands: ['read-configuration', 'up', 'exec'],
+				commands: ['read-configuration', 'up', 'build', 'exec'],
 			},
 			releaseDocs: {
 				ok: true,
@@ -33,6 +33,39 @@ describe('standalone phase 2 evaluator', () => {
 
 		expect(result.complete).to.equal(true);
 		expect(result.summary).to.include('Phase 2 complete');
+	});
+
+
+	it('fails phase 2 completion when smoke lane omits required commands', () => {
+		const result = evaluatePhase2({
+			reproducibleBuild: {
+				ok: true,
+				workflowPath: '.github/workflows/standalone-release.yml',
+				deterministicInputs: ['node-version=20.19.1'],
+			},
+			signing: {
+				ok: true,
+				strategy: 'cosign keyless signatures',
+			},
+			packagedSmokeTests: {
+				ok: true,
+				lane: 'standalone-smoke',
+				commands: ['read-configuration', 'up', 'exec'],
+			},
+			releaseDocs: {
+				ok: true,
+				docPath: 'docs/standalone/phase2.md',
+				fallbackInstaller: 'npm i -g @devcontainers/cli',
+			},
+			experimentalChannel: {
+				ok: true,
+				artifactSuffix: '-standalone',
+				published: true,
+			},
+		});
+
+		expect(result.complete).to.equal(false);
+		expect(result.missingChecks).to.deep.equal(['packaged-smoke-tests']);
 	});
 
 	it('fails phase 2 completion when standalone smoke lane is missing', () => {

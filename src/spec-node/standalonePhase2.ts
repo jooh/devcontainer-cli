@@ -57,7 +57,12 @@ function hasSigningStrategy(input: SigningInput) {
 }
 
 function hasPackagedSmokeLane(input: PackagedSmokeTestsInput) {
-	return input.ok && input.lane.trim().length > 0 && input.commands.length > 0;
+	const requiredCommands = ['read-configuration', 'up', 'build', 'exec'];
+	const providedCommands = new Set(input.commands.map(command => command.trim()).filter(Boolean));
+
+	return input.ok
+		&& input.lane.trim().length > 0
+		&& requiredCommands.every(command => providedCommands.has(command));
 }
 
 function hasReleaseDocs(input: ReleaseDocsInput) {
