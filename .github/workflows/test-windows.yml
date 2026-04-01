@@ -16,8 +16,9 @@ permissions:
   contents: read
 
 jobs:
- tests-matrix:
+  tests-matrix:
     name: Tests Matrix (Windows)
+    if: ${{ vars.ENABLE_UPSTREAM_CI == 'true' }}
     runs-on: windows-latest
     strategy:
       fail-fast: false

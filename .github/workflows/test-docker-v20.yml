@@ -12,6 +12,7 @@ permissions:
 jobs:
   test-docker-v20:
     name: Docker v20.10 Compatibility
+    if: ${{ vars.ENABLE_UPSTREAM_CI == 'true' }}
     runs-on: ubuntu-22.04
     
     steps:
