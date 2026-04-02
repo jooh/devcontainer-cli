@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { evaluatePhase3, REQUIRED_PHASE3_TOP_LEVEL_COMMANDS } from '../spec-node/standalonePhase3';
+import { evaluatePhase3, REQUIRED_PHASE3_TOP_LEVEL_COMMANDS } from '../spec-node/migration/standalonePhase3';
 
 describe('standalone phase 3 evaluator', () => {
 	it('marks phase 3 complete when native foundation checks pass', () => {

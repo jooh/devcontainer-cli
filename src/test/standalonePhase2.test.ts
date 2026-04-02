@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { evaluatePhase2 } from '../spec-node/standalonePhase2';
+import { evaluatePhase2 } from '../spec-node/migration/standalonePhase2';
 
 describe('standalone phase 2 evaluator', () => {
 	it('marks phase 2 complete when all productionization checks pass', () => {
