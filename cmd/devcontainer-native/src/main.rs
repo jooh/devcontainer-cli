@@ -109,41 +109,20 @@ fn run_native_read_configuration(args: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
-fn run_external_command(program: &str, args: &[String]) -> ExitCode {
-    if env::var("DEVCONTAINER_NATIVE_DRY_RUN").ok().as_deref() == Some("1") {
-        println!("DRY_RUN {program} {}", args.join(" "));
-        return ExitCode::SUCCESS;
-    }
-
-    let status = Command::new(program).args(args).status();
-    match status {
-        Ok(exit_status) => match exit_status.code() {
-            Some(code) => ExitCode::from(code as u8),
-            None => ExitCode::from(1),
-        },
-        Err(error) => {
-            eprintln!("Failed to invoke {program}: {error}");
-            ExitCode::from(1)
+fn should_use_native_read_configuration(args: &[String]) -> bool {
+    const SUPPORTED_OPTIONS: [&str; 2] = ["--workspace-folder", "--config"];
+    let mut index = 0;
+    while index < args.len() {
+        let arg = &args[index];
+        if !arg.starts_with("--") {
+            return false;
         }
+        if !SUPPORTED_OPTIONS.contains(&arg.as_str()) {
+            return false;
+        }
+        index += 2;
     }
-}
-
-fn run_native_build(args: &[String]) -> ExitCode {
-    let mut docker_args = vec!["build".to_string()];
-    docker_args.extend_from_slice(args);
-    run_external_command("docker", &docker_args)
-}
-
-fn run_native_up(args: &[String]) -> ExitCode {
-    let mut docker_args = vec!["compose".to_string(), "up".to_string()];
-    docker_args.extend_from_slice(args);
-    run_external_command("docker", &docker_args)
-}
-
-fn run_native_exec(args: &[String]) -> ExitCode {
-    let mut docker_args = vec!["exec".to_string()];
-    docker_args.extend_from_slice(args);
-    run_external_command("docker", &docker_args)
+    true
 }
 
 fn run_native_collection(command: &str, args: &[String]) -> ExitCode {
@@ -164,6 +143,12 @@ fn run_native_collection(command: &str, args: &[String]) -> ExitCode {
     let _ = io::stdout().write_all(payload.as_bytes());
     let _ = io::stdout().write_all(b"\n");
     ExitCode::SUCCESS
+}
+
+fn should_use_native_collection(args: &[String]) -> bool {
+    args.first()
+        .map(|arg| arg == "list" || arg == "ls")
+        .unwrap_or(true)
 }
 
 fn main() -> ExitCode {
@@ -193,11 +178,12 @@ fn main() -> ExitCode {
 
     let command_args = &raw_args[offset + 1..];
     match command.as_str() {
-        "read-configuration" => return run_native_read_configuration(command_args),
-        "build" => return run_native_build(command_args),
-        "up" => return run_native_up(command_args),
-        "exec" => return run_native_exec(command_args),
-        "features" | "templates" => return run_native_collection(command, command_args),
+        "read-configuration" if should_use_native_read_configuration(command_args) => {
+            return run_native_read_configuration(command_args);
+        }
+        "features" | "templates" if should_use_native_collection(command_args) => {
+            return run_native_collection(command, command_args);
+        }
         _ => {}
     }
 
@@ -230,7 +216,10 @@ fn main() -> ExitCode {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_read_configuration_path, run_native_collection};
+    use super::{
+        resolve_read_configuration_path, run_native_collection, should_use_native_collection,
+        should_use_native_read_configuration,
+    };
     use std::fs;
     use std::process::ExitCode;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -311,8 +300,16 @@ mod tests {
     }
 
     #[test]
-    fn rejects_unsupported_native_templates_subcommand() {
-        let result = run_native_collection("templates", &["apply".to_string()]);
-        assert_eq!(result, ExitCode::from(2));
+    fn non_list_collection_subcommands_fall_back_to_node() {
+        assert!(!should_use_native_collection(&["apply".to_string()]));
+    }
+
+    #[test]
+    fn read_configuration_with_additional_flags_falls_back_to_node() {
+        assert!(!should_use_native_read_configuration(&[
+            "--workspace-folder".to_string(),
+            "/workspace".to_string(),
+            "--include-merged-configuration".to_string(),
+        ]));
     }
 }
