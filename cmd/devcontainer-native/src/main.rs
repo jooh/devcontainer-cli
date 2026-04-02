@@ -1,4 +1,5 @@
 use std::env;
+use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 const PHASE3_COMMANDS: [&str; 6] = [
@@ -36,6 +37,15 @@ fn emit_log(log_format: &str, message: &str) {
     }
 }
 
+fn resolve_bridge_script() -> Result<PathBuf, String> {
+    let exe_path = env::current_exe().map_err(|error| error.to_string())?;
+    let exe_dir = exe_path
+        .parent()
+        .ok_or_else(|| "Unable to determine executable directory".to_string())?;
+
+    Ok(exe_dir.join("dist/spec-node/devContainersSpecCLI.js"))
+}
+
 fn main() -> ExitCode {
     let raw_args: Vec<String> = env::args().skip(1).collect();
     if raw_args.is_empty() || raw_args[0] == "--help" || raw_args[0] == "-h" {
@@ -55,7 +65,6 @@ fn main() -> ExitCode {
     }
 
     let command = &raw_args[offset];
-    let passthrough_args = &raw_args[offset..];
 
     if !PHASE3_COMMANDS.contains(&command.as_str()) {
         eprintln!("Unsupported command: {command}");
@@ -67,9 +76,17 @@ fn main() -> ExitCode {
         "Delegating command to Node compatibility bridge.",
     );
 
+    let bridge_script = match resolve_bridge_script() {
+        Ok(path) => path,
+        Err(error) => {
+            eprintln!("Failed to resolve Node compatibility bridge path: {error}");
+            return ExitCode::from(1);
+        }
+    };
+
     let status = Command::new("node")
-        .arg("dist/spec-node/devContainersSpecCLI.js")
-        .args(passthrough_args)
+        .arg(bridge_script)
+        .args(&raw_args)
         .status();
 
     match status {
