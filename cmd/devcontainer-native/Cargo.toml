@@ -1,0 +1,9 @@
+[package]
+name = "devcontainer-native"
+version = "0.1.0"
+edition = "2021"
+description = "Native Rust foundation for devcontainer CLI"
+license = "MIT"
+publish = false
+
+[dependencies]

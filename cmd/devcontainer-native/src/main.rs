@@ -1,0 +1,85 @@
+use std::env;
+use std::process::{Command, ExitCode};
+
+const PHASE3_COMMANDS: [&str; 6] = [
+    "read-configuration",
+    "build",
+    "up",
+    "exec",
+    "features",
+    "templates",
+];
+
+fn print_help() {
+    println!("devcontainer-native (phase 3)");
+    println!("\nUsage:\n  devcontainer-native [--log-format text|json] <command> [args...]\n");
+    println!("Supported top-level commands (forwarded to Node bridge):");
+    for command in PHASE3_COMMANDS {
+        println!("  - {command}");
+    }
+}
+
+fn parse_log_format(args: &[String]) -> (&str, usize) {
+    if args.len() >= 3 && args[0] == "--log-format" {
+        return (args[1].as_str(), 2);
+    }
+    ("text", 0)
+}
+
+fn emit_log(log_format: &str, message: &str) {
+    match log_format {
+        "json" => println!(
+            "{{\"level\":\"info\",\"message\":\"{}\"}}",
+            message.replace('"', "\\\"")
+        ),
+        _ => println!("{message}"),
+    }
+}
+
+fn main() -> ExitCode {
+    let raw_args: Vec<String> = env::args().skip(1).collect();
+    if raw_args.is_empty() || raw_args[0] == "--help" || raw_args[0] == "-h" {
+        print_help();
+        return ExitCode::SUCCESS;
+    }
+
+    let (log_format, offset) = parse_log_format(&raw_args);
+    if log_format != "text" && log_format != "json" {
+        eprintln!("Unsupported log format: {log_format}");
+        return ExitCode::from(2);
+    }
+
+    if raw_args.len() <= offset {
+        print_help();
+        return ExitCode::from(2);
+    }
+
+    let command = &raw_args[offset];
+    let passthrough_args = &raw_args[offset..];
+
+    if !PHASE3_COMMANDS.contains(&command.as_str()) {
+        eprintln!("Unsupported command: {command}");
+        return ExitCode::from(2);
+    }
+
+    emit_log(
+        log_format,
+        "Delegating command to Node compatibility bridge.",
+    );
+
+    let status = Command::new("node")
+        .arg("dist/spec-node/devContainersSpecCLI.js")
+        .args(passthrough_args)
+        .status();
+
+    match status {
+        Ok(exit_status) => match exit_status.code() {
+            Some(code) => ExitCode::from(code as u8),
+            None => ExitCode::from(1),
+        },
+        Err(error) => {
+            eprintln!("Failed to invoke Node compatibility bridge: {error}");
+            ExitCode::from(1)
+        }
+    }
+}
