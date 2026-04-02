@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { evaluatePhase5, REQUIRED_PHASE5_PARITY_COMMANDS } from '../spec-node/standalonePhase5';
+import { evaluatePhase5, REQUIRED_PHASE5_PARITY_COMMANDS } from '../spec-node/migration/standalonePhase5';
 
 describe('standalone phase 5 evaluator', () => {
 	it('marks phase 5 complete when hardening and cutover checks pass', () => {

@@ -1,6 +1,6 @@
 import { expect } from 'chai';
 
-import { evaluatePhase1, REQUIRED_PHASE1_COMMANDS } from '../spec-node/standalonePhase1';
+import { evaluatePhase1, REQUIRED_PHASE1_COMMANDS } from '../spec-node/migration/standalonePhase1';
 
 describe('standalone phase 1 evaluator', () => {
 	it('marks phase 1 complete when all required checks pass', () => {
