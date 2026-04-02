@@ -9,7 +9,7 @@ on:
 jobs:
   standalone:
     permissions:
-      contents: read
+      contents: write
       id-token: write
     strategy:
       fail-fast: false
@@ -18,7 +18,7 @@ jobs:
           - target: linux-x64
             runner: ubuntu-22.04
           - target: darwin-x64
-            runner: macos-13
+            runner: macos-15-intel
           - target: darwin-arm64
             runner: macos-14
     runs-on: ${{ matrix.runner }}
@@ -64,6 +64,16 @@ jobs:
           path: |
             ${{ env.ARTIFACT }}
             dist/standalone/spec-node/**
+            ${{ env.ARTIFACT }}.sha256
+            ${{ env.ARTIFACT }}.sha256.sig
+            ${{ env.ARTIFACT }}.sha256.pem
+
+      - name: Publish standalone assets to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.ARTIFACT }}
             ${{ env.ARTIFACT }}.sha256
             ${{ env.ARTIFACT }}.sha256.sig
             ${{ env.ARTIFACT }}.sha256.pem
