@@ -124,11 +124,11 @@ This balances near-term user value with long-term maintainability.
   - See `docs/standalone/phase2.md` for the completion report and rollout notes.
 
 ### Phase 3 — Native rewrite foundation (Rust) (2–4 weeks)
-- [ ] Create `cmd/devcontainer-native` Rust crate in repo (or sibling repo with mirrored CI).
-- [ ] Implement CLI argument surface for top-level commands and help text parity.
-- [ ] Implement logging format parity (`text` / `json`) and exit code semantics.
-- [ ] Add compatibility bridge:
-  - [ ] If command not yet ported, shell out to current Node implementation.
+- [x] Create `cmd/devcontainer-native` Rust crate in repo (or sibling repo with mirrored CI).
+- [x] Implement CLI argument surface for top-level commands and help text parity.
+- [x] Implement logging format parity (`text` / `json`) and exit code semantics.
+- [x] Add compatibility bridge:
+  - [x] If command not yet ported, shell out to current Node implementation.
 
 ### Phase 4 — Port high-value command paths first (6–12+ weeks)
 - [ ] Port read-only/introspection paths first:
