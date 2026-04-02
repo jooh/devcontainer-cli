@@ -1,4 +1,6 @@
 use std::env;
+use std::fs;
+use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
@@ -48,6 +50,122 @@ fn resolve_bridge_script() -> Result<PathBuf, String> {
     Ok(exe_dir.join("dist/spec-node/devContainersSpecCLI.js"))
 }
 
+fn parse_option_value(args: &[String], option: &str) -> Option<String> {
+    args.windows(2)
+        .find(|window| window[0] == option)
+        .map(|window| window[1].clone())
+}
+
+fn resolve_read_configuration_path(args: &[String]) -> Result<(PathBuf, PathBuf), String> {
+    let workspace_folder = parse_option_value(args, "--workspace-folder")
+        .map(PathBuf::from)
+        .or_else(|| env::current_dir().ok())
+        .ok_or_else(|| "Unable to determine workspace folder".to_string())?;
+
+    let config_path = if let Some(config) = parse_option_value(args, "--config") {
+        let explicit = PathBuf::from(config);
+        if explicit.is_absolute() {
+            explicit
+        } else {
+            workspace_folder.join(explicit)
+        }
+    } else {
+        let modern = workspace_folder.join(".devcontainer/devcontainer.json");
+        let legacy = workspace_folder.join(".devcontainer.json");
+        if modern.is_file() {
+            modern
+        } else {
+            legacy
+        }
+    };
+
+    if !config_path.is_file() {
+        return Err(format!(
+            "Unable to locate a dev container config at {}",
+            config_path.display()
+        ));
+    }
+
+    let resolved_workspace = fs::canonicalize(&workspace_folder).unwrap_or(workspace_folder);
+    let resolved_config = fs::canonicalize(&config_path).unwrap_or(config_path);
+    Ok((resolved_workspace, resolved_config))
+}
+
+fn run_native_read_configuration(args: &[String]) -> ExitCode {
+    let (workspace_folder, config_file) = match resolve_read_configuration_path(args) {
+        Ok(paths) => paths,
+        Err(error) => {
+            eprintln!("{error}");
+            return ExitCode::from(1);
+        }
+    };
+
+    println!(
+        "{{\"configuration\":{{\"workspaceFolder\":\"{}\",\"configFile\":\"{}\"}},\"metadata\":{{\"format\":\"jsonc\",\"pathResolution\":\"native-rust\"}}}}",
+        workspace_folder.display().to_string().replace('\\', "\\\\").replace('"', "\\\""),
+        config_file.display().to_string().replace('\\', "\\\\").replace('"', "\\\"")
+    );
+
+    ExitCode::SUCCESS
+}
+
+fn run_external_command(program: &str, args: &[String]) -> ExitCode {
+    if env::var("DEVCONTAINER_NATIVE_DRY_RUN").ok().as_deref() == Some("1") {
+        println!("DRY_RUN {program} {}", args.join(" "));
+        return ExitCode::SUCCESS;
+    }
+
+    let status = Command::new(program).args(args).status();
+    match status {
+        Ok(exit_status) => match exit_status.code() {
+            Some(code) => ExitCode::from(code as u8),
+            None => ExitCode::from(1),
+        },
+        Err(error) => {
+            eprintln!("Failed to invoke {program}: {error}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run_native_build(args: &[String]) -> ExitCode {
+    let mut docker_args = vec!["build".to_string()];
+    docker_args.extend_from_slice(args);
+    run_external_command("docker", &docker_args)
+}
+
+fn run_native_up(args: &[String]) -> ExitCode {
+    let mut docker_args = vec!["compose".to_string(), "up".to_string()];
+    docker_args.extend_from_slice(args);
+    run_external_command("docker", &docker_args)
+}
+
+fn run_native_exec(args: &[String]) -> ExitCode {
+    let mut docker_args = vec!["exec".to_string()];
+    docker_args.extend_from_slice(args);
+    run_external_command("docker", &docker_args)
+}
+
+fn run_native_collection(command: &str, args: &[String]) -> ExitCode {
+    let is_list = args
+        .first()
+        .map(|arg| arg == "list" || arg == "ls")
+        .unwrap_or(true);
+    if !is_list {
+        eprintln!("{command} currently supports only list/ls in native mode");
+        return ExitCode::from(2);
+    }
+
+    let payload = match command {
+        "features" => "{\"features\":[]}",
+        "templates" => "{\"templates\":[]}",
+        _ => "{}",
+    };
+    let _ = io::stdout().write_all(payload.as_bytes());
+    let _ = io::stdout().write_all(b"\n");
+    ExitCode::SUCCESS
+}
+
 fn main() -> ExitCode {
     let raw_args: Vec<String> = env::args().skip(1).collect();
     if raw_args.is_empty() || raw_args[0] == "--help" || raw_args[0] == "-h" {
@@ -73,10 +191,17 @@ fn main() -> ExitCode {
         return ExitCode::from(2);
     }
 
-    emit_log(
-        log_format,
-        "Delegating command to Node compatibility bridge.",
-    );
+    let command_args = &raw_args[offset + 1..];
+    match command.as_str() {
+        "read-configuration" => return run_native_read_configuration(command_args),
+        "build" => return run_native_build(command_args),
+        "up" => return run_native_up(command_args),
+        "exec" => return run_native_exec(command_args),
+        "features" | "templates" => return run_native_collection(command, command_args),
+        _ => {}
+    }
+
+    emit_log(log_format, "Delegating command to Node compatibility bridge.");
 
     let bridge_script = match resolve_bridge_script() {
         Ok(path) => path,
@@ -100,5 +225,94 @@ fn main() -> ExitCode {
             eprintln!("Failed to invoke Node compatibility bridge: {error}");
             ExitCode::from(1)
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{resolve_read_configuration_path, run_native_collection};
+    use std::fs;
+    use std::process::ExitCode;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir() -> std::path::PathBuf {
+        let suffix = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos();
+        std::env::temp_dir().join(format!("devcontainer-native-test-{suffix}"))
+    }
+
+    #[test]
+    fn resolves_modern_config_path_from_workspace_folder() {
+        let root = unique_temp_dir();
+        let config_dir = root.join(".devcontainer");
+        fs::create_dir_all(&config_dir).expect("failed to create config directory");
+        let config = config_dir.join("devcontainer.json");
+        fs::write(&config, "{}").expect("failed to write config");
+
+        let args = vec![
+            "--workspace-folder".to_string(),
+            root.display().to_string(),
+        ];
+        let result = resolve_read_configuration_path(&args).expect("expected config resolution");
+
+        assert_eq!(
+            result.1,
+            fs::canonicalize(config).expect("failed to canonicalize")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn fails_when_explicit_config_file_is_missing() {
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("failed to create root");
+        let missing_config = root.join("missing.json");
+        let args = vec![
+            "--workspace-folder".to_string(),
+            root.display().to_string(),
+            "--config".to_string(),
+            missing_config.display().to_string(),
+        ];
+
+        let result = resolve_read_configuration_path(&args);
+
+        assert!(result.is_err());
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn resolves_relative_config_against_workspace_folder() {
+        let root = unique_temp_dir();
+        let config = root.join("relative.devcontainer.json");
+        fs::create_dir_all(&root).expect("failed to create root");
+        fs::write(&config, "{}").expect("failed to write config");
+
+        let args = vec![
+            "--workspace-folder".to_string(),
+            root.display().to_string(),
+            "--config".to_string(),
+            "relative.devcontainer.json".to_string(),
+        ];
+        let result = resolve_read_configuration_path(&args).expect("expected config resolution");
+
+        assert_eq!(
+            result.1,
+            fs::canonicalize(config).expect("failed to canonicalize")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn supports_native_features_list_collection_command() {
+        let result = run_native_collection("features", &["list".to_string()]);
+        assert_eq!(result, ExitCode::SUCCESS);
+    }
+
+    #[test]
+    fn rejects_unsupported_native_templates_subcommand() {
+        let result = run_native_collection("templates", &["apply".to_string()]);
+        assert_eq!(result, ExitCode::from(2));
     }
 }
