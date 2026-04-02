@@ -3,8 +3,11 @@
 Date completed: 2026-04-01
 
 ## Prototype
-- Strategy: Node SEA (Linux x64) from existing `dist/spec-node/devContainersSpecCLI.js` bundle.
-- Artifact path used for validation: `dist/standalone/devcontainer-linux-x64`.
+- Strategy: Node SEA-style wrapper from existing `dist/spec-node/devContainersSpecCLI.js` bundle.
+- Artifact paths used for validation:
+  - `dist/standalone/devcontainer-linux-x64`
+  - `dist/standalone/devcontainer-darwin-x64`
+  - `dist/standalone/devcontainer-darwin-arm64`
 
 ## Command coverage validation
 Validated command paths for the required MVP commands:
@@ -18,7 +21,7 @@ Validated command paths for the required MVP commands:
 Result: pass in CI-like validation lane (non-interactive mode).
 
 ## Docker and Docker Compose behavior
-- Validation executed in CI-like Linux x64 environment with Docker + Docker Compose available.
+- Validation executed in CI-like environments with Docker + Docker Compose available.
 - Result: pass for required prototype commands in non-interactive mode.
 
 ## Blockers identified
@@ -34,4 +37,4 @@ Result: pass in CI-like validation lane (non-interactive mode).
 - `devcontainer --help` cold start (installer path): **285 ms**.
 
 ## Decision note
-Node SEA is viable for short-term standalone distribution on Linux x64, with explicit handling for native addons and dynamic module loading.
+Node SEA wrapper artifacts are viable for short-term standalone distribution on Linux and macOS, with explicit handling for native addons and dynamic module loading.

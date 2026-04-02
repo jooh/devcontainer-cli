@@ -7,14 +7,26 @@ on:
       - 'v*'
 
 jobs:
-  standalone-linux-x64:
+  standalone:
     permissions:
       contents: read
       id-token: write
-    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-22.04
+          - target: darwin-x64
+            runner: macos-13
+          - target: darwin-arm64
+            runner: macos-14
+    runs-on: ${{ matrix.runner }}
     env:
       SOURCE_DATE_EPOCH: '1704067200'
       NODE_VERSION: '20.19.1'
+      TARGET: ${{ matrix.target }}
+      ARTIFACT: dist/standalone/devcontainer-${{ matrix.target }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,25 +42,28 @@ jobs:
       - name: Build production bundle
         run: npm run compile-prod
 
-      - name: Build standalone Linux x64 artifact
-        run: scripts/standalone/build-linux-x64.sh
+      - name: Build standalone artifact
+        run: scripts/standalone/build.sh "$TARGET"
 
       - name: Standalone smoke tests
-        run: scripts/standalone/smoke.sh dist/standalone/devcontainer-linux-x64
+        run: scripts/standalone/smoke.sh "$ARTIFACT"
 
       - name: Create checksums
-        run: sha256sum dist/standalone/devcontainer-linux-x64 > dist/standalone/devcontainer-linux-x64.sha256
+        run: shasum -a 256 "$ARTIFACT" > "$ARTIFACT.sha256"
+
+      - name: Install Cosign
+        uses: sigstore/cosign-installer@v3.8.1
 
       - name: Sign checksums with cosign (keyless)
-        run: cosign sign-blob --yes dist/standalone/devcontainer-linux-x64.sha256 --output-signature dist/standalone/devcontainer-linux-x64.sha256.sig --output-certificate dist/standalone/devcontainer-linux-x64.sha256.pem
+        run: cosign sign-blob --yes "$ARTIFACT.sha256" --output-signature "$ARTIFACT.sha256.sig" --output-certificate "$ARTIFACT.sha256.pem"
 
       - name: Upload standalone artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: devcontainer-linux-x64-standalone
+          name: devcontainer-${{ matrix.target }}-standalone
           path: |
-            dist/standalone/devcontainer-linux-x64
+            ${{ env.ARTIFACT }}
             dist/standalone/spec-node/**
-            dist/standalone/devcontainer-linux-x64.sha256
-            dist/standalone/devcontainer-linux-x64.sha256.sig
-            dist/standalone/devcontainer-linux-x64.sha256.pem
+            ${{ env.ARTIFACT }}.sha256
+            ${{ env.ARTIFACT }}.sha256.sig
+            ${{ env.ARTIFACT }}.sha256.pem
