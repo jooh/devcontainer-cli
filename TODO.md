@@ -173,3 +173,55 @@ This balances near-term user value with long-term maintainability.
 - [x] Create a short decision memo: SEA viability vs packager alternatives.
 - [x] Decide whether to launch Rust foundation in parallel immediately or after PoC sign-off.
   - Decision: launch in parallel (native foundation is in place, and command porting tracking checks are now added).
+
+---
+
+## Phase: Upstream submodule cutover (`upstream/`)
+
+### Objective
+Move all vendored upstream TypeScript CLI sources out of repo root and treat `upstream/` (git submodule) as the canonical upstream baseline we target for compatibility.
+
+### 1) Repository layout and ownership
+- [ ] Confirm `upstream/` is the only place where upstream devcontainers/cli code lives.
+- [ ] Remove duplicated upstream-owned files currently checked in at repository root once replacements are wired.
+- [ ] Keep only project-owned integration/porting assets at repository root (Rust code, migration docs, compatibility harness, and project-specific tests).
+- [ ] Add/refresh `.gitmodules` and contributor guidance so updating upstream is intentional and reviewable.
+
+### 2) Build/test path migration
+- [ ] Audit all test fixtures, scripts, and build commands that currently reference root-level upstream paths.
+- [ ] Rewrite references to point at `upstream/...` explicitly (including npm/yarn commands, fixture paths, and script helpers).
+- [ ] Introduce shared path helpers (where practical) to avoid hardcoded duplicate path strings in tests.
+- [ ] Ensure CI jobs execute against `upstream/` sources and fail fast when submodule is missing/uninitialized.
+
+### 3) Compatibility target versioning
+- [ ] Define the compatibility contract as: “this repo targets the exact commit pinned in `upstream/`.”
+- [ ] Expose the pinned upstream commit in test output/logging for traceability.
+- [ ] Add a dedicated CI check that reports diffs/regressions when submodule commit changes.
+- [ ] Create an “update upstream” workflow (bump submodule -> run parity suite -> fix breakages -> merge).
+
+### 4) Documentation updates
+- [ ] Update `README.md` with:
+  - [ ] why `upstream/` exists,
+  - [ ] how to clone/init submodules,
+  - [ ] what to run when submodule is not initialized,
+  - [ ] how compatibility testing maps to the pinned upstream revision.
+- [ ] Add/update root `AGENTS.md` with contributor/agent rules for:
+  - [ ] where upstream code must live (`upstream/` only),
+  - [ ] where project-owned changes should be made,
+  - [ ] how to perform/validate submodule bumps.
+- [ ] Add a short migration note in changelog or docs index once root-level upstream code is removed.
+
+### 5) Execution plan and rollout
+- [ ] Land this as staged PRs to reduce risk:
+  1. [ ] docs + guardrails (`README.md`, `AGENTS.md`, CI checks),
+  2. [ ] path rewrites in tests/scripts,
+  3. [ ] removal of duplicated root upstream code,
+  4. [ ] final parity + cleanup.
+- [ ] Run full parity/integration suite before and after each stage to isolate regressions.
+- [ ] Gate final removal behind green CI across at least one Linux x64 lane.
+
+### Exit criteria
+- [ ] No tests/build scripts depend on root-level upstream copies.
+- [ ] `upstream/` submodule commit is the declared compatibility baseline.
+- [ ] Docs clearly explain contributor workflow for submodule init/update.
+- [ ] CI protects against accidental drift or missing submodule checkout.

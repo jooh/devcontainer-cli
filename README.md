@@ -2,6 +2,25 @@
 
 This repository is a Rust port of [devcontainer](https://github.com/devcontainers/cli) CLI. Work in progress, use at own risk.
 
+## Repository layout and upstream compatibility
+
+This repo now tracks the upstream TypeScript implementation as a git submodule at [`upstream/`](./upstream). The pinned submodule commit is the compatibility baseline for this project: when we say we are compatible with upstream, we mean compatible with that exact revision.
+
+- `upstream/`: unmodified upstream devcontainers/cli sources (baseline under test).
+- repository root: project-owned Rust port, migration tooling, compatibility tests, and docs.
+
+When updating upstream, prefer an explicit workflow:
+1. Bump the `upstream/` submodule commit.
+2. Run parity/compatibility tests against the new pinned revision.
+3. Fix regressions in project-owned code.
+4. Merge once CI is green.
+
+If you clone this repository without submodules, initialize them before building/testing:
+
+```bash
+git submodule update --init --recursive
+```
+
 ## Context
 
 A development container allows you to use a container as a full-featured development environment. It can be used to run an application, to separate tools, libraries, or runtimes needed for working with a codebase, and to aid in continuous integration and testing. Dev containers can be run locally or remotely, in a private or public cloud.
@@ -143,6 +162,12 @@ The [example-usage](./example-usage) folder contains some simple shell scripts t
 ## Build from sources
 
 This repository has a [dev container configuration](https://github.com/devcontainers/cli/tree/main/.devcontainer), which you can use to ensure you have the right dependencies installed.
+
+If you have not initialized submodules yet, run:
+
+```sh
+git submodule update --init --recursive
+```
 
 Compile the CLI with yarn:
 ```sh
