@@ -27,6 +27,7 @@ jobs:
       NODE_VERSION: '20.19.1'
       TARGET: ${{ matrix.target }}
       ARTIFACT: dist/standalone/devcontainer-${{ matrix.target }}
+      RUNTIME_BUNDLE: dist/standalone/devcontainer-${{ matrix.target }}-runtime.tar.gz
     steps:
       - uses: actions/checkout@v4
 
@@ -48,14 +49,23 @@ jobs:
       - name: Standalone smoke tests
         run: scripts/standalone/smoke.sh "$ARTIFACT"
 
+      - name: Package standalone runtime payload
+        run: tar -czf "$RUNTIME_BUNDLE" -C dist/standalone "$(basename "$ARTIFACT")" spec-node
+
       - name: Create checksums
-        run: shasum -a 256 "$ARTIFACT" > "$ARTIFACT.sha256"
+        run: |
+          for file in "$ARTIFACT" "$RUNTIME_BUNDLE"; do
+            shasum -a 256 "$file" > "$file.sha256"
+          done
 
       - name: Install Cosign
         uses: sigstore/cosign-installer@v3.8.1
 
       - name: Sign checksums with cosign (keyless)
-        run: cosign sign-blob --yes "$ARTIFACT.sha256" --output-signature "$ARTIFACT.sha256.sig" --output-certificate "$ARTIFACT.sha256.pem"
+        run: |
+          for file in "$ARTIFACT" "$RUNTIME_BUNDLE"; do
+            cosign sign-blob --yes "$file.sha256" --output-signature "$file.sha256.sig" --output-certificate "$file.sha256.pem"
+          done
 
       - name: Upload standalone artifacts
         uses: actions/upload-artifact@v4
@@ -64,9 +74,13 @@ jobs:
           path: |
             ${{ env.ARTIFACT }}
             dist/standalone/spec-node/**
+            ${{ env.RUNTIME_BUNDLE }}
             ${{ env.ARTIFACT }}.sha256
             ${{ env.ARTIFACT }}.sha256.sig
             ${{ env.ARTIFACT }}.sha256.pem
+            ${{ env.RUNTIME_BUNDLE }}.sha256
+            ${{ env.RUNTIME_BUNDLE }}.sha256.sig
+            ${{ env.RUNTIME_BUNDLE }}.sha256.pem
 
       - name: Publish standalone assets to GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
@@ -74,6 +88,10 @@ jobs:
         with:
           files: |
             ${{ env.ARTIFACT }}
+            ${{ env.RUNTIME_BUNDLE }}
             ${{ env.ARTIFACT }}.sha256
             ${{ env.ARTIFACT }}.sha256.sig
             ${{ env.ARTIFACT }}.sha256.pem
+            ${{ env.RUNTIME_BUNDLE }}.sha256
+            ${{ env.RUNTIME_BUNDLE }}.sha256.sig
+            ${{ env.RUNTIME_BUNDLE }}.sha256.pem
