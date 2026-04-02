@@ -3,14 +3,14 @@
 Date completed: 2026-04-01
 
 ## Reproducible standalone build pipeline
-- Added a deterministic standalone release workflow for Linux x64 artifacts.
+- Added a deterministic standalone release workflow for Linux x64 and macOS (x64 + arm64) artifacts.
 - Build inputs are pinned and reproducibility is enforced via deterministic bundle + artifact checksums.
 - Workflow path: `.github/workflows/standalone-release.yml`.
 
 ## Signing strategy
-- Linux standalone artifacts are signed using keyless Sigstore/Cosign in CI.
-- Public checksums and signature material are published with each standalone release.
-- Notarization remains deferred for non-Linux targets while Linux x64 is the only supported standalone channel.
+- Standalone artifacts are signed using keyless Sigstore/Cosign in CI.
+- Public checksums and signature material are published with each standalone release target.
+- macOS notarization remains deferred while the channel is marked experimental.
 
 ## Packaged executable smoke/integration lane
 - Added a `standalone-smoke` lane that executes packaged binary tests (instead of `node ...`).
