@@ -1,4 +1,4 @@
-export const REQUIRED_PHASE1_COMMANDS = [
+export const REQUIRED_PROTOTYPE_COMMANDS = [
 	'up',
 	'build',
 	'exec',
@@ -7,19 +7,19 @@ export const REQUIRED_PHASE1_COMMANDS = [
 	'templates',
 ] as const;
 
-export type Phase1Command = (typeof REQUIRED_PHASE1_COMMANDS)[number];
+export type PrototypeCommand = (typeof REQUIRED_PROTOTYPE_COMMANDS)[number];
 
 interface CheckResult {
 	ok: boolean;
 	details?: string;
 }
 
-interface Phase1Input {
+interface PrototypeReadinessInput {
 	prototype: {
 		strategy: 'node-sea' | 'pkg' | 'nexe' | 'other';
 		binaryPath: string;
 	};
-	commandCoverage: Partial<Record<Phase1Command, CheckResult>>;
+	commandCoverage: Partial<Record<PrototypeCommand, CheckResult>>;
 	composeValidation: CheckResult;
 	blockers: Array<{ id: string; severity: 'low' | 'medium' | 'high'; mitigation: string }>;
 	benchmarks: {
@@ -30,17 +30,17 @@ interface Phase1Input {
 	};
 }
 
-interface Phase1Evaluation {
+interface PrototypeReadinessEvaluation {
 	complete: boolean;
 	summary: string;
 	missingChecks: Array<'prototype' | 'command-coverage' | 'compose-validation' | 'blockers' | 'benchmarks'>;
 }
 
-function hasCommandCoverage(commandCoverage: Phase1Input['commandCoverage']) {
-	return REQUIRED_PHASE1_COMMANDS.every(command => commandCoverage[command]?.ok === true);
+function hasCommandCoverage(commandCoverage: PrototypeReadinessInput['commandCoverage']) {
+	return REQUIRED_PROTOTYPE_COMMANDS.every(command => commandCoverage[command]?.ok === true);
 }
 
-function hasBenchmarkComparison(benchmarks: Phase1Input['benchmarks']) {
+function hasBenchmarkComparison(benchmarks: PrototypeReadinessInput['benchmarks']) {
 	return Number.isFinite(benchmarks.standaloneSizeBytes)
 		&& Number.isFinite(benchmarks.baselineSizeBytes)
 		&& Number.isFinite(benchmarks.standaloneHelpColdStartMs)
@@ -51,8 +51,8 @@ function hasBenchmarkComparison(benchmarks: Phase1Input['benchmarks']) {
 		&& benchmarks.baselineHelpColdStartMs > 0;
 }
 
-export function evaluatePhase1(input: Phase1Input): Phase1Evaluation {
-	const missingChecks: Phase1Evaluation['missingChecks'] = [];
+export function evaluatePrototypeReadiness(input: PrototypeReadinessInput): PrototypeReadinessEvaluation {
+	const missingChecks: PrototypeReadinessEvaluation['missingChecks'] = [];
 
 	if (!input.prototype.binaryPath.trim()) {
 		missingChecks.push('prototype');
@@ -73,14 +73,14 @@ export function evaluatePhase1(input: Phase1Input): Phase1Evaluation {
 	if (!missingChecks.length) {
 		return {
 			complete: true,
-			summary: `Phase 1 complete via ${input.prototype.strategy} prototype at ${input.prototype.binaryPath}.`,
+			summary: `Prototype readiness complete via ${input.prototype.strategy} prototype at ${input.prototype.binaryPath}.`,
 			missingChecks,
 		};
 	}
 
 	return {
 		complete: false,
-		summary: `Phase 1 incomplete. Missing: ${missingChecks.join(', ')}.`,
+		summary: `Prototype readiness incomplete. Missing: ${missingChecks.join(', ')}.`,
 		missingChecks,
 	};
 }

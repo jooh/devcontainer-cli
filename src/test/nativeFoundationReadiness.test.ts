@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 
-import { evaluatePhase3, REQUIRED_PHASE3_TOP_LEVEL_COMMANDS } from '../spec-node/migration/standalonePhase3';
+import { evaluateNativeFoundationReadiness, REQUIRED_NATIVE_FOUNDATION_TOP_LEVEL_COMMANDS } from '../spec-node/migration/nativeFoundationReadiness';
 
-describe('standalone phase 3 evaluator', () => {
-	it('marks phase 3 complete when native foundation checks pass', () => {
-		const result = evaluatePhase3({
+describe('native foundation readiness evaluator', () => {
+	it('marks native foundation readiness complete when native foundation checks pass', () => {
+		const result = evaluateNativeFoundationReadiness({
 			rustCrate: {
 				ok: true,
 				cratePath: 'cmd/devcontainer-native',
@@ -12,7 +12,7 @@ describe('standalone phase 3 evaluator', () => {
 			},
 			cliParity: {
 				ok: true,
-				topLevelCommands: [...REQUIRED_PHASE3_TOP_LEVEL_COMMANDS],
+				topLevelCommands: [...REQUIRED_NATIVE_FOUNDATION_TOP_LEVEL_COMMANDS],
 				helpParity: true,
 			},
 			loggingAndExitCodes: {
@@ -29,11 +29,11 @@ describe('standalone phase 3 evaluator', () => {
 		});
 
 		expect(result.complete).to.equal(true);
-		expect(result.summary).to.include('Phase 3 complete');
+		expect(result.summary).to.include('Native foundation readiness complete');
 	});
 
-	it('fails phase 3 completion when fallback bridge is missing', () => {
-		const result = evaluatePhase3({
+	it('fails native foundation readiness when fallback bridge is missing', () => {
+		const result = evaluateNativeFoundationReadiness({
 			rustCrate: {
 				ok: true,
 				cratePath: 'cmd/devcontainer-native',
@@ -41,7 +41,7 @@ describe('standalone phase 3 evaluator', () => {
 			},
 			cliParity: {
 				ok: true,
-				topLevelCommands: [...REQUIRED_PHASE3_TOP_LEVEL_COMMANDS],
+				topLevelCommands: [...REQUIRED_NATIVE_FOUNDATION_TOP_LEVEL_COMMANDS],
 				helpParity: true,
 			},
 			loggingAndExitCodes: {

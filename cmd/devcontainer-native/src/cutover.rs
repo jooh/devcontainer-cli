@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-pub const REQUIRED_PHASE5_PARITY_COMMANDS: [&str; 6] = [
+pub const REQUIRED_CUTOVER_PARITY_COMMANDS: [&str; 6] = [
     "read-configuration",
     "build",
     "up",
@@ -36,7 +36,7 @@ pub struct FallbackRemovalInput {
     pub planned: bool,
 }
 
-pub struct Phase5Input {
+pub struct CutoverReadinessInput {
     pub integration_parity: IntegrationParityInput,
     pub performance_benchmarks: PerformanceBenchmarksInput,
     pub default_release_cutover: DefaultReleaseCutoverInput,
@@ -44,7 +44,7 @@ pub struct Phase5Input {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Phase5MissingCheck {
+pub enum CutoverMissingCheck {
     IntegrationParity,
     PerformanceBenchmarks,
     DefaultReleaseCutover,
@@ -52,10 +52,10 @@ pub enum Phase5MissingCheck {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Phase5Evaluation {
+pub struct CutoverReadinessEvaluation {
     pub complete: bool,
     pub summary: String,
-    pub missing_checks: Vec<Phase5MissingCheck>,
+    pub missing_checks: Vec<CutoverMissingCheck>,
 }
 
 fn has_integration_parity(input: &IntegrationParityInput) -> bool {
@@ -69,7 +69,7 @@ fn has_integration_parity(input: &IntegrationParityInput) -> bool {
     input.ok
         && !input.baseline.trim().is_empty()
         && !input.parity_suite_path.trim().is_empty()
-        && REQUIRED_PHASE5_PARITY_COMMANDS
+        && REQUIRED_CUTOVER_PARITY_COMMANDS
             .iter()
             .all(|required| commands.contains(required))
 }
@@ -89,30 +89,30 @@ fn has_fallback_removal(input: &FallbackRemovalInput) -> bool {
     input.ok && !input.criteria.trim().is_empty() && !input.removal_issue.trim().is_empty() && input.planned
 }
 
-pub fn evaluate_phase5(input: &Phase5Input) -> Phase5Evaluation {
+pub fn evaluate_cutover(input: &CutoverReadinessInput) -> CutoverReadinessEvaluation {
     let mut missing_checks = Vec::new();
 
     if !has_integration_parity(&input.integration_parity) {
-        missing_checks.push(Phase5MissingCheck::IntegrationParity);
+        missing_checks.push(CutoverMissingCheck::IntegrationParity);
     }
 
     if !has_performance_benchmarks(&input.performance_benchmarks) {
-        missing_checks.push(Phase5MissingCheck::PerformanceBenchmarks);
+        missing_checks.push(CutoverMissingCheck::PerformanceBenchmarks);
     }
 
     if !has_default_release_cutover(&input.default_release_cutover) {
-        missing_checks.push(Phase5MissingCheck::DefaultReleaseCutover);
+        missing_checks.push(CutoverMissingCheck::DefaultReleaseCutover);
     }
 
     if !has_fallback_removal(&input.fallback_removal) {
-        missing_checks.push(Phase5MissingCheck::FallbackRemoval);
+        missing_checks.push(CutoverMissingCheck::FallbackRemoval);
     }
 
     if missing_checks.is_empty() {
-        return Phase5Evaluation {
+        return CutoverReadinessEvaluation {
             complete: true,
             summary: format!(
-                "Phase 5 complete with parity suite at {}.",
+                "Cutover readiness complete with parity suite at {}.",
                 input.integration_parity.parity_suite_path
             ),
             missing_checks,
@@ -122,17 +122,17 @@ pub fn evaluate_phase5(input: &Phase5Input) -> Phase5Evaluation {
     let missing_labels = missing_checks
         .iter()
         .map(|missing_check| match missing_check {
-            Phase5MissingCheck::IntegrationParity => "integration-parity",
-            Phase5MissingCheck::PerformanceBenchmarks => "performance-benchmarks",
-            Phase5MissingCheck::DefaultReleaseCutover => "default-release-cutover",
-            Phase5MissingCheck::FallbackRemoval => "fallback-removal",
+            CutoverMissingCheck::IntegrationParity => "integration-parity",
+            CutoverMissingCheck::PerformanceBenchmarks => "performance-benchmarks",
+            CutoverMissingCheck::DefaultReleaseCutover => "default-release-cutover",
+            CutoverMissingCheck::FallbackRemoval => "fallback-removal",
         })
         .collect::<Vec<_>>()
         .join(", ");
 
-    Phase5Evaluation {
+    CutoverReadinessEvaluation {
         complete: false,
-        summary: format!("Phase 5 incomplete. Missing: {missing_labels}."),
+        summary: format!("Cutover readiness incomplete. Missing: {missing_labels}."),
         missing_checks,
     }
 }
@@ -141,20 +141,20 @@ pub fn evaluate_phase5(input: &Phase5Input) -> Phase5Evaluation {
 mod tests {
     use super::*;
 
-    fn complete_input() -> Phase5Input {
-        Phase5Input {
+    fn complete_input() -> CutoverReadinessInput {
+        CutoverReadinessInput {
             integration_parity: IntegrationParityInput {
                 ok: true,
                 baseline: "node-cli".to_string(),
                 parity_suite_path: "src/test/native-parity".to_string(),
-                covered_commands: REQUIRED_PHASE5_PARITY_COMMANDS
+                covered_commands: REQUIRED_CUTOVER_PARITY_COMMANDS
                     .iter()
                     .map(|command| (*command).to_string())
                     .collect(),
             },
             performance_benchmarks: PerformanceBenchmarksInput {
                 ok: true,
-                report_path: "docs/standalone/phase5.md".to_string(),
+                report_path: "docs/standalone/cutover.md".to_string(),
                 startup_latency_ms: 220,
                 peak_memory_mb: 96,
             },
@@ -173,26 +173,26 @@ mod tests {
     }
 
     #[test]
-    fn marks_phase5_complete_when_all_checks_pass() {
+    fn marks_cutover_complete_when_all_checks_pass() {
         let input = complete_input();
-        let result = evaluate_phase5(&input);
+        let result = evaluate_cutover(&input);
 
         assert!(result.complete);
-        assert!(result.summary.contains("Phase 5 complete"));
+        assert!(result.summary.contains("Cutover readiness complete"));
         assert!(result.missing_checks.is_empty());
     }
 
     #[test]
-    fn fails_phase5_when_parity_coverage_is_incomplete() {
+    fn fails_cutover_when_parity_coverage_is_incomplete() {
         let mut input = complete_input();
         input.integration_parity.covered_commands = vec!["read-configuration".to_string(), "build".to_string()];
 
-        let result = evaluate_phase5(&input);
+        let result = evaluate_cutover(&input);
 
         assert!(!result.complete);
         assert_eq!(
             result.missing_checks,
-            vec![Phase5MissingCheck::IntegrationParity]
+            vec![CutoverMissingCheck::IntegrationParity]
         );
     }
 }

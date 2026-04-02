@@ -27,7 +27,7 @@ interface ExperimentalChannelInput extends CheckResult {
 	published: boolean;
 }
 
-interface Phase2Input {
+interface DistributionReadinessInput {
 	reproducibleBuild: ReproducibleBuildInput;
 	signing: SigningInput;
 	packagedSmokeTests: PackagedSmokeTestsInput;
@@ -35,7 +35,7 @@ interface Phase2Input {
 	experimentalChannel: ExperimentalChannelInput;
 }
 
-interface Phase2Evaluation {
+interface DistributionReadinessEvaluation {
 	complete: boolean;
 	summary: string;
 	missingChecks: Array<
@@ -73,8 +73,8 @@ function hasExperimentalChannel(input: ExperimentalChannelInput) {
 	return input.ok && input.artifactSuffix.trim().length > 0 && input.published;
 }
 
-export function evaluatePhase2(input: Phase2Input): Phase2Evaluation {
-	const missingChecks: Phase2Evaluation['missingChecks'] = [];
+export function evaluateDistributionReadiness(input: DistributionReadinessInput): DistributionReadinessEvaluation {
+	const missingChecks: DistributionReadinessEvaluation['missingChecks'] = [];
 
 	if (!hasReproducibleBuild(input.reproducibleBuild)) {
 		missingChecks.push('reproducible-build');
@@ -95,14 +95,14 @@ export function evaluatePhase2(input: Phase2Input): Phase2Evaluation {
 	if (!missingChecks.length) {
 		return {
 			complete: true,
-			summary: `Phase 2 complete with reproducible builds in ${input.reproducibleBuild.workflowPath}.`,
+			summary: `Distribution readiness complete with reproducible builds in ${input.reproducibleBuild.workflowPath}.`,
 			missingChecks,
 		};
 	}
 
 	return {
 		complete: false,
-		summary: `Phase 2 incomplete. Missing: ${missingChecks.join(', ')}.`,
+		summary: `Distribution readiness incomplete. Missing: ${missingChecks.join(', ')}.`,
 		missingChecks,
 	};
 }

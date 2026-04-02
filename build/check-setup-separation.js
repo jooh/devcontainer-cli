@@ -10,14 +10,14 @@ const path = require('path');
 
 const specNodeRoot = path.join(__dirname, '..', 'src', 'spec-node');
 const migrationNamespace = path.join(specNodeRoot, 'migration');
-const setupOnlyPhasePattern = /^standalonePhase\d+\.ts$/;
+const setupOnlyReadinessPattern = /(?:.*Readiness)\.ts$/;
 
 const offenders = fs.readdirSync(specNodeRoot)
-	.filter(entry => setupOnlyPhasePattern.test(entry))
+	.filter(entry => setupOnlyReadinessPattern.test(entry))
 	.map(entry => path.join(specNodeRoot, entry));
 
 if (offenders.length) {
-	console.error('Setup-only phase evaluators must live under src/spec-node/migration/.');
+	console.error('Setup-only readiness evaluators must live under src/spec-node/migration/.');
 	offenders.forEach(offender => {
 		const relative = path.relative(path.join(__dirname, '..'), offender);
 		console.error(` - ${relative}`);

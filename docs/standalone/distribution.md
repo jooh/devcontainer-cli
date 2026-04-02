@@ -1,4 +1,4 @@
-# Phase 2 — Productionize short-term binary distribution (completed)
+# Standalone distribution report (completed)
 
 Date completed: 2026-04-01
 

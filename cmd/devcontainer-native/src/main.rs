@@ -4,10 +4,10 @@ use std::io::{self, Write};
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
-mod phase4;
-mod phase5;
+mod command_porting;
+mod cutover;
 
-const PHASE3_COMMANDS: [&str; 6] = [
+const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 6] = [
     "read-configuration",
     "build",
     "up",
@@ -17,10 +17,10 @@ const PHASE3_COMMANDS: [&str; 6] = [
 ];
 
 fn print_help() {
-    println!("devcontainer-native (phase 3)");
+    println!("devcontainer-native (native foundation)");
     println!("\nUsage:\n  devcontainer-native [--log-format text|json] <command> [args...]\n");
     println!("Supported top-level commands (forwarded to Node bridge):");
-    for command in PHASE3_COMMANDS {
+    for command in SUPPORTED_TOP_LEVEL_COMMANDS {
         println!("  - {command}");
     }
 }
@@ -172,7 +172,7 @@ fn main() -> ExitCode {
 
     let command = &raw_args[offset];
 
-    if !PHASE3_COMMANDS.contains(&command.as_str()) {
+    if !SUPPORTED_TOP_LEVEL_COMMANDS.contains(&command.as_str()) {
         eprintln!("Unsupported command: {command}");
         return ExitCode::from(2);
     }

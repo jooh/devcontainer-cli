@@ -1,6 +1,6 @@
-# Phase 5 Hardening and Cutover Report
+# Hardening and cutover report
 
-This report records completion evidence for the Phase 5 TODO items:
+This report records completion evidence for the hardening and cutover TODO items:
 
 - Full integration parity suite against Node baseline.
 - Performance and resource benchmarking.
@@ -12,13 +12,13 @@ This report records completion evidence for the Phase 5 TODO items:
 - Baseline: Node CLI behavior compared against `devcontainer-native` command flows.
 - Coverage scope: `read-configuration`, `build`, `up`, `exec`, `features`, and `templates`.
 - Automation entrypoints:
-  - `src/test/standalonePhase5.test.ts` (phase gating checks)
-  - `cmd/devcontainer-native/src/phase5.rs` tests (native progress checks)
+  - `src/test/cutoverReadiness.test.ts` (readiness gating checks)
+  - `cmd/devcontainer-native/src/cutover.rs` tests (native progress checks)
 
 ## Performance and resource benchmark targets
 
-- Startup latency target retained from prior phases: `devcontainer --help` <= 300 ms.
-- Current measured placeholder budget check for phase tracking:
+- Startup latency target retained from earlier implementation steps: `devcontainer --help` <= 300 ms.
+- Current measured placeholder budget check for readiness tracking:
   - startup latency: 220 ms
   - peak memory: 96 MB
 
