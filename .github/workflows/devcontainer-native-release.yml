@@ -5,6 +5,10 @@ on:
     branches:
       - main
 
+concurrency:
+  group: devcontainer-native-release-${{ github.ref }}
+  cancel-in-progress: false
+
 permissions:
   contents: write
 
@@ -83,6 +87,7 @@ jobs:
 
           gh release create "$tag" \
             --target "$GITHUB_SHA" \
+            --fail-on-no-commits \
             --title "devcontainer-native v${version}" \
             --notes "Automated release for devcontainer-native v${version}." \
             "$artifact" \
