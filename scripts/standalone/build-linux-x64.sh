@@ -3,7 +3,7 @@ set -euo pipefail
 
 mkdir -p dist/standalone/spec-node
 
-# Phase-2 placeholder build contract:
+# Standalone distribution placeholder build contract:
 # package a runnable wrapper plus the JS payload to emulate a standalone artifact.
 # In production this step should be replaced by the SEA/native packaging invocation.
 cp -R dist/spec-node/. dist/standalone/spec-node/

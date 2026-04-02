@@ -3,7 +3,7 @@ interface CheckResult {
 	details?: string;
 }
 
-export const REQUIRED_PHASE5_PARITY_COMMANDS = [
+export const REQUIRED_CUTOVER_PARITY_COMMANDS = [
 	'read-configuration',
 	'build',
 	'up',
@@ -35,14 +35,14 @@ interface FallbackRemovalInput extends CheckResult {
 	planned: boolean;
 }
 
-interface Phase5Input {
+interface CutoverReadinessInput {
 	integrationParity: IntegrationParityInput;
 	performanceBenchmarks: PerformanceBenchmarkInput;
 	defaultReleaseCutover: DefaultReleaseCutoverInput;
 	fallbackRemoval: FallbackRemovalInput;
 }
 
-interface Phase5Evaluation {
+interface CutoverReadinessEvaluation {
 	complete: boolean;
 	summary: string;
 	missingChecks: Array<
@@ -57,7 +57,7 @@ function hasIntegrationParity(input: IntegrationParityInput) {
 	return input.ok
 		&& input.baseline.trim().length > 0
 		&& input.paritySuitePath.trim().length > 0
-		&& REQUIRED_PHASE5_PARITY_COMMANDS.every(command => commands.has(command));
+		&& REQUIRED_CUTOVER_PARITY_COMMANDS.every(command => commands.has(command));
 }
 
 function hasPerformanceBenchmarks(input: PerformanceBenchmarkInput) {
@@ -80,8 +80,8 @@ function hasFallbackRemovalPlan(input: FallbackRemovalInput) {
 		&& input.planned;
 }
 
-export function evaluatePhase5(input: Phase5Input): Phase5Evaluation {
-	const missingChecks: Phase5Evaluation['missingChecks'] = [];
+export function evaluateCutoverReadiness(input: CutoverReadinessInput): CutoverReadinessEvaluation {
+	const missingChecks: CutoverReadinessEvaluation['missingChecks'] = [];
 
 	if (!hasIntegrationParity(input.integrationParity)) {
 		missingChecks.push('integration-parity');
@@ -99,14 +99,14 @@ export function evaluatePhase5(input: Phase5Input): Phase5Evaluation {
 	if (!missingChecks.length) {
 		return {
 			complete: true,
-			summary: `Phase 5 complete with parity suite at ${input.integrationParity.paritySuitePath}.`,
+			summary: `Cutover readiness complete with parity suite at ${input.integrationParity.paritySuitePath}.`,
 			missingChecks,
 		};
 	}
 
 	return {
 		complete: false,
-		summary: `Phase 5 incomplete. Missing: ${missingChecks.join(', ')}.`,
+		summary: `Cutover readiness incomplete. Missing: ${missingChecks.join(', ')}.`,
 		missingChecks,
 	};
 }

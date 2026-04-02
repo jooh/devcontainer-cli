@@ -1,10 +1,10 @@
 import { expect } from 'chai';
 
-import { evaluatePhase2 } from '../spec-node/migration/standalonePhase2';
+import { evaluateDistributionReadiness } from '../spec-node/migration/distributionReadiness';
 
-describe('standalone phase 2 evaluator', () => {
-	it('marks phase 2 complete when all productionization checks pass', () => {
-		const result = evaluatePhase2({
+describe('distribution readiness evaluator', () => {
+	it('marks distribution readiness complete when all productionization checks pass', () => {
+		const result = evaluateDistributionReadiness({
 			reproducibleBuild: {
 				ok: true,
 				workflowPath: '.github/workflows/standalone-release.yml',
@@ -21,7 +21,7 @@ describe('standalone phase 2 evaluator', () => {
 			},
 			releaseDocs: {
 				ok: true,
-				docPath: 'docs/standalone/phase2.md',
+				docPath: 'docs/standalone/distribution.md',
 				fallbackInstaller: 'npm i -g @devcontainers/cli',
 			},
 			experimentalChannel: {
@@ -32,12 +32,12 @@ describe('standalone phase 2 evaluator', () => {
 		});
 
 		expect(result.complete).to.equal(true);
-		expect(result.summary).to.include('Phase 2 complete');
+		expect(result.summary).to.include('Distribution readiness complete');
 	});
 
 
-	it('fails phase 2 completion when smoke lane omits required commands', () => {
-		const result = evaluatePhase2({
+	it('fails distribution readiness when smoke lane omits required commands', () => {
+		const result = evaluateDistributionReadiness({
 			reproducibleBuild: {
 				ok: true,
 				workflowPath: '.github/workflows/standalone-release.yml',
@@ -54,7 +54,7 @@ describe('standalone phase 2 evaluator', () => {
 			},
 			releaseDocs: {
 				ok: true,
-				docPath: 'docs/standalone/phase2.md',
+				docPath: 'docs/standalone/distribution.md',
 				fallbackInstaller: 'npm i -g @devcontainers/cli',
 			},
 			experimentalChannel: {
@@ -68,8 +68,8 @@ describe('standalone phase 2 evaluator', () => {
 		expect(result.missingChecks).to.deep.equal(['packaged-smoke-tests']);
 	});
 
-	it('fails phase 2 completion when standalone smoke lane is missing', () => {
-		const result = evaluatePhase2({
+	it('fails distribution readiness when standalone smoke lane is missing', () => {
+		const result = evaluateDistributionReadiness({
 			reproducibleBuild: {
 				ok: true,
 				workflowPath: '.github/workflows/standalone-release.yml',
@@ -86,7 +86,7 @@ describe('standalone phase 2 evaluator', () => {
 			},
 			releaseDocs: {
 				ok: true,
-				docPath: 'docs/standalone/phase2.md',
+				docPath: 'docs/standalone/distribution.md',
 				fallbackInstaller: 'npm i -g @devcontainers/cli',
 			},
 			experimentalChannel: {

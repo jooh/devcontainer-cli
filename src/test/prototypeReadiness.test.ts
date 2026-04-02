@@ -1,12 +1,12 @@
 import { expect } from 'chai';
 
-import { evaluatePhase1, REQUIRED_PHASE1_COMMANDS } from '../spec-node/migration/standalonePhase1';
+import { evaluatePrototypeReadiness, REQUIRED_PROTOTYPE_COMMANDS } from '../spec-node/migration/prototypeReadiness';
 
-describe('standalone phase 1 evaluator', () => {
-	it('marks phase 1 complete when all required checks pass', () => {
-		const result = evaluatePhase1({
+describe('prototype readiness evaluator', () => {
+	it('marks prototype readiness complete when all required checks pass', () => {
+		const result = evaluatePrototypeReadiness({
 			prototype: { strategy: 'node-sea', binaryPath: 'dist/devcontainer-linux-x64' },
-			commandCoverage: Object.fromEntries(REQUIRED_PHASE1_COMMANDS.map(command => [command, { ok: true }])),
+			commandCoverage: Object.fromEntries(REQUIRED_PROTOTYPE_COMMANDS.map(command => [command, { ok: true }])),
 			composeValidation: { ok: true },
 			blockers: [
 				{ id: 'node-pty-sea', severity: 'high', mitigation: 'Extract native modules next to SEA binary.' },
@@ -20,12 +20,12 @@ describe('standalone phase 1 evaluator', () => {
 		});
 
 		expect(result.complete).to.equal(true);
-		expect(result.summary).to.include('Phase 1 complete');
+		expect(result.summary).to.include('Prototype readiness complete');
 	});
 
-	it('fails phase 1 completion when command coverage is partial', () => {
-		const [firstCommand] = REQUIRED_PHASE1_COMMANDS;
-		const result = evaluatePhase1({
+	it('fails prototype readiness when command coverage is partial', () => {
+		const [firstCommand] = REQUIRED_PROTOTYPE_COMMANDS;
+		const result = evaluatePrototypeReadiness({
 			prototype: { strategy: 'node-sea', binaryPath: 'dist/devcontainer-linux-x64' },
 			commandCoverage: {
 				[firstCommand]: { ok: false, details: 'binary failed with exit code 1' },

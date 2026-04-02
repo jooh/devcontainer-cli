@@ -1,19 +1,19 @@
 import { expect } from 'chai';
 
-import { evaluatePhase5, REQUIRED_PHASE5_PARITY_COMMANDS } from '../spec-node/migration/standalonePhase5';
+import { evaluateCutoverReadiness, REQUIRED_CUTOVER_PARITY_COMMANDS } from '../spec-node/migration/cutoverReadiness';
 
-describe('standalone phase 5 evaluator', () => {
-	it('marks phase 5 complete when hardening and cutover checks pass', () => {
-		const result = evaluatePhase5({
+describe('cutover readiness evaluator', () => {
+	it('marks cutover readiness complete when hardening and cutover checks pass', () => {
+		const result = evaluateCutoverReadiness({
 			integrationParity: {
 				ok: true,
 				baseline: 'node-cli',
 				paritySuitePath: 'src/test/native-parity',
-				coveredCommands: [...REQUIRED_PHASE5_PARITY_COMMANDS],
+				coveredCommands: [...REQUIRED_CUTOVER_PARITY_COMMANDS],
 			},
 			performanceBenchmarks: {
 				ok: true,
-				reportPath: 'docs/standalone/benchmarks/phase5.md',
+				reportPath: 'docs/standalone/cutover.md',
 				startupLatencyMs: 220,
 				peakMemoryMb: 96,
 			},
@@ -31,11 +31,11 @@ describe('standalone phase 5 evaluator', () => {
 		});
 
 		expect(result.complete).to.equal(true);
-		expect(result.summary).to.include('Phase 5 complete');
+		expect(result.summary).to.include('Cutover readiness complete');
 	});
 
-	it('fails phase 5 completion when command parity coverage is incomplete', () => {
-		const result = evaluatePhase5({
+	it('fails cutover readiness when command parity coverage is incomplete', () => {
+		const result = evaluateCutoverReadiness({
 			integrationParity: {
 				ok: true,
 				baseline: 'node-cli',
@@ -44,7 +44,7 @@ describe('standalone phase 5 evaluator', () => {
 			},
 			performanceBenchmarks: {
 				ok: true,
-				reportPath: 'docs/standalone/benchmarks/phase5.md',
+				reportPath: 'docs/standalone/cutover.md',
 				startupLatencyMs: 220,
 				peakMemoryMb: 96,
 			},

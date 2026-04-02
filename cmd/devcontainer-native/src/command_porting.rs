@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
-pub const REQUIRED_PHASE4_EXECUTION_COMMANDS: [&str; 3] = ["build", "up", "exec"];
-pub const REQUIRED_PHASE4_COLLECTION_COMMANDS: [&str; 2] = ["features", "templates"];
+pub const REQUIRED_EXECUTION_COMMANDS: [&str; 3] = ["build", "up", "exec"];
+pub const REQUIRED_COLLECTION_COMMANDS: [&str; 2] = ["features", "templates"];
 
 pub struct IntrospectionPortingInput {
     pub ok: bool,
@@ -20,7 +20,7 @@ pub struct OutputCompatibilityInput {
     pub text_output_parity: bool,
 }
 
-pub struct Phase4Input {
+pub struct CommandPortingInputSet {
     pub introspection_porting: IntrospectionPortingInput,
     pub execution_porting: CommandPortingInput,
     pub collection_porting: CommandPortingInput,
@@ -28,7 +28,7 @@ pub struct Phase4Input {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum Phase4MissingCheck {
+pub enum CommandPortingMissingCheck {
     IntrospectionPorting,
     ExecutionPorting,
     CollectionPorting,
@@ -36,10 +36,10 @@ pub enum Phase4MissingCheck {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Phase4Evaluation {
+pub struct CommandPortingEvaluation {
     pub complete: bool,
     pub summary: String,
-    pub missing_checks: Vec<Phase4MissingCheck>,
+    pub missing_checks: Vec<CommandPortingMissingCheck>,
 }
 
 fn has_introspection_porting(input: &IntrospectionPortingInput) -> bool {
@@ -64,35 +64,35 @@ fn has_output_compatibility(input: &OutputCompatibilityInput) -> bool {
     input.ok && input.json_schema_parity && input.text_output_parity
 }
 
-pub fn evaluate_phase4(input: &Phase4Input) -> Phase4Evaluation {
+pub fn evaluate_command_porting(input: &CommandPortingInputSet) -> CommandPortingEvaluation {
     let mut missing_checks = Vec::new();
 
     if !has_introspection_porting(&input.introspection_porting) {
-        missing_checks.push(Phase4MissingCheck::IntrospectionPorting);
+        missing_checks.push(CommandPortingMissingCheck::IntrospectionPorting);
     }
 
     if !has_command_porting(
         &input.execution_porting,
-        &REQUIRED_PHASE4_EXECUTION_COMMANDS,
+        &REQUIRED_EXECUTION_COMMANDS,
     ) {
-        missing_checks.push(Phase4MissingCheck::ExecutionPorting);
+        missing_checks.push(CommandPortingMissingCheck::ExecutionPorting);
     }
 
     if !has_command_porting(
         &input.collection_porting,
-        &REQUIRED_PHASE4_COLLECTION_COMMANDS,
+        &REQUIRED_COLLECTION_COMMANDS,
     ) {
-        missing_checks.push(Phase4MissingCheck::CollectionPorting);
+        missing_checks.push(CommandPortingMissingCheck::CollectionPorting);
     }
 
     if !has_output_compatibility(&input.output_compatibility) {
-        missing_checks.push(Phase4MissingCheck::OutputCompatibility);
+        missing_checks.push(CommandPortingMissingCheck::OutputCompatibility);
     }
 
     if missing_checks.is_empty() {
-        return Phase4Evaluation {
+        return CommandPortingEvaluation {
             complete: true,
-            summary: "Phase 4 complete with command porting and output compatibility checks satisfied.".to_string(),
+            summary: "Command porting complete with output compatibility checks satisfied.".to_string(),
             missing_checks,
         };
     }
@@ -100,17 +100,17 @@ pub fn evaluate_phase4(input: &Phase4Input) -> Phase4Evaluation {
     let missing_labels = missing_checks
         .iter()
         .map(|missing_check| match missing_check {
-            Phase4MissingCheck::IntrospectionPorting => "introspection-porting",
-            Phase4MissingCheck::ExecutionPorting => "execution-porting",
-            Phase4MissingCheck::CollectionPorting => "collection-porting",
-            Phase4MissingCheck::OutputCompatibility => "output-compatibility",
+            CommandPortingMissingCheck::IntrospectionPorting => "introspection-porting",
+            CommandPortingMissingCheck::ExecutionPorting => "execution-porting",
+            CommandPortingMissingCheck::CollectionPorting => "collection-porting",
+            CommandPortingMissingCheck::OutputCompatibility => "output-compatibility",
         })
         .collect::<Vec<_>>()
         .join(", ");
 
-    Phase4Evaluation {
+    CommandPortingEvaluation {
         complete: false,
-        summary: format!("Phase 4 incomplete. Missing: {missing_labels}."),
+        summary: format!("Command porting incomplete. Missing: {missing_labels}."),
         missing_checks,
     }
 }
@@ -119,8 +119,8 @@ pub fn evaluate_phase4(input: &Phase4Input) -> Phase4Evaluation {
 mod tests {
     use super::*;
 
-    fn complete_input() -> Phase4Input {
-        Phase4Input {
+    fn complete_input() -> CommandPortingInputSet {
+        CommandPortingInputSet {
             introspection_porting: IntrospectionPortingInput {
                 ok: true,
                 read_configuration_ported: true,
@@ -128,14 +128,14 @@ mod tests {
             },
             execution_porting: CommandPortingInput {
                 ok: true,
-                ported_commands: REQUIRED_PHASE4_EXECUTION_COMMANDS
+                ported_commands: REQUIRED_EXECUTION_COMMANDS
                     .iter()
                     .map(|command| (*command).to_string())
                     .collect(),
             },
             collection_porting: CommandPortingInput {
                 ok: true,
-                ported_commands: REQUIRED_PHASE4_COLLECTION_COMMANDS
+                ported_commands: REQUIRED_COLLECTION_COMMANDS
                     .iter()
                     .map(|command| (*command).to_string())
                     .collect(),
@@ -149,31 +149,31 @@ mod tests {
     }
 
     #[test]
-    fn marks_phase4_complete_when_all_porting_checks_pass() {
+    fn marks_command_porting_complete_when_all_porting_checks_pass() {
         let input = complete_input();
-        let result = evaluate_phase4(&input);
+        let result = evaluate_command_porting(&input);
 
         assert!(result.complete);
-        assert!(result.summary.contains("Phase 4 complete"));
+        assert!(result.summary.contains("Command porting complete"));
         assert!(result.missing_checks.is_empty());
     }
 
     #[test]
-    fn fails_phase4_when_execution_commands_are_partially_ported() {
+    fn fails_command_porting_when_execution_commands_are_partially_ported() {
         let mut input = complete_input();
         input.execution_porting.ported_commands = vec!["build".to_string(), "up".to_string()];
 
-        let result = evaluate_phase4(&input);
+        let result = evaluate_command_porting(&input);
 
         assert!(!result.complete);
         assert_eq!(
             result.missing_checks,
-            vec![Phase4MissingCheck::ExecutionPorting]
+            vec![CommandPortingMissingCheck::ExecutionPorting]
         );
     }
 
     #[test]
-    fn fails_phase4_when_output_compatibility_is_not_preserved() {
+    fn fails_command_porting_when_output_compatibility_is_not_preserved() {
         let mut input = complete_input();
         input.output_compatibility = OutputCompatibilityInput {
             ok: false,
@@ -181,12 +181,12 @@ mod tests {
             text_output_parity: true,
         };
 
-        let result = evaluate_phase4(&input);
+        let result = evaluate_command_porting(&input);
 
         assert!(!result.complete);
         assert_eq!(
             result.missing_checks,
-            vec![Phase4MissingCheck::OutputCompatibility]
+            vec![CommandPortingMissingCheck::OutputCompatibility]
         );
     }
 }

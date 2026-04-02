@@ -1,4 +1,4 @@
-# Phase 1 — Fast standalone executable PoC (completed)
+# Standalone prototype report (completed)
 
 Date completed: 2026-04-01
 
@@ -19,7 +19,7 @@ Result: pass in CI-like validation lane (non-interactive mode).
 
 ## Docker and Docker Compose behavior
 - Validation executed in CI-like Linux x64 environment with Docker + Docker Compose available.
-- Result: pass for required phase-1 commands in non-interactive mode.
+- Result: pass for required prototype commands in non-interactive mode.
 
 ## Blockers identified
 1. `node-pty` native addon loading is the primary portability risk for SEA packaging.

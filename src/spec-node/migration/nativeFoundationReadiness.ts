@@ -3,7 +3,7 @@ interface CheckResult {
 	details?: string;
 }
 
-export const REQUIRED_PHASE3_TOP_LEVEL_COMMANDS = [
+export const REQUIRED_NATIVE_FOUNDATION_TOP_LEVEL_COMMANDS = [
 	'read-configuration',
 	'build',
 	'up',
@@ -33,14 +33,14 @@ interface CompatibilityBridgeInput extends CheckResult {
 	unportedCommandBehaviorVerified: boolean;
 }
 
-interface Phase3Input {
+interface NativeFoundationReadinessInput {
 	rustCrate: RustCrateInput;
 	cliParity: CliParityInput;
 	loggingAndExitCodes: LoggingAndExitCodesInput;
 	compatibilityBridge: CompatibilityBridgeInput;
 }
 
-interface Phase3Evaluation {
+interface NativeFoundationReadinessEvaluation {
 	complete: boolean;
 	summary: string;
 	missingChecks: Array<'rust-crate' | 'cli-parity' | 'logging-exit-codes' | 'compatibility-bridge'>;
@@ -56,7 +56,7 @@ function hasCliParity(input: CliParityInput) {
 	const providedCommands = new Set(input.topLevelCommands.map(command => command.trim()).filter(Boolean));
 	return input.ok
 		&& input.helpParity
-		&& REQUIRED_PHASE3_TOP_LEVEL_COMMANDS.every(command => providedCommands.has(command));
+		&& REQUIRED_NATIVE_FOUNDATION_TOP_LEVEL_COMMANDS.every(command => providedCommands.has(command));
 }
 
 function hasLoggingAndExitCodeParity(input: LoggingAndExitCodesInput) {
@@ -71,8 +71,8 @@ function hasCompatibilityBridge(input: CompatibilityBridgeInput) {
 		&& input.unportedCommandBehaviorVerified;
 }
 
-export function evaluatePhase3(input: Phase3Input): Phase3Evaluation {
-	const missingChecks: Phase3Evaluation['missingChecks'] = [];
+export function evaluateNativeFoundationReadiness(input: NativeFoundationReadinessInput): NativeFoundationReadinessEvaluation {
+	const missingChecks: NativeFoundationReadinessEvaluation['missingChecks'] = [];
 
 	if (!hasRustCrate(input.rustCrate)) {
 		missingChecks.push('rust-crate');
@@ -90,14 +90,14 @@ export function evaluatePhase3(input: Phase3Input): Phase3Evaluation {
 	if (!missingChecks.length) {
 		return {
 			complete: true,
-			summary: `Phase 3 complete with Rust crate at ${input.rustCrate.cratePath}.`,
+			summary: `Native foundation readiness complete with Rust crate at ${input.rustCrate.cratePath}.`,
 			missingChecks,
 		};
 	}
 
 	return {
 		complete: false,
-		summary: `Phase 3 incomplete. Missing: ${missingChecks.join(', ')}.`,
+		summary: `Native foundation readiness incomplete. Missing: ${missingChecks.join(', ')}.`,
 		missingChecks,
 	};
 }

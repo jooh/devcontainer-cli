@@ -1,4 +1,4 @@
-# Phase 3 — Native rewrite foundation (Rust) (completed)
+# Native foundation report (Rust) (completed)
 
 Date completed: 2026-04-01
 
@@ -7,7 +7,7 @@ Date completed: 2026-04-01
 - Crate defines an initial native binary target named `devcontainer-native` to host incremental command ports.
 
 ## Top-level CLI parity scaffold
-- Added a Phase 3 evaluator that verifies parity coverage for required top-level command surfaces:
+- Added a native foundation readiness evaluator that verifies parity coverage for required top-level command surfaces:
   - `read-configuration`
   - `build`
   - `up`
@@ -17,7 +17,7 @@ Date completed: 2026-04-01
 - Evaluator includes help text parity gating (`helpParity`) so parity checks require both command presence and help alignment.
 
 ## Logging and exit-code parity checks
-- Added explicit Phase 3 gating for logging output formats:
+- Added explicit native foundation readiness gating for logging output formats:
   - `text`
   - `json`
 - Evaluator also requires exit code parity verification to pass (`exitCodeParity`).
@@ -29,6 +29,6 @@ Date completed: 2026-04-01
   - verified behavior for unported command delegation
 
 ## Test coverage
-- Added standalone Phase 3 unit tests covering:
+- Added native foundation readiness unit tests covering:
   - successful completion when all checks pass
   - failure mode when compatibility bridge requirements are not met

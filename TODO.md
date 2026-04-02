@@ -79,9 +79,9 @@ This balances near-term user value with long-term maintainability.
 
 ---
 
-## Implementation plan (phased)
+## Implementation workstreams
 
-### Phase 0 — Discovery and constraints (1 week)
+### Discovery and constraints (1 week)
 - [x] Inventory all Node-specific and native-binding dependencies (especially `node-pty`).
   - Native bindings: `node-pty` (declared in `package.json`, loaded dynamically in `src/spec-common/commonUtils.ts` and `src/spec-shutdown/dockerUtils.ts`; highest risk for SEA/single-file portability).
   - Node runtime coupling: CLI entrypoint remains `#!/usr/bin/env node` in `devcontainer.js`, and runtime bundle target is `dist/spec-node/devContainersSpecCLI.js` (requires embedded/provided Node runtime for standalone delivery).
@@ -102,7 +102,7 @@ This balances near-term user value with long-term maintainability.
   - Output/behavior parity requirement: preserve exit codes and machine-readable JSON output for `read-configuration`; preserve existing non-interactive behavior for CI usage of `build/up/exec`.
   - Explicitly out-of-scope for MVP parity: perfect TTY UX parity for every interactive edge case and non-Linux platform-specific behavior (tracked for post-MVP hardening).
 
-### Phase 1 — Fast standalone executable PoC (1–2 weeks)
+### Standalone prototype (1–2 weeks)
 - [x] Prototype Node SEA (or alternative) from existing bundle.
 - [x] Validate command coverage:
   - [x] `up`
@@ -113,24 +113,24 @@ This balances near-term user value with long-term maintainability.
 - [x] Validate behavior on Docker + Docker Compose in CI-like environment.
 - [x] Identify blockers around native addons / dynamic requires.
 - [x] Produce size/startup benchmarks and compare to current install script approach.
-  - See `docs/standalone/phase1.md` for the completion report and benchmark summary.
+  - See `docs/standalone/prototype.md` for the completion report and benchmark summary.
 
-### Phase 2 — Productionize short-term binary distribution (2–4 weeks)
+### Standalone distribution (2–4 weeks)
 - [x] Add reproducible build pipeline for standalone binary artifacts.
 - [x] Add signing/notarization strategy where needed.
 - [x] Add smoke/integration test lane that runs packaged executable (not just `node ...`).
 - [x] Add release docs and fallback installer path.
 - [x] Publish experimental channel (e.g., `-standalone` artifacts).
-  - See `docs/standalone/phase2.md` for the completion report and rollout notes.
+  - See `docs/standalone/distribution.md` for the completion report and rollout notes.
 
-### Phase 3 — Native rewrite foundation (Rust) (2–4 weeks)
+### Native foundation (Rust) (2–4 weeks)
 - [x] Create `cmd/devcontainer-native` Rust crate in repo (or sibling repo with mirrored CI).
 - [x] Implement CLI argument surface for top-level commands and help text parity.
 - [x] Implement logging format parity (`text` / `json`) and exit code semantics.
 - [x] Add compatibility bridge:
   - [x] If command not yet ported, shell out to current Node implementation.
 
-### Phase 4 — Port high-value command paths first (6–12+ weeks)
+### Command porting (6–12+ weeks)
 - [x] Port read-only/introspection paths first:
   - [x] `read-configuration`
   - [x] portions of metadata/resolve logic
@@ -140,17 +140,17 @@ This balances near-term user value with long-term maintainability.
   - [x] `exec`
 - [x] Port `features`/`templates` subcommands.
 - [x] Preserve compatibility output JSON schema and text output where practical.
-  - [x] Progress tracking now exists in Rust via `cmd/devcontainer-native/src/phase4.rs` tests.
+  - [x] Progress tracking now exists in Rust via `cmd/devcontainer-native/src/command_porting.rs` tests.
   - [x] Native Rust `read-configuration` path now resolves workspace/config paths (including `.devcontainer/devcontainer.json`, legacy `.devcontainer.json`, and workspace-relative `--config`) in `cmd/devcontainer-native/src/main.rs` with unit coverage.
   - [x] `build`/`up`/`exec` now route through native Rust handlers that execute Docker CLI commands without Node bridge dependency.
   - [x] `features`/`templates` now provide native list-mode handlers with explicit subcommand validation and stable JSON output.
 
-### Phase 5 — Hardening and cutover
+### Hardening and cutover
 - [x] Full integration parity suite against Node baseline.
 - [x] Performance and resource benchmarking.
 - [x] Release native binary as default, keep Node build as fallback for one major cycle.
 - [x] Deprecate and remove fallback once confidence is high.
-  - See `docs/standalone/phase5.md` for the completion report and cutover policy.
+  - See `docs/standalone/cutover.md` for the completion report and cutover policy.
 
 ---
 
@@ -172,4 +172,4 @@ This balances near-term user value with long-term maintainability.
 - [x] Run top 5 commands against existing test fixtures.
 - [x] Create a short decision memo: SEA viability vs packager alternatives.
 - [x] Decide whether to launch Rust foundation in parallel immediately or after PoC sign-off.
-  - Decision: launch in parallel (Phase 3 Rust foundation is in place, and Phase 4 Rust tracking checks are now added).
+  - Decision: launch in parallel (native foundation is in place, and command porting tracking checks are now added).

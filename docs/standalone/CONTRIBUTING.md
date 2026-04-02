@@ -17,7 +17,7 @@ Changes in these areas should be reviewed as production refactors and can impact
 Treat the following as **setup/migration scaffolding**:
 
 - Files under `src/spec-node/migration/`.
-- Tests that validate migration/standalone phase evaluators (`src/test/standalonePhase*.test.ts`).
+- Tests that validate migration/standalone readiness evaluators (`src/test/*Readiness.test.ts`).
 - Tooling and docs that enforce this separation (for example `build/check-setup-separation.js` and this document).
 
 These files are expected to evolve to support migration and fork maintenance workflows.
@@ -37,4 +37,4 @@ Run:
 npm run check-setup-separation
 ```
 
-This check fails when new setup-only phase evaluator files are introduced under `src/spec-node/` instead of `src/spec-node/migration/`.
+This check fails when new setup-only readiness evaluator files are introduced under `src/spec-node/` instead of `src/spec-node/migration/`.
