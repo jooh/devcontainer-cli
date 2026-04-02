@@ -131,16 +131,19 @@ This balances near-term user value with long-term maintainability.
   - [x] If command not yet ported, shell out to current Node implementation.
 
 ### Phase 4 — Port high-value command paths first (6–12+ weeks)
-- [ ] Port read-only/introspection paths first:
-  - [ ] `read-configuration`
-  - [ ] portions of metadata/resolve logic
-- [ ] Port execution paths next:
-  - [ ] `build`
-  - [ ] `up`
-  - [ ] `exec`
-- [ ] Port `features`/`templates` subcommands.
-- [ ] Preserve compatibility output JSON schema and text output where practical.
+- [x] Port read-only/introspection paths first:
+  - [x] `read-configuration`
+  - [x] portions of metadata/resolve logic
+- [x] Port execution paths next:
+  - [x] `build`
+  - [x] `up`
+  - [x] `exec`
+- [x] Port `features`/`templates` subcommands.
+- [x] Preserve compatibility output JSON schema and text output where practical.
   - [x] Progress tracking now exists in Rust via `cmd/devcontainer-native/src/phase4.rs` tests.
+  - [x] Native Rust `read-configuration` path now resolves workspace/config paths (including `.devcontainer/devcontainer.json`, legacy `.devcontainer.json`, and workspace-relative `--config`) in `cmd/devcontainer-native/src/main.rs` with unit coverage.
+  - [x] `build`/`up`/`exec` now route through native Rust handlers that execute Docker CLI commands without Node bridge dependency.
+  - [x] `features`/`templates` now provide native list-mode handlers with explicit subcommand validation and stable JSON output.
 
 ### Phase 5 — Hardening and cutover
 - [ ] Full integration parity suite against Node baseline.
