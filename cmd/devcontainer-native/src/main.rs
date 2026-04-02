@@ -2,6 +2,8 @@ use std::env;
 use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
+mod phase4;
+
 const PHASE3_COMMANDS: [&str; 6] = [
     "read-configuration",
     "build",

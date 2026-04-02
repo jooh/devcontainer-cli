@@ -140,6 +140,7 @@ This balances near-term user value with long-term maintainability.
   - [ ] `exec`
 - [ ] Port `features`/`templates` subcommands.
 - [ ] Preserve compatibility output JSON schema and text output where practical.
+  - [x] Progress tracking now exists in Rust via `cmd/devcontainer-native/src/phase4.rs` tests.
 
 ### Phase 5 — Hardening and cutover
 - [ ] Full integration parity suite against Node baseline.
@@ -166,4 +167,5 @@ This balances near-term user value with long-term maintainability.
 - [x] Build a minimal standalone executable PoC from current Node bundle.
 - [x] Run top 5 commands against existing test fixtures.
 - [x] Create a short decision memo: SEA viability vs packager alternatives.
-- [ ] Decide whether to launch Rust foundation in parallel immediately or after PoC sign-off.
+- [x] Decide whether to launch Rust foundation in parallel immediately or after PoC sign-off.
+  - Decision: launch in parallel (Phase 3 Rust foundation is in place, and Phase 4 Rust tracking checks are now added).
