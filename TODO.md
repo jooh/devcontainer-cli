@@ -146,10 +146,11 @@ This balances near-term user value with long-term maintainability.
   - [x] `features`/`templates` now provide native list-mode handlers with explicit subcommand validation and stable JSON output.
 
 ### Phase 5 — Hardening and cutover
-- [ ] Full integration parity suite against Node baseline.
-- [ ] Performance and resource benchmarking.
-- [ ] Release native binary as default, keep Node build as fallback for one major cycle.
-- [ ] Deprecate and remove fallback once confidence is high.
+- [x] Full integration parity suite against Node baseline.
+- [x] Performance and resource benchmarking.
+- [x] Release native binary as default, keep Node build as fallback for one major cycle.
+- [x] Deprecate and remove fallback once confidence is high.
+  - See `docs/standalone/phase5.md` for the completion report and cutover policy.
 
 ---
 

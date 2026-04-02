@@ -5,6 +5,7 @@ use std::path::PathBuf;
 use std::process::{Command, ExitCode};
 
 mod phase4;
+mod phase5;
 
 const PHASE3_COMMANDS: [&str; 6] = [
     "read-configuration",
