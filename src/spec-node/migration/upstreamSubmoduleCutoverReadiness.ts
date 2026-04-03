@@ -59,7 +59,7 @@ const DEFAULT_SOURCE_ROOTS = ['src'];
 const DEFAULT_INCLUDED_EXTENSIONS = new Set(['.ts', '.tsx']);
 const DEFAULT_REFERENCE_SCAN_ROOTS = ['package.json', 'esbuild.js', 'build', 'scripts', 'src/test'];
 const DEFAULT_REFERENCE_SCAN_EXTENSIONS = new Set(['.ts', '.js', '.json', '.md', '.sh', '.yml', '.yaml']);
-const DEFAULT_EXCLUDED_ROOT_FILES = new Set(['README.md', 'AGENTS.md', 'TODO.md', 'package.json', '.gitignore', '.gitattributes']);
+const DEFAULT_EXCLUDED_ROOT_FILES = new Set(['README.md', 'AGENTS.md', 'TODO.md', 'package.json', 'yarn.lock', '.gitignore', '.gitattributes']);
 const DOCUMENTATION_REQUIREMENTS: DocumentationRequirement[] = [
 	{
 		check: 'readme-purpose',

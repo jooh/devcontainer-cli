@@ -96,14 +96,16 @@ describe('collectRootLevelDuplicateUpstreamFiles', () => {
 		}
 	});
 
-	it('excludes .gitignore and .gitattributes from duplicate-file failures by default', () => {
+	it('excludes yarn.lock, .gitignore, and .gitattributes from duplicate-file failures by default', () => {
 		const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'upstream-root-duplicates-'));
 		try {
 			mkdirSync(path.join(fixtureRoot, 'upstream'), { recursive: true });
 			writeFileSync(path.join(fixtureRoot, '.gitignore'), 'node_modules\n');
 			writeFileSync(path.join(fixtureRoot, '.gitattributes'), '*.sh text eol=lf\n');
+			writeFileSync(path.join(fixtureRoot, 'yarn.lock'), '# yarn lockfile v1\n');
 			writeFileSync(path.join(fixtureRoot, 'upstream/.gitignore'), 'node_modules\n');
 			writeFileSync(path.join(fixtureRoot, 'upstream/.gitattributes'), '*.sh text eol=lf\n');
+			writeFileSync(path.join(fixtureRoot, 'upstream/yarn.lock'), '# yarn lockfile v1\n');
 
 			const duplicates = collectRootLevelDuplicateUpstreamFiles({ repositoryRoot: fixtureRoot });
 			expect(duplicates).to.deep.equal([]);
