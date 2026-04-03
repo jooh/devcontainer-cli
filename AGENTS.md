@@ -5,8 +5,9 @@ These instructions apply to the entire repository tree rooted at this directory.
 
 ## Upstream submodule policy
 - The `upstream/` directory is the canonical location for upstream `devcontainers/cli` TypeScript sources.
+- The `spec/` directory is the canonical location for upstream `devcontainers/spec` schemas and specification docs.
 - Do **not** introduce new copies of upstream-owned files at repository root.
-- Keep project-owned implementation and migration work outside `upstream/` unless explicitly updating the submodule pointer.
+- Keep project-owned implementation and migration work outside `upstream/` and `spec/` unless explicitly updating submodule pointers.
 
 ## Compatibility baseline
 - Treat the pinned `upstream/` submodule commit as the compatibility target.
@@ -20,9 +21,17 @@ When asked to update upstream:
 
 ## Pathing expectations
 - Tests, scripts, and docs that need upstream assets should reference paths under `upstream/...` explicitly.
+- Tests, scripts, and docs that need spec assets should reference paths under `spec/...` explicitly.
 - Avoid hardcoded assumptions that upstream files exist at repository root.
 
 ## Submodule bump checklist
 - Use `git submodule update --init --recursive` before running migration/parity checks.
 - Record the new pinned revision with `git rev-parse HEAD:upstream` in PR notes/tests when changing compatibility behavior.
+- Record the pinned spec revision with `git rev-parse HEAD:spec` when changing schema-sensitive behavior.
 - Keep submodule updates reviewable by separating the submodule pointer bump from project-owned compatibility fixes when practical.
+
+## Spec references to consult for build/config work
+- Primary schema baseline: `spec/schemas/devContainer.base.schema.json`.
+- Aggregated schema view: `spec/schemas/devContainer.schema.json`.
+- Feature schema: `spec/schemas/devContainerFeature.schema.json`.
+- Normative config behavior reference: `spec/docs/specs/devcontainerjson-reference.md`.

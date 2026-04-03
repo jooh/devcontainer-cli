@@ -50,6 +50,19 @@ Top-level commands in scope for full native parity:
 - `templates` subcommands (`apply`, `publish`, `metadata`, `generate-docs`)
 - `exec`
 
+## Specification reference analysis (`spec/` baseline)
+
+### Scope snapshot
+- `spec/` now exists as a pinned submodule reference for normative schema/docs.
+- Primary machine-readable schema baseline is `spec/schemas/devContainer.base.schema.json`.
+- Aggregated schema (`spec/schemas/devContainer.schema.json`) layers in editor/tool overlays and is still useful for compatibility visibility.
+- Behavioral semantics that are not fully captured by schema shape live in `spec/docs/specs/devcontainerjson-reference.md` and related docs.
+
+### Planning impact
+- The overall migration plan still holds.
+- We should explicitly treat schema compatibility as a first-class parity lane alongside upstream CLI behavior parity.
+- We can and should consume schemas directly from `spec/schemas/...` for validation tests/fixtures rather than maintaining duplicated local schema copies.
+
 ---
 
 ## Target architecture (Rust-only runtime)
@@ -91,8 +104,13 @@ Top-level commands in scope for full native parity:
   - config substitution/merge behavior
   - Docker command construction
   - JSON output schemas
+- [ ] Build schema contract tests against pinned `spec/` submodule:
+  - [ ] Validate accepted configs against `spec/schemas/devContainer.base.schema.json`.
+  - [ ] Validate known-invalid configs fail with expected error categories/messages.
+  - [ ] Track schema revision provenance in test output (`git rev-parse HEAD:spec`).
 - [ ] Add dual-run test harness: execute same scenario against upstream CLI and Rust CLI, diff outputs/exit codes.
 - [ ] Treat text/log/output parity as **semantic equivalence** unless a contract explicitly requires byte-level matching.
+- [ ] Add a schema drift check that fails when pinned `HEAD:spec` changes without corresponding schema-parity fixture/test updates.
 
 ## Phase 2 — Port foundational libraries (non-command-specific)
 - [ ] Implement Rust logging/event primitives compatible with upstream formats (`text`/`json`).
@@ -143,4 +161,5 @@ Top-level commands in scope for full native parity:
 - [ ] `devcontainer` runs full target command set on machines without Node installed.
 - [ ] No runtime subprocess invocation of `node` for any GA command path.
 - [ ] Output/exit-code parity suite passes against pinned upstream baseline.
+- [ ] Schema contract suite passes against pinned `spec` baseline.
 - [ ] Published artifact is a standalone Rust binary for target platforms.
