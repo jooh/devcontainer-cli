@@ -7,8 +7,8 @@ describe('native foundation readiness evaluator', () => {
 		const result = evaluateNativeFoundationReadiness({
 			rustCrate: {
 				ok: true,
-				cratePath: 'cmd/devcontainer-native',
-				binaryName: 'devcontainer-native',
+				cratePath: 'cmd/devcontainer',
+				binaryName: 'devcontainer',
 			},
 			cliParity: {
 				ok: true,
@@ -36,8 +36,8 @@ describe('native foundation readiness evaluator', () => {
 		const result = evaluateNativeFoundationReadiness({
 			rustCrate: {
 				ok: true,
-				cratePath: 'cmd/devcontainer-native',
-				binaryName: 'devcontainer-native',
+				cratePath: 'cmd/devcontainer',
+				binaryName: 'devcontainer',
 			},
 			cliParity: {
 				ok: true,

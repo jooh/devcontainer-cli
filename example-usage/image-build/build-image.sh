@@ -2,7 +2,7 @@
 set -e
 cd "$(dirname $0)"
 
-image_name="${1:-"devcontainer-cli-test-image"}"
+image_name="${1:-"devcontainer-rs-test-image"}"
 
 # Push will upload the image to a registry when done (if logged in via docker CLI)
 push_flag="${2:-false}"

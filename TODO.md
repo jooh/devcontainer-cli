@@ -1,14 +1,14 @@
 # TODO: Native Rust Cutover Plan (No Node Runtime)
 
 ## Objective
-Ship `devcontainer-native` as a **standalone Rust binary** that does not require Node.js, JavaScript bundles, or TypeScript artifacts at runtime.
+Ship `devcontainer` as a **standalone Rust binary** that does not require Node.js, JavaScript bundles, or TypeScript artifacts at runtime.
 
 ---
 
 ## Current-state analysis (what exists today)
 
 ### Native binary status (project-owned Rust)
-- `cmd/devcontainer-native` is currently a **partial shim**, not a full port.
+- `cmd/devcontainer` is currently a **partial shim**, not a full port.
 - Native behavior exists only for:
   - `read-configuration` with a limited option surface (`--workspace-folder`, `--config` only).
   - `features list|ls` and `templates list|ls` returning placeholder empty arrays.
@@ -63,7 +63,7 @@ Top-level commands in scope for full native parity:
   - major text/diagnostic messages,
   - Docker/Compose behavior.
 
-### Proposed crate/module layout (inside `cmd/devcontainer-native`)
+### Proposed crate/module layout (inside `cmd/devcontainer`)
 - `cli/`: argument parsing + command dispatch.
 - `config/`: JSONC parsing, schema-ish validation, variable substitution, merge logic.
 - `docker/`: Docker/Compose command construction + execution wrappers.
@@ -116,7 +116,7 @@ Top-level commands in scope for full native parity:
 - [ ] Sequence network-dependent `features/templates publish` parity after local/resolve/test/apply parity is stable.
 
 ## Phase 5 — Hardening + cutover
-- [ ] Remove Node bridge codepath entirely from `devcontainer-native`.
+- [ ] Remove Node bridge codepath entirely from `devcontainer`.
 - [ ] Remove runtime assumptions about `dist/spec-node/devContainersSpecCLI.js`.
 - [ ] Add release CI lanes for multi-platform Rust binaries.
 - [ ] Publish release artifacts via **GitHub Releases** (no npm publication for current rollout).
@@ -140,7 +140,7 @@ Top-level commands in scope for full native parity:
 ---
 
 ## Definition of done (native milestone)
-- [ ] `devcontainer-native` runs full target command set on machines without Node installed.
+- [ ] `devcontainer` runs full target command set on machines without Node installed.
 - [ ] No runtime subprocess invocation of `node` for any GA command path.
 - [ ] Output/exit-code parity suite passes against pinned upstream baseline.
 - [ ] Published artifact is a standalone Rust binary for target platforms.

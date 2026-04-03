@@ -17,8 +17,8 @@ const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 6] = [
 ];
 
 fn print_help() {
-    println!("devcontainer-native (native foundation)");
-    println!("\nUsage:\n  devcontainer-native [--log-format text|json] <command> [args...]\n");
+    println!("devcontainer (native foundation)");
+    println!("\nUsage:\n  devcontainer [--log-format text|json] <command> [args...]\n");
     println!("Supported top-level commands (forwarded to Node bridge):");
     for command in SUPPORTED_TOP_LEVEL_COMMANDS {
         println!("  - {command}");
@@ -233,7 +233,7 @@ mod tests {
             .duration_since(UNIX_EPOCH)
             .expect("time went backwards")
             .as_nanos();
-        std::env::temp_dir().join(format!("devcontainer-native-test-{suffix}"))
+        std::env::temp_dir().join(format!("devcontainer-test-{suffix}"))
     }
 
     #[test]
