@@ -4,6 +4,8 @@ import os from 'os';
 import path from 'path';
 
 import {
+	collectUpstreamSubmoduleDocumentationGaps,
+	collectRootLevelDuplicateUpstreamFiles,
 	collectRootLevelUpstreamPathReferences,
 	collectDuplicateUpstreamPaths,
 	evaluateUpstreamSubmoduleCutoverReadiness,
@@ -73,6 +75,48 @@ describe('collectDuplicateUpstreamPaths', () => {
 	it('finds no duplicate upstream TypeScript source files in this repository', () => {
 		const repositoryRoot = path.resolve(__dirname, '../..');
 		const duplicates = collectDuplicateUpstreamPaths({ repositoryRoot });
+		expect(duplicates).to.deep.equal([]);
+	});
+});
+
+describe('collectRootLevelDuplicateUpstreamFiles', () => {
+	it('detects duplicate root-level files that match upstream byte-for-byte', () => {
+		const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'upstream-root-duplicates-'));
+		try {
+			mkdirSync(path.join(fixtureRoot, 'upstream'), { recursive: true });
+			writeFileSync(path.join(fixtureRoot, 'duplicate.txt'), 'same');
+			writeFileSync(path.join(fixtureRoot, 'upstream/duplicate.txt'), 'same');
+			writeFileSync(path.join(fixtureRoot, 'project-owned.txt'), 'different local');
+			writeFileSync(path.join(fixtureRoot, 'upstream/project-owned.txt'), 'different upstream');
+
+			const duplicates = collectRootLevelDuplicateUpstreamFiles({ repositoryRoot: fixtureRoot });
+			expect(duplicates).to.deep.equal(['duplicate.txt']);
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('excludes yarn.lock, .gitignore, and .gitattributes from duplicate-file failures by default', () => {
+		const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'upstream-root-duplicates-'));
+		try {
+			mkdirSync(path.join(fixtureRoot, 'upstream'), { recursive: true });
+			writeFileSync(path.join(fixtureRoot, '.gitignore'), 'node_modules\n');
+			writeFileSync(path.join(fixtureRoot, '.gitattributes'), '*.sh text eol=lf\n');
+			writeFileSync(path.join(fixtureRoot, 'yarn.lock'), '# yarn lockfile v1\n');
+			writeFileSync(path.join(fixtureRoot, 'upstream/.gitignore'), 'node_modules\n');
+			writeFileSync(path.join(fixtureRoot, 'upstream/.gitattributes'), '*.sh text eol=lf\n');
+			writeFileSync(path.join(fixtureRoot, 'upstream/yarn.lock'), '# yarn lockfile v1\n');
+
+			const duplicates = collectRootLevelDuplicateUpstreamFiles({ repositoryRoot: fixtureRoot });
+			expect(duplicates).to.deep.equal([]);
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('finds no duplicate root-level upstream files in this repository', () => {
+		const repositoryRoot = path.resolve(__dirname, '../..');
+		const duplicates = collectRootLevelDuplicateUpstreamFiles({ repositoryRoot });
 		expect(duplicates).to.deep.equal([]);
 	});
 });
@@ -155,5 +199,34 @@ describe('collectRootLevelUpstreamPathReferences', () => {
 			scanRoots: ['package.json'],
 		});
 		expect(references).to.deep.equal([]);
+	});
+});
+
+describe('collectUpstreamSubmoduleDocumentationGaps', () => {
+	it('reports missing documentation checks for incomplete docs', () => {
+		const fixtureRoot = mkdtempSync(path.join(os.tmpdir(), 'upstream-doc-gaps-'));
+		try {
+			mkdirSync(path.join(fixtureRoot, 'docs/standalone'), { recursive: true });
+			writeFileSync(path.join(fixtureRoot, 'README.md'), '# Project\n');
+			writeFileSync(path.join(fixtureRoot, 'AGENTS.md'), '# Agents\n');
+			writeFileSync(path.join(fixtureRoot, 'docs/standalone/cutover.md'), '# Cutover\n');
+
+			const gaps = collectUpstreamSubmoduleDocumentationGaps(fixtureRoot);
+			expect(gaps.map(gap => gap.check)).to.deep.equal([
+				'readme-purpose',
+				'readme-submodule-init',
+				'readme-compatibility-target',
+				'agents-guidance',
+				'migration-note',
+			]);
+		} finally {
+			rmSync(fixtureRoot, { recursive: true, force: true });
+		}
+	});
+
+	it('finds no documentation gaps in this repository', () => {
+		const repositoryRoot = path.resolve(__dirname, '../..');
+		const gaps = collectUpstreamSubmoduleDocumentationGaps(repositoryRoot);
+		expect(gaps).to.deep.equal([]);
 	});
 });
