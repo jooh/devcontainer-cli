@@ -2,3 +2,6 @@
 	path = upstream
 	url = https://github.com/devcontainers/cli
 	branch = main
+[submodule "spec"]
+	path = spec
+	url = https://github.com/devcontainers/spec
