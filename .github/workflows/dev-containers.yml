@@ -19,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v6
+      with:
+        submodules: recursive
     - uses: actions/setup-node@v5
       with:
         node-version: '20.x'
@@ -26,6 +28,8 @@ jobs:
         scope: '@microsoft'
     - name: Install Dependencies
       run: yarn install --frozen-lockfile
+    - name: Upstream Compatibility Baseline
+      run: yarn check-upstream-compatibility
     - name: Type-Check
       run: yarn type-check
     - name: Lint
@@ -69,6 +73,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        submodules: recursive
     - name: Setup Node.js
       uses: actions/setup-node@v5
       with:
@@ -117,6 +123,8 @@ jobs:
     steps:
     - name: Checkout
       uses: actions/checkout@v6
+      with:
+        submodules: recursive
     - name: Setup Node.js
       uses: actions/setup-node@v5
       with:
@@ -151,6 +159,8 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v6
+      with:
+        submodules: recursive
     - name: Run install.sh tests
       run: sh scripts/install.test.sh
 

@@ -1,9 +1,0 @@
-{
-	"name": "C++",
-	"build": {
-		"dockerfile": "Dockerfile"
-	},
-	"features": {
-		"ghcr.io/devcontainers/features/common-utils:1": {}
-	}
-}

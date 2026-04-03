@@ -1,19 +1,19 @@
 {
 	"references": [
 		{
-			"path": "./src/spec-common"
+			"path": "./upstream/src/spec-common"
 		},
 		{
-			"path": "./src/spec-configuration"
+			"path": "./upstream/src/spec-configuration"
 		},
 		{
-			"path": "./src/spec-node"
+			"path": "./upstream/src/spec-node"
 		},
 		{
-			"path": "./src/spec-shutdown"
+			"path": "./upstream/src/spec-shutdown"
 		},
 		{
-			"path": "./src/spec-utils"
+			"path": "./upstream/src/spec-utils"
 		}
 	],
 	"files": []

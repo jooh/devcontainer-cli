@@ -3,7 +3,7 @@
 	"description": "Dev Containers CLI",
 	"version": "0.85.0",
 	"bin": {
-		"devcontainer": "devcontainer.js"
+		"devcontainer": "upstream/devcontainer.js"
 	},
 	"author": "Microsoft Corporation",
 	"repository": {
@@ -39,17 +39,19 @@
 		"clean-built": "rimraf built",
 		"test": "env TS_NODE_PROJECT=src/test/tsconfig.json mocha -r ts-node/register --exit src/test/*.test.ts",
 		"test-matrix": "env TS_NODE_PROJECT=src/test/tsconfig.json mocha -r ts-node/register --exit",
-		"test-container-features": "env TS_NODE_PROJECT=src/test/tsconfig.json mocha -r ts-node/register --exit src/test/container-features/*.test.ts",
-		"test-container-features-cli": "env TS_NODE_PROJECT=src/test/tsconfig.json mocha -r ts-node/register --exit src/test/container-features/featuresCLICommands.test.ts",
-		"test-container-templates": "env TS_NODE_PROJECT=src/test/tsconfig.json mocha -r ts-node/register --exit src/test/container-templates/*.test.ts",
-		"check-setup-separation": "node build/check-setup-separation.js"
+		"test-container-features": "env TS_NODE_PROJECT=upstream/src/test/tsconfig.json mocha -r ts-node/register --exit upstream/src/test/container-features/*.test.ts",
+		"test-container-features-cli": "env TS_NODE_PROJECT=upstream/src/test/tsconfig.json mocha -r ts-node/register --exit upstream/src/test/container-features/featuresCLICommands.test.ts",
+		"test-container-templates": "env TS_NODE_PROJECT=upstream/src/test/tsconfig.json mocha -r ts-node/register --exit upstream/src/test/container-templates/*.test.ts",
+		"check-setup-separation": "node build/check-setup-separation.js",
+		"check-upstream-submodule": "node build/check-upstream-submodule.js",
+		"check-upstream-compatibility": "node build/check-upstream-compatibility.js"
 	},
 	"files": [
-		"CHANGELOG.md",
-		"LICENSE.txt",
+		"upstream/CHANGELOG.md",
+		"upstream/LICENSE.txt",
 		"README.md",
-		"ThirdPartyNotices.txt",
-		"devcontainer.js",
+		"upstream/ThirdPartyNotices.txt",
+		"upstream/devcontainer.js",
 		"dist/spec-node/devContainersSpecCLI.js",
 		"package.json",
 		"scripts/updateUID.Dockerfile"

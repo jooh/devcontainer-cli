@@ -173,3 +173,68 @@ This balances near-term user value with long-term maintainability.
 - [x] Create a short decision memo: SEA viability vs packager alternatives.
 - [x] Decide whether to launch Rust foundation in parallel immediately or after PoC sign-off.
   - Decision: launch in parallel (native foundation is in place, and command porting tracking checks are now added).
+
+---
+
+## Phase: Upstream submodule cutover (`upstream/`)
+
+### Objective
+Move all vendored upstream TypeScript CLI sources out of repo root and treat `upstream/` (git submodule) as the canonical upstream baseline we target for compatibility.
+
+### 1) Repository layout and ownership
+- [x] Confirm `upstream/` is the only place where upstream devcontainers/cli code lives.
+  - Added `collectDuplicateUpstreamPaths(...)` + `evaluateUpstreamSubmoduleCutoverReadiness(...)` with tests so duplicate upstream-owned paths outside `upstream/` are detected from filesystem layout.
+- [x] Remove duplicated upstream-owned files currently checked in at repository root once replacements are wired.
+  - Removed root-level duplicated TypeScript sources/tests that are now sourced exclusively from `upstream/` for upstream-owned logic.
+  - Removed root-level files that were byte-for-byte duplicates of `upstream/` (`CHANGELOG.md`, `CODEOWNERS`, `CONTRIBUTING.md`, `LICENSE.txt`, `ThirdPartyNotices.txt`, `devcontainer.js`, `eslint.config.mjs`, `tsconfig.base.json`, `tsfmt.json`, `yarn.lock`, `.gitignore`, `.gitattributes`).
+- [x] Keep only project-owned integration/porting assets at repository root (Rust code, migration docs, compatibility harness, and project-specific tests).
+  - Root `src/` now contains only migration/readiness contract helpers and project-owned tests.
+- [x] Add/refresh `.gitmodules` and contributor guidance so updating upstream is intentional and reviewable.
+  - `.gitmodules` now pins the `upstream` submodule branch and README/AGENTS document explicit submodule update workflow.
+
+### 2) Build/test path migration
+- [x] Audit all test fixtures, scripts, and build commands that currently reference root-level upstream paths.
+  - Added `collectRootLevelUpstreamPathReferences(...)` plus fixture coverage in `src/test/upstreamSubmoduleCutoverReadiness.test.ts` to automatically detect root-level references when an equivalent asset exists under `upstream/...`.
+- [x] Rewrite references to point at `upstream/...` explicitly (including npm/yarn commands, fixture paths, and script helpers).
+  - Updated npm container test commands in `package.json` to execute against `upstream/src/test/...` and `upstream/src/test/tsconfig.json`.
+- [x] Introduce shared path helpers (where practical) to avoid hardcoded duplicate path strings in tests.
+  - Added `src/spec-node/migration/upstreamPaths.ts` and adopted `buildUpstreamPath(...)` in cutover readiness tests.
+- [x] Ensure CI jobs execute against `upstream/` sources and fail fast when submodule is missing/uninitialized.
+  - Added `build/check-upstream-submodule.js` and `npm run check-upstream-submodule` so CI can fail fast when `upstream/` is missing/uninitialized.
+
+### 3) Compatibility target versioning
+- [x] Define the compatibility contract as: “this repo targets the exact commit pinned in `upstream/`.”
+  - Added `resolvePinnedUpstreamCommit(...)` and `formatUpstreamCompatibilityContract(...)` helpers (with tests) to make the pinned-commit contract explicit and machine-resolvable.
+- [x] Expose the pinned upstream commit in test output/logging for traceability.
+  - Added `formatUpstreamCommitTraceLine(...)` and a CI-emitted `[upstream-compat] pinned upstream commit: ...` log line so pinned commit traces appear in automated output.
+- [x] Add a dedicated CI check that reports diffs/regressions when submodule commit changes.
+  - Added `build/check-upstream-compatibility.js`, baseline metadata in `docs/upstream/compatibility-baseline.json`, npm script `check-upstream-compatibility`, and wired it into the CI workflow.
+- [x] Create an “update upstream” workflow (bump submodule -> run parity suite -> fix breakages -> merge).
+  - Expanded `README.md` with a concrete command sequence for submodule bump, compatibility checks, parity tests, and baseline update expectations.
+
+### 4) Documentation updates
+- [x] Update `README.md` with:
+  - [x] why `upstream/` exists,
+  - [x] how to clone/init submodules,
+  - [x] what to run when submodule is not initialized,
+  - [x] how compatibility testing maps to the pinned upstream revision.
+- [x] Add/update root `AGENTS.md` with contributor/agent rules for:
+  - [x] where upstream code must live (`upstream/` only),
+  - [x] where project-owned changes should be made,
+  - [x] how to perform/validate submodule bumps.
+- [x] Add a short migration note in changelog or docs index once root-level upstream code is removed.
+
+### 5) Execution plan and rollout
+- [ ] Land this as staged PRs to reduce risk:
+  1. [ ] docs + guardrails (`README.md`, `AGENTS.md`, CI checks),
+  2. [ ] path rewrites in tests/scripts,
+  3. [ ] removal of duplicated root upstream code,
+  4. [ ] final parity + cleanup.
+- [ ] Run full parity/integration suite before and after each stage to isolate regressions.
+- [ ] Gate final removal behind green CI across at least one Linux x64 lane.
+
+### Exit criteria
+- [ ] No tests/build scripts depend on root-level upstream copies.
+- [ ] `upstream/` submodule commit is the declared compatibility baseline.
+- [ ] Docs clearly explain contributor workflow for submodule init/update.
+- [ ] CI protects against accidental drift or missing submodule checkout.

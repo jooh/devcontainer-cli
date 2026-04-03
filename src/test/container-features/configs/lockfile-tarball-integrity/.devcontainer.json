@@ -1,6 +1,0 @@
-{
-	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
-	"features": {
-		"https://github.com/codspace/features/releases/download/tarball02/devcontainer-feature-docker-in-docker.tgz": {}
-	}
-}

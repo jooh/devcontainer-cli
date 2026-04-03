@@ -77,10 +77,10 @@ const watch = process.argv.indexOf('--watch') !== -1;
 `.trimStart()
 		},
 		entryPoints: [
-			'./src/spec-node/devContainersSpecCLI.ts',
+			'./upstream/src/spec-node/devContainersSpecCLI.ts',
 		],
 		tsconfig: 'tsconfig.json',
-		outbase: 'src',
+		outbase: 'upstream/src',
 	};
 
 	if (watch) {
