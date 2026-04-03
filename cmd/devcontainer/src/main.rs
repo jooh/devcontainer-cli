@@ -15,6 +15,7 @@ const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 6] = [
     "features",
     "templates",
 ];
+const NATIVE_ONLY_ENV_VAR: &str = "DEVCONTAINER_NATIVE_ONLY";
 
 fn print_help() {
     println!("devcontainer (native foundation)");
@@ -22,6 +23,38 @@ fn print_help() {
     println!("Supported top-level commands (forwarded to Node bridge):");
     for command in SUPPORTED_TOP_LEVEL_COMMANDS {
         println!("  - {command}");
+    }
+}
+
+fn print_command_help(command: &str) {
+    match command {
+        "read-configuration" => {
+            println!("Usage:\n  devcontainer read-configuration [--workspace-folder <path>] [--config <path>]");
+            println!("\nNative support:");
+            println!("  - resolves .devcontainer/devcontainer.json or .devcontainer.json");
+            println!("  - supports --workspace-folder and --config");
+        }
+        "features" => {
+            println!("Usage:\n  devcontainer features <list|ls>");
+            println!("\nNative support:");
+            println!("  - list");
+            println!("  - ls");
+        }
+        "templates" => {
+            println!("Usage:\n  devcontainer templates <list|ls>");
+            println!("\nNative support:");
+            println!("  - list");
+            println!("  - ls");
+        }
+        "build" | "up" | "exec" => {
+            println!("Usage:\n  devcontainer {command} [args...]");
+            println!("\nCurrent state:");
+            println!("  - subcommand help is native");
+            println!("  - execution still relies on the compatibility bridge unless native-only mode blocks it");
+        }
+        _ => {
+            println!("Usage:\n  devcontainer {command} [args...]");
+        }
     }
 }
 
@@ -40,6 +73,19 @@ fn emit_log(log_format: &str, message: &str) {
         ),
         _ => println!("{message}"),
     }
+}
+
+fn native_only_mode_enabled() -> bool {
+    env::var(NATIVE_ONLY_ENV_VAR)
+        .map(|value| {
+            let normalized = value.trim().to_ascii_lowercase();
+            !normalized.is_empty() && normalized != "0" && normalized != "false" && normalized != "no"
+        })
+        .unwrap_or(false)
+}
+
+fn is_command_help_request(args: &[String]) -> bool {
+    matches!(args.first().map(String::as_str), Some("--help") | Some("-h"))
 }
 
 fn resolve_bridge_script() -> Result<PathBuf, String> {
@@ -178,6 +224,11 @@ fn main() -> ExitCode {
     }
 
     let command_args = &raw_args[offset + 1..];
+    if is_command_help_request(command_args) {
+        print_command_help(command);
+        return ExitCode::SUCCESS;
+    }
+
     match command.as_str() {
         "read-configuration" if should_use_native_read_configuration(command_args) => {
             return run_native_read_configuration(command_args);
@@ -186,6 +237,13 @@ fn main() -> ExitCode {
             return run_native_collection(command, command_args);
         }
         _ => {}
+    }
+
+    if native_only_mode_enabled() {
+        eprintln!(
+            "Native-only mode forbids Node fallback for command: {command}. Port the command or disable {NATIVE_ONLY_ENV_VAR}."
+        );
+        return ExitCode::from(3);
     }
 
     emit_log(
@@ -221,8 +279,8 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::{
-        resolve_read_configuration_path, run_native_collection, should_use_native_collection,
-        should_use_native_read_configuration,
+        is_command_help_request, native_only_mode_enabled, resolve_read_configuration_path,
+        run_native_collection, should_use_native_collection, should_use_native_read_configuration,
     };
     use std::fs;
     use std::process::ExitCode;
@@ -312,5 +370,28 @@ mod tests {
             "/workspace".to_string(),
             "--include-merged-configuration".to_string(),
         ]));
+    }
+
+    #[test]
+    fn detects_subcommand_help_requests_without_needing_node() {
+        assert!(is_command_help_request(&["--help".to_string()]));
+        assert!(is_command_help_request(&["-h".to_string()]));
+        assert!(!is_command_help_request(&["list".to_string()]));
+    }
+
+    #[test]
+    fn native_only_mode_uses_environment_switch() {
+        let original = std::env::var("DEVCONTAINER_NATIVE_ONLY").ok();
+        std::env::set_var("DEVCONTAINER_NATIVE_ONLY", "1");
+        assert!(native_only_mode_enabled());
+
+        std::env::set_var("DEVCONTAINER_NATIVE_ONLY", "false");
+        assert!(!native_only_mode_enabled());
+
+        if let Some(value) = original {
+            std::env::set_var("DEVCONTAINER_NATIVE_ONLY", value);
+        } else {
+            std::env::remove_var("DEVCONTAINER_NATIVE_ONLY");
+        }
     }
 }

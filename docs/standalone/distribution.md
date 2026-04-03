@@ -1,11 +1,11 @@
-# Standalone distribution report (completed)
+# Standalone distribution report (in progress)
 
-Date completed: 2026-04-01
+Status updated: 2026-04-03
 
 ## Reproducible standalone build pipeline
 - Added a deterministic standalone release workflow for Linux x64 and macOS (x64 + arm64) artifacts.
 - Build inputs are pinned and reproducibility is enforced via deterministic bundle + artifact checksums.
-- Workflow path: `.github/workflows/standalone-release.yml`.
+- Workflow path: `.github/workflows/devcontainer-release.yml`.
 
 ## Signing strategy
 - Standalone artifacts are signed using keyless Sigstore/Cosign in CI.
@@ -13,7 +13,7 @@ Date completed: 2026-04-01
 - macOS notarization remains deferred while the channel is marked experimental.
 
 ## Packaged executable smoke/integration lane
-- Added a `standalone-smoke` lane that executes packaged binary tests (instead of `node ...`).
+- Added a native-only startup contract lane that executes the Rust binary with `PATH` excluding Node.
 - Required smoke commands include:
   - `read-configuration`
   - `build`

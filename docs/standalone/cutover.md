@@ -1,19 +1,19 @@
 # Hardening and cutover report
 
-This report records completion evidence for the hardening and cutover TODO items:
+This report tracks cutover progress against the hardening and cutover TODO items. The repository is not yet at full cutover:
 
-- Full integration parity suite against Node baseline.
-- Performance and resource benchmarking.
-- Native binary as default release with Node fallback for one major cycle.
-- Planned fallback removal criteria once confidence gates are met.
+- Integration parity coverage is still being expanded command-by-command.
+- The Node compatibility bridge still exists for unported command paths.
+- Native-only mode is now enforced as a guardrail for CI and local validation.
 
 ## Integration parity suite
 
 - Baseline: Node CLI behavior compared against `devcontainer` command flows.
-- Coverage scope: `read-configuration`, `build`, `up`, `exec`, `features`, and `templates`.
+- Coverage scope target: `read-configuration`, `build`, `up`, `exec`, `features`, and `templates`.
 - Automation entrypoints:
   - `src/test/cutoverReadiness.test.ts` (readiness gating checks)
   - `cmd/devcontainer/src/cutover.rs` tests (native progress checks)
+  - `build/check-native-only.js` (native startup contract without Node on `PATH`)
 
 ## Performance and resource benchmark targets
 
@@ -24,9 +24,9 @@ This report records completion evidence for the hardening and cutover TODO items
 
 ## Cutover and fallback policy
 
-- Default release mode: native binary.
-- Fallback mode: Node bridge retained for one major release cycle.
-- Removal policy: remove fallback after sustained parity confidence and no Sev1 regressions across two consecutive releases.
+- Default release mode target: native binary.
+- Current fallback mode: Node bridge retained until core and collection command parity is complete.
+- Removal policy target: remove fallback after sustained parity confidence and no Sev1 regressions across two consecutive releases.
 
 ## Upstream submodule cutover migration note
 

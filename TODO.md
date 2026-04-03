@@ -91,9 +91,9 @@ Top-level commands in scope for full native parity:
 ## Execution plan
 
 ## Phase 0 — Reset and truth alignment
-- [ ] Mark the current Node-bridge state as transitional in docs/readiness checks.
-- [ ] Add explicit CI check that fails when any command path shells out to Node in “native-only” mode.
-- [ ] Add startup/runtime contract test: running binary with `PATH` excluding Node still supports implemented commands.
+- [x] Mark the current Node-bridge state as transitional in docs/readiness checks.
+- [x] Add explicit CI check that fails when any command path shells out to Node in “native-only” mode.
+- [x] Add startup/runtime contract test: running binary with `PATH` excluding Node still supports implemented commands.
 
 ## Phase 1 — Build parity harness against upstream
 - [ ] Auto-generate command/option matrix from upstream yargs definitions for drift detection.

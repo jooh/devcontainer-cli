@@ -43,6 +43,7 @@
 		"test-container-features-cli": "env TS_NODE_PROJECT=upstream/src/test/tsconfig.json mocha -r ts-node/register --exit upstream/src/test/container-features/featuresCLICommands.test.ts",
 		"test-container-templates": "env TS_NODE_PROJECT=upstream/src/test/tsconfig.json mocha -r ts-node/register --exit upstream/src/test/container-templates/*.test.ts",
 		"check-setup-separation": "node build/check-setup-separation.js",
+		"check-native-only": "node build/check-native-only.js",
 		"check-upstream-submodule": "node build/check-upstream-submodule.js",
 		"check-upstream-compatibility": "node build/check-upstream-compatibility.js"
 	},
