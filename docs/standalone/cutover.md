@@ -9,11 +9,11 @@ This report records completion evidence for the hardening and cutover TODO items
 
 ## Integration parity suite
 
-- Baseline: Node CLI behavior compared against `devcontainer-native` command flows.
+- Baseline: Node CLI behavior compared against `devcontainer` command flows.
 - Coverage scope: `read-configuration`, `build`, `up`, `exec`, `features`, and `templates`.
 - Automation entrypoints:
   - `src/test/cutoverReadiness.test.ts` (readiness gating checks)
-  - `cmd/devcontainer-native/src/cutover.rs` tests (native progress checks)
+  - `cmd/devcontainer/src/cutover.rs` tests (native progress checks)
 
 ## Performance and resource benchmark targets
 

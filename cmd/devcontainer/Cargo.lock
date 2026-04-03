@@ -3,5 +3,5 @@
 version = 4
 
 [[package]]
-name = "devcontainer-native"
+name = "devcontainer"
 version = "0.0.1"
