@@ -1,0 +1,10 @@
+{
+	"requiredTopLevelKeys": [
+		"configuration",
+		"metadata"
+	],
+	"requiredMetadataKeys": [
+		"format",
+		"pathResolution"
+	]
+}

@@ -1,0 +1,4 @@
+{
+	"name": "read-configuration-basic",
+	"fixtureConfigPath": "src/test/parity/fixtures/schema/valid-image/devcontainer.json"
+}

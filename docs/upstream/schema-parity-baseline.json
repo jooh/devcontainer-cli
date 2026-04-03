@@ -1,0 +1,10 @@
+{
+	"specCommit": "c95ffeed1d059abfe9ffbe79762dc2fa4e7c2421",
+	"schemaPath": "spec/schemas/devContainer.base.schema.json",
+	"fixtureRoots": [
+		"src/test/parity/fixtures/schema"
+	],
+	"scenarioPaths": [
+		"src/test/parity/scenarios/read-configuration-basic.json"
+	]
+}
