@@ -1,4 +1,4 @@
-# Devcontainer CLI Native Port
+# devcontainer-rs
 
 This repository hosts a **project-owned native migration** of the Dev Containers CLI, with compatibility targeted against the upstream TypeScript implementation stored in the `upstream/` git submodule.
 

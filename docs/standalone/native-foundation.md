@@ -3,8 +3,8 @@
 Date completed: 2026-04-01
 
 ## Rust crate foundation
-- Added an in-repo Rust crate at `cmd/devcontainer-native`.
-- Crate defines an initial native binary target named `devcontainer-native` to host incremental command ports.
+- Added an in-repo Rust crate at `cmd/devcontainer`.
+- Crate defines an initial native binary target named `devcontainer` to host incremental command ports.
 
 ## Top-level CLI parity scaffold
 - Added a native foundation readiness evaluator that verifies parity coverage for required top-level command surfaces:

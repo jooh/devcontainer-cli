@@ -124,7 +124,7 @@ This balances near-term user value with long-term maintainability.
   - See `docs/standalone/distribution.md` for the completion report and rollout notes.
 
 ### Native foundation (Rust) (2–4 weeks)
-- [x] Create `cmd/devcontainer-native` Rust crate in repo (or sibling repo with mirrored CI).
+- [x] Create `cmd/devcontainer` Rust crate in repo (or sibling repo with mirrored CI).
 - [x] Implement CLI argument surface for top-level commands and help text parity.
 - [x] Implement logging format parity (`text` / `json`) and exit code semantics.
 - [x] Add compatibility bridge:
@@ -140,8 +140,8 @@ This balances near-term user value with long-term maintainability.
   - [x] `exec`
 - [x] Port `features`/`templates` subcommands.
 - [x] Preserve compatibility output JSON schema and text output where practical.
-  - [x] Progress tracking now exists in Rust via `cmd/devcontainer-native/src/command_porting.rs` tests.
-  - [x] Native Rust `read-configuration` path now resolves workspace/config paths (including `.devcontainer/devcontainer.json`, legacy `.devcontainer.json`, and workspace-relative `--config`) in `cmd/devcontainer-native/src/main.rs` with unit coverage.
+  - [x] Progress tracking now exists in Rust via `cmd/devcontainer/src/command_porting.rs` tests.
+  - [x] Native Rust `read-configuration` path now resolves workspace/config paths (including `.devcontainer/devcontainer.json`, legacy `.devcontainer.json`, and workspace-relative `--config`) in `cmd/devcontainer/src/main.rs` with unit coverage.
   - [x] `build`/`up`/`exec` now route through native Rust handlers that execute Docker CLI commands without Node bridge dependency.
   - [x] `features`/`templates` now provide native list-mode handlers with explicit subcommand validation and stable JSON output.
 

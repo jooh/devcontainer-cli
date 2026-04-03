@@ -85,7 +85,7 @@ You can use the example by opening a terminal and typing the following:
 image-build/build-image.sh
 ```
 
-The resulting image name defaults to `devcontainer-cli-test-image`,  but you can change it with the first argument, and configure it to push to a registry by setting the second argument to true. The third argument allows you to build for multiple architectures.
+The resulting image name defaults to `devcontainer-rs-test-image`,  but you can change it with the first argument, and configure it to push to a registry by setting the second argument to true. The third argument allows you to build for multiple architectures.
 
 ```
 image-build/build-image.sh ghcr.io/my-org/my-image-name-here true "linux/amd64 linux/arm64"
