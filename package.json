@@ -3,7 +3,7 @@
 	"description": "Dev Containers CLI",
 	"version": "0.85.0",
 	"bin": {
-		"devcontainer": "devcontainer.js"
+		"devcontainer": "upstream/devcontainer.js"
 	},
 	"author": "Microsoft Corporation",
 	"repository": {
@@ -47,11 +47,11 @@
 		"check-upstream-compatibility": "node build/check-upstream-compatibility.js"
 	},
 	"files": [
-		"CHANGELOG.md",
-		"LICENSE.txt",
+		"upstream/CHANGELOG.md",
+		"upstream/LICENSE.txt",
 		"README.md",
-		"ThirdPartyNotices.txt",
-		"devcontainer.js",
+		"upstream/ThirdPartyNotices.txt",
+		"upstream/devcontainer.js",
 		"dist/spec-node/devContainersSpecCLI.js",
 		"package.json",
 		"scripts/updateUID.Dockerfile"

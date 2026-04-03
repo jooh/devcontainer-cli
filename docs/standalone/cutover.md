@@ -27,3 +27,7 @@ This report records completion evidence for the hardening and cutover TODO items
 - Default release mode: native binary.
 - Fallback mode: Node bridge retained for one major release cycle.
 - Removal policy: remove fallback after sustained parity confidence and no Sev1 regressions across two consecutive releases.
+
+## Upstream submodule cutover migration note
+
+- Upstream submodule cutover is complete: `upstream/` is the canonical source of upstream TypeScript CLI code for compatibility validation.

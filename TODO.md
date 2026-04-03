@@ -186,6 +186,7 @@ Move all vendored upstream TypeScript CLI sources out of repo root and treat `up
   - Added `collectDuplicateUpstreamPaths(...)` + `evaluateUpstreamSubmoduleCutoverReadiness(...)` with tests so duplicate upstream-owned paths outside `upstream/` are detected from filesystem layout.
 - [x] Remove duplicated upstream-owned files currently checked in at repository root once replacements are wired.
   - Removed root-level duplicated TypeScript sources/tests that are now sourced exclusively from `upstream/` for upstream-owned logic.
+  - Removed root-level files that were byte-for-byte duplicates of `upstream/` (`CHANGELOG.md`, `CODEOWNERS`, `CONTRIBUTING.md`, `LICENSE.txt`, `ThirdPartyNotices.txt`, `devcontainer.js`, `eslint.config.mjs`, `tsconfig.base.json`, `tsfmt.json`, `yarn.lock`, `.gitignore`, `.gitattributes`).
 - [x] Keep only project-owned integration/porting assets at repository root (Rust code, migration docs, compatibility harness, and project-specific tests).
   - Root `src/` now contains only migration/readiness contract helpers and project-owned tests.
 - [x] Add/refresh `.gitmodules` and contributor guidance so updating upstream is intentional and reviewable.
@@ -212,16 +213,16 @@ Move all vendored upstream TypeScript CLI sources out of repo root and treat `up
   - Expanded `README.md` with a concrete command sequence for submodule bump, compatibility checks, parity tests, and baseline update expectations.
 
 ### 4) Documentation updates
-- [ ] Update `README.md` with:
-  - [ ] why `upstream/` exists,
-  - [ ] how to clone/init submodules,
-  - [ ] what to run when submodule is not initialized,
-  - [ ] how compatibility testing maps to the pinned upstream revision.
-- [ ] Add/update root `AGENTS.md` with contributor/agent rules for:
-  - [ ] where upstream code must live (`upstream/` only),
-  - [ ] where project-owned changes should be made,
-  - [ ] how to perform/validate submodule bumps.
-- [ ] Add a short migration note in changelog or docs index once root-level upstream code is removed.
+- [x] Update `README.md` with:
+  - [x] why `upstream/` exists,
+  - [x] how to clone/init submodules,
+  - [x] what to run when submodule is not initialized,
+  - [x] how compatibility testing maps to the pinned upstream revision.
+- [x] Add/update root `AGENTS.md` with contributor/agent rules for:
+  - [x] where upstream code must live (`upstream/` only),
+  - [x] where project-owned changes should be made,
+  - [x] how to perform/validate submodule bumps.
+- [x] Add a short migration note in changelog or docs index once root-level upstream code is removed.
 
 ### 5) Execution plan and rollout
 - [ ] Land this as staged PRs to reduce risk:

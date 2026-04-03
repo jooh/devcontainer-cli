@@ -29,6 +29,12 @@ interface DuplicatePathScanOptions {
 	includedExtensions?: string[];
 }
 
+interface RootLevelDuplicateFileScanOptions {
+	repositoryRoot: string;
+	upstreamRoot?: string;
+	excludedFiles?: string[];
+}
+
 interface RootLevelPathReference {
 	filePath: string;
 	lineNumber: number;
@@ -43,10 +49,44 @@ interface RootLevelPathReferenceScanOptions {
 	includeExistingLocalPaths?: boolean;
 }
 
+interface DocumentationRequirement {
+	check: 'readme-purpose' | 'readme-submodule-init' | 'readme-compatibility-target' | 'agents-guidance' | 'migration-note';
+	filePath: string;
+	description: string;
+}
+
 const DEFAULT_SOURCE_ROOTS = ['src'];
 const DEFAULT_INCLUDED_EXTENSIONS = new Set(['.ts', '.tsx']);
 const DEFAULT_REFERENCE_SCAN_ROOTS = ['package.json', 'esbuild.js', 'build', 'scripts', 'src/test'];
 const DEFAULT_REFERENCE_SCAN_EXTENSIONS = new Set(['.ts', '.js', '.json', '.md', '.sh', '.yml', '.yaml']);
+const DEFAULT_EXCLUDED_ROOT_FILES = new Set(['README.md', 'AGENTS.md', 'TODO.md', 'package.json', '.gitignore', '.gitattributes']);
+const DOCUMENTATION_REQUIREMENTS: DocumentationRequirement[] = [
+	{
+		check: 'readme-purpose',
+		filePath: 'README.md',
+		description: 'README explains why upstream/ exists and ownership boundaries.',
+	},
+	{
+		check: 'readme-submodule-init',
+		filePath: 'README.md',
+		description: 'README documents submodule initialization and recovery steps.',
+	},
+	{
+		check: 'readme-compatibility-target',
+		filePath: 'README.md',
+		description: 'README maps compatibility testing to the pinned upstream revision.',
+	},
+	{
+		check: 'agents-guidance',
+		filePath: 'AGENTS.md',
+		description: 'AGENTS.md documents upstream-only ownership and bump validation workflow.',
+	},
+	{
+		check: 'migration-note',
+		filePath: 'docs/standalone/cutover.md',
+		description: 'Project-owned docs include a migration note about upstream submodule cutover.',
+	},
+];
 
 function walkRelativeFiles(rootDir: string, startDir = rootDir): string[] {
 	const entries = readdirSync(startDir, { withFileTypes: true });
@@ -156,6 +196,42 @@ export function collectDuplicateUpstreamPaths(options: DuplicatePathScanOptions)
 	return duplicatePaths.sort((a, b) => a.localeCompare(b));
 }
 
+export function collectRootLevelDuplicateUpstreamFiles(options: RootLevelDuplicateFileScanOptions) {
+	const upstreamRoot = options.upstreamRoot ?? DEFAULT_UPSTREAM_SUBMODULE_ROOT;
+	const excludedFiles = new Set(options.excludedFiles ?? [...DEFAULT_EXCLUDED_ROOT_FILES]);
+	const upstreamAbsoluteRoot = path.join(options.repositoryRoot, upstreamRoot);
+
+	if (!existsSync(upstreamAbsoluteRoot) || !statSync(upstreamAbsoluteRoot).isDirectory()) {
+		return [];
+	}
+
+	const rootEntries = readdirSync(options.repositoryRoot, { withFileTypes: true });
+	const duplicateFiles: string[] = [];
+
+	for (const entry of rootEntries) {
+		if (!entry.isFile()) {
+			continue;
+		}
+		if (excludedFiles.has(entry.name)) {
+			continue;
+		}
+
+		const localPath = path.join(options.repositoryRoot, entry.name);
+		const upstreamPath = path.join(upstreamAbsoluteRoot, entry.name);
+		if (!existsSync(upstreamPath) || !statSync(upstreamPath).isFile()) {
+			continue;
+		}
+
+		const localContent = readFileSync(localPath);
+		const upstreamContent = readFileSync(upstreamPath);
+		if (localContent.equals(upstreamContent)) {
+			duplicateFiles.push(entry.name);
+		}
+	}
+
+	return duplicateFiles.sort((a, b) => a.localeCompare(b));
+}
+
 export function collectRootLevelUpstreamPathReferences(options: RootLevelPathReferenceScanOptions): RootLevelPathReference[] {
 	const upstreamRoot = options.upstreamRoot ?? DEFAULT_UPSTREAM_SUBMODULE_ROOT;
 	const references: RootLevelPathReference[] = [];
@@ -203,6 +279,44 @@ export function collectRootLevelUpstreamPathReferences(options: RootLevelPathRef
 		}
 		return a.referencedPath.localeCompare(b.referencedPath);
 	});
+}
+
+function hasAllMarkers(content: string, markers: string[]) {
+	return markers.every(marker => content.includes(marker));
+}
+
+function resolveDocumentationCheckPass(check: DocumentationRequirement['check'], content: string) {
+	switch (check) {
+		case 'readme-purpose':
+			return hasAllMarkers(content, ['Repository layout and upstream compatibility', 'upstream/', 'compatibility baseline']);
+		case 'readme-submodule-init':
+			return hasAllMarkers(content, ['git submodule update --init --recursive', 'If you clone this repository without submodules']);
+		case 'readme-compatibility-target':
+			return hasAllMarkers(content, ['npm run check-upstream-compatibility', 'git rev-parse HEAD:upstream']);
+		case 'agents-guidance':
+			return hasAllMarkers(content, ['Upstream submodule policy', 'Pathing expectations', 'Submodule bump checklist']);
+		case 'migration-note':
+			return hasAllMarkers(content, ['Upstream submodule cutover', 'upstream/']);
+	}
+}
+
+export function collectUpstreamSubmoduleDocumentationGaps(repositoryRoot: string) {
+	const missingRequirements: DocumentationRequirement[] = [];
+
+	for (const requirement of DOCUMENTATION_REQUIREMENTS) {
+		const absolutePath = path.join(repositoryRoot, requirement.filePath);
+		if (!existsSync(absolutePath) || !statSync(absolutePath).isFile()) {
+			missingRequirements.push(requirement);
+			continue;
+		}
+
+		const content = readFileSync(absolutePath, 'utf8');
+		if (!resolveDocumentationCheckPass(requirement.check, content)) {
+			missingRequirements.push(requirement);
+		}
+	}
+
+	return missingRequirements;
 }
 
 function hasCanonicalUpstreamLocation(input: RepositoryLayoutAndOwnershipInput) {
