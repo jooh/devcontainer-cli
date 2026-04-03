@@ -21,3 +21,8 @@ When asked to update upstream:
 ## Pathing expectations
 - Tests, scripts, and docs that need upstream assets should reference paths under `upstream/...` explicitly.
 - Avoid hardcoded assumptions that upstream files exist at repository root.
+
+## Submodule bump checklist
+- Use `git submodule update --init --recursive` before running migration/parity checks.
+- Record the new pinned revision with `git rev-parse HEAD:upstream` in PR notes/tests when changing compatibility behavior.
+- Keep submodule updates reviewable by separating the submodule pointer bump from project-owned compatibility fixes when practical.

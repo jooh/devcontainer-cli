@@ -1,9 +1,0 @@
-{
-	"build": {
-		"dockerfile": "Dockerfile",
-		"args": {
-			"LOCAL_GID": "${localEnv:LOCAL_GID}"
-		}
-	},
-	"remoteUser": "foo"
-}

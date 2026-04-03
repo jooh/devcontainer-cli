@@ -182,10 +182,14 @@ This balances near-term user value with long-term maintainability.
 Move all vendored upstream TypeScript CLI sources out of repo root and treat `upstream/` (git submodule) as the canonical upstream baseline we target for compatibility.
 
 ### 1) Repository layout and ownership
-- [ ] Confirm `upstream/` is the only place where upstream devcontainers/cli code lives.
-- [ ] Remove duplicated upstream-owned files currently checked in at repository root once replacements are wired.
-- [ ] Keep only project-owned integration/porting assets at repository root (Rust code, migration docs, compatibility harness, and project-specific tests).
-- [ ] Add/refresh `.gitmodules` and contributor guidance so updating upstream is intentional and reviewable.
+- [x] Confirm `upstream/` is the only place where upstream devcontainers/cli code lives.
+  - Added `collectDuplicateUpstreamPaths(...)` + `evaluateUpstreamSubmoduleCutoverReadiness(...)` with tests so duplicate upstream-owned paths outside `upstream/` are detected from filesystem layout.
+- [x] Remove duplicated upstream-owned files currently checked in at repository root once replacements are wired.
+  - Removed root-level duplicated TypeScript sources/tests that are now sourced exclusively from `upstream/` for upstream-owned logic.
+- [x] Keep only project-owned integration/porting assets at repository root (Rust code, migration docs, compatibility harness, and project-specific tests).
+  - Root `src/` now contains only migration/readiness contract helpers and project-owned tests.
+- [x] Add/refresh `.gitmodules` and contributor guidance so updating upstream is intentional and reviewable.
+  - `.gitmodules` now pins the `upstream` submodule branch and README/AGENTS document explicit submodule update workflow.
 
 ### 2) Build/test path migration
 - [ ] Audit all test fixtures, scripts, and build commands that currently reference root-level upstream paths.
@@ -194,7 +198,8 @@ Move all vendored upstream TypeScript CLI sources out of repo root and treat `up
 - [ ] Ensure CI jobs execute against `upstream/` sources and fail fast when submodule is missing/uninitialized.
 
 ### 3) Compatibility target versioning
-- [ ] Define the compatibility contract as: “this repo targets the exact commit pinned in `upstream/`.”
+- [x] Define the compatibility contract as: “this repo targets the exact commit pinned in `upstream/`.”
+  - Added `resolvePinnedUpstreamCommit(...)` and `formatUpstreamCompatibilityContract(...)` helpers (with tests) to make the pinned-commit contract explicit and machine-resolvable.
 - [ ] Expose the pinned upstream commit in test output/logging for traceability.
 - [ ] Add a dedicated CI check that reports diffs/regressions when submodule commit changes.
 - [ ] Create an “update upstream” workflow (bump submodule -> run parity suite -> fix breakages -> merge).
