@@ -19,7 +19,7 @@ function fail(message) {
 }
 
 function resolveCurrentPinnedCommit() {
-	return cp.execFileSync('git', ['rev-parse', `HEAD:${submodulePath}`], {
+	return cp.execFileSync('git', ['rev-parse', `:${submodulePath}`], {
 		cwd: repositoryRoot,
 		encoding: 'utf8',
 		stdio: ['ignore', 'pipe', 'pipe'],
