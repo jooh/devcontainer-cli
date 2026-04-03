@@ -15,6 +15,22 @@ When updating upstream, prefer an explicit workflow:
 3. Fix regressions in project-owned code.
 4. Merge once CI is green.
 
+Recommended command sequence:
+
+```bash
+git submodule update --init --recursive
+git -C upstream fetch origin
+git -C upstream checkout <new-upstream-commit>
+git add upstream
+git rev-parse HEAD:upstream
+npm run check-upstream-compatibility
+npm test
+```
+
+If `npm run check-upstream-compatibility` reports a commit change, update
+[`docs/upstream/compatibility-baseline.json`](./docs/upstream/compatibility-baseline.json)
+in the same change after parity checks pass.
+
 If you clone this repository without submodules, initialize them before building/testing:
 
 ```bash

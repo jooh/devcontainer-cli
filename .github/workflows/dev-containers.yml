@@ -28,6 +28,8 @@ jobs:
         scope: '@microsoft'
     - name: Install Dependencies
       run: yarn install --frozen-lockfile
+    - name: Upstream Compatibility Baseline
+      run: yarn check-upstream-compatibility
     - name: Type-Check
       run: yarn type-check
     - name: Lint
