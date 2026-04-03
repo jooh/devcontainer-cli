@@ -53,13 +53,12 @@ Top-level commands in scope for full native parity:
 ## Specification reference analysis (`spec/` baseline)
 
 ### Scope snapshot
-- `spec/` now exists as a pinned submodule reference for normative schema/docs.
+- `spec/` is a pinned submodule reference for normative schema/docs.
 - Primary machine-readable schema baseline is `spec/schemas/devContainer.base.schema.json`.
 - Aggregated schema (`spec/schemas/devContainer.schema.json`) layers in editor/tool overlays and is still useful for compatibility visibility.
 - Behavioral semantics that are not fully captured by schema shape live in `spec/docs/specs/devcontainerjson-reference.md` and related docs.
 
 ### Planning impact
-- The overall migration plan still holds.
 - We should explicitly treat schema compatibility as a first-class parity lane alongside upstream CLI behavior parity.
 - We can and should consume schemas directly from `spec/schemas/...` for validation tests/fixtures rather than maintaining duplicated local schema copies.
 
@@ -146,14 +145,6 @@ Top-level commands in scope for full native parity:
 - [ ] Move TS/Node build/test assets to compatibility-only role (or separate tooling repo) if no longer needed for distribution.
 - [ ] Keep npm/bin metadata out of the native release path while GitHub Releases remains the distribution channel.
 - [ ] Keep `upstream/` as reference baseline and parity fixture source.
-
----
-
-## Suggested implementation order (first 4 weeks)
-1. **Week 1:** parity harness + config semantics foundation.
-2. **Week 2:** full `read-configuration` parity and exhaustive fixtures; establish semantic parity assertions for logs/text output.
-3. **Week 3:** `build` + `set-up` + `run-user-commands` parity for mainstream Dockerfile and Compose flows.
-4. **Week 4:** `up`, `exec` (non-interactive parity gate), and `outdated`; begin post-GA TTY hardening backlog.
 
 ---
 
