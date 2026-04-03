@@ -1,4 +1,4 @@
-name: devcontainer-native-release
+name: devcontainer-release
 
 on:
   push:
@@ -6,7 +6,7 @@ on:
       - main
 
 concurrency:
-  group: devcontainer-native-release-${{ github.ref }}
+  group: devcontainer-release-${{ github.ref }}
   cancel-in-progress: false
 
 permissions:
@@ -19,7 +19,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       tag: ${{ steps.version.outputs.tag }}
     env:
-      TAG_PREFIX: devcontainer-native-v
+      TAG_PREFIX: devcontainer-v
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -55,20 +55,20 @@ jobs:
         include:
           - target: linux-x64
             runner: ubuntu-latest
-            archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-linux-x64.tar.gz
+            archive_name: devcontainer-${{ needs.prepare.outputs.version }}-linux-x64.tar.gz
             checksum_cmd: sha256sum
           - target: darwin-x64
             runner: macos-15-intel
-            archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-darwin-x64.tar.gz
+            archive_name: devcontainer-${{ needs.prepare.outputs.version }}-darwin-x64.tar.gz
             checksum_cmd: shasum -a 256
           - target: darwin-arm64
             runner: macos-15
-            archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-darwin-arm64.tar.gz
+            archive_name: devcontainer-${{ needs.prepare.outputs.version }}-darwin-arm64.tar.gz
             checksum_cmd: shasum -a 256
     runs-on: ${{ matrix.runner }}
     env:
-      CARGO_TOML_PATH: cmd/devcontainer-native/Cargo.toml
-      CRATE_DIR: cmd/devcontainer-native
+      CARGO_TOML_PATH: cmd/devcontainer/Cargo.toml
+      CRATE_DIR: cmd/devcontainer
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -94,7 +94,7 @@ jobs:
         run: |
           set -euo pipefail
           artifact_name='${{ matrix.archive_name }}'
-          tar -C "$CRATE_DIR/target/release" -czf "$artifact_name" devcontainer-native
+          tar -C "$CRATE_DIR/target/release" -czf "$artifact_name" devcontainer
           ${{ matrix.checksum_cmd }} "$artifact_name" > "${artifact_name}.sha256"
 
       - name: Upload release artifact
@@ -130,6 +130,6 @@ jobs:
           gh release create "$tag" \
             --target "$GITHUB_SHA" \
             --fail-on-no-commits \
-            --title "devcontainer-native v${version}" \
-            --notes "Automated release for devcontainer-native v${version}." \
+            --title "devcontainer v${version}" \
+            --notes "Automated release for devcontainer v${version}." \
             artifacts/*
