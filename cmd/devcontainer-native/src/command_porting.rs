@@ -71,17 +71,11 @@ pub fn evaluate_command_porting(input: &CommandPortingInputSet) -> CommandPortin
         missing_checks.push(CommandPortingMissingCheck::IntrospectionPorting);
     }
 
-    if !has_command_porting(
-        &input.execution_porting,
-        &REQUIRED_EXECUTION_COMMANDS,
-    ) {
+    if !has_command_porting(&input.execution_porting, &REQUIRED_EXECUTION_COMMANDS) {
         missing_checks.push(CommandPortingMissingCheck::ExecutionPorting);
     }
 
-    if !has_command_porting(
-        &input.collection_porting,
-        &REQUIRED_COLLECTION_COMMANDS,
-    ) {
+    if !has_command_porting(&input.collection_porting, &REQUIRED_COLLECTION_COMMANDS) {
         missing_checks.push(CommandPortingMissingCheck::CollectionPorting);
     }
 
@@ -92,7 +86,8 @@ pub fn evaluate_command_porting(input: &CommandPortingInputSet) -> CommandPortin
     if missing_checks.is_empty() {
         return CommandPortingEvaluation {
             complete: true,
-            summary: "Command porting complete with output compatibility checks satisfied.".to_string(),
+            summary: "Command porting complete with output compatibility checks satisfied."
+                .to_string(),
             missing_checks,
         };
     }

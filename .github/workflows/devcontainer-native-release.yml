@@ -13,20 +13,18 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      tag: ${{ steps.version.outputs.tag }}
     env:
-      CARGO_TOML_PATH: cmd/devcontainer-native/Cargo.toml
-      CRATE_DIR: cmd/devcontainer-native
       TAG_PREFIX: devcontainer-native-v
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
 
       - name: Compute next patch version
         id: version
@@ -46,15 +44,43 @@ jobs:
           next_version="${major}.${minor}.$((patch + 1))"
           next_tag="${TAG_PREFIX}${next_version}"
 
-          echo "latest_tag=${latest_tag}" >> "$GITHUB_OUTPUT"
           echo "version=${next_version}" >> "$GITHUB_OUTPUT"
           echo "tag=${next_tag}" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x64
+            runner: ubuntu-latest
+            archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-linux-x64.tar.gz
+            checksum_cmd: sha256sum
+          - target: darwin-x64
+            runner: macos-13
+            archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-darwin-x64.tar.gz
+            checksum_cmd: shasum -a 256
+          - target: darwin-arm64
+            runner: macos-14
+            archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-darwin-arm64.tar.gz
+            checksum_cmd: shasum -a 256
+    runs-on: ${{ matrix.runner }}
+    env:
+      CARGO_TOML_PATH: cmd/devcontainer-native/Cargo.toml
+      CRATE_DIR: cmd/devcontainer-native
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
 
       - name: Set Cargo version
         shell: bash
         run: |
           set -euo pipefail
-          version='${{ steps.version.outputs.version }}'
+          version='${{ needs.prepare.outputs.version }}'
           perl -0pi -e 's/^version\s*=\s*"[0-9]+\.[0-9]+\.[0-9]+"/version = "'"$version"'"/m' "$CARGO_TOML_PATH"
 
       - name: Build release binary
@@ -64,31 +90,43 @@ jobs:
           cargo build --release --manifest-path "$CARGO_TOML_PATH"
 
       - name: Package release artifact
-        id: package
         shell: bash
         run: |
           set -euo pipefail
-          version='${{ steps.version.outputs.version }}'
-          artifact_name="devcontainer-native-${version}-linux-x64.tar.gz"
+          artifact_name='${{ matrix.archive_name }}'
           tar -C "$CRATE_DIR/target/release" -czf "$artifact_name" devcontainer-native
-          sha256sum "$artifact_name" > "${artifact_name}.sha256"
+          ${{ matrix.checksum_cmd }} "$artifact_name" > "${artifact_name}.sha256"
 
-          echo "artifact=${artifact_name}" >> "$GITHUB_OUTPUT"
+      - name: Upload release artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.target }}
+          path: |
+            ${{ matrix.archive_name }}
+            ${{ matrix.archive_name }}.sha256
+
+  release:
+    needs: [prepare, build]
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
 
       - name: Create GitHub release
-        env:
-          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          version='${{ steps.version.outputs.version }}'
-          tag='${{ steps.version.outputs.tag }}'
-          artifact='${{ steps.package.outputs.artifact }}'
+          version='${{ needs.prepare.outputs.version }}'
+          tag='${{ needs.prepare.outputs.tag }}'
 
           gh release create "$tag" \
             --target "$GITHUB_SHA" \
             --fail-on-no-commits \
             --title "devcontainer-native v${version}" \
             --notes "Automated release for devcontainer-native v${version}." \
-            "$artifact" \
-            "${artifact}.sha256"
+            artifacts/*

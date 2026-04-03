@@ -86,7 +86,10 @@ fn has_default_release_cutover(input: &DefaultReleaseCutoverInput) -> bool {
 }
 
 fn has_fallback_removal(input: &FallbackRemovalInput) -> bool {
-    input.ok && !input.criteria.trim().is_empty() && !input.removal_issue.trim().is_empty() && input.planned
+    input.ok
+        && !input.criteria.trim().is_empty()
+        && !input.removal_issue.trim().is_empty()
+        && input.planned
 }
 
 pub fn evaluate_cutover(input: &CutoverReadinessInput) -> CutoverReadinessEvaluation {
@@ -185,7 +188,8 @@ mod tests {
     #[test]
     fn fails_cutover_when_parity_coverage_is_incomplete() {
         let mut input = complete_input();
-        input.integration_parity.covered_commands = vec!["read-configuration".to_string(), "build".to_string()];
+        input.integration_parity.covered_commands =
+            vec!["read-configuration".to_string(), "build".to_string()];
 
         let result = evaluate_cutover(&input);
 

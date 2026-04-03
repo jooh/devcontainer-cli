@@ -188,7 +188,10 @@ fn main() -> ExitCode {
         _ => {}
     }
 
-    emit_log(log_format, "Delegating command to Node compatibility bridge.");
+    emit_log(
+        log_format,
+        "Delegating command to Node compatibility bridge.",
+    );
 
     let bridge_script = match resolve_bridge_script() {
         Ok(path) => path,
@@ -241,10 +244,7 @@ mod tests {
         let config = config_dir.join("devcontainer.json");
         fs::write(&config, "{}").expect("failed to write config");
 
-        let args = vec![
-            "--workspace-folder".to_string(),
-            root.display().to_string(),
-        ];
+        let args = vec!["--workspace-folder".to_string(), root.display().to_string()];
         let result = resolve_read_configuration_path(&args).expect("expected config resolution");
 
         assert_eq!(
