@@ -58,11 +58,11 @@ jobs:
             archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-linux-x64.tar.gz
             checksum_cmd: sha256sum
           - target: darwin-x64
-            runner: macos-13
+            runner: macos-15-intel
             archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-darwin-x64.tar.gz
             checksum_cmd: shasum -a 256
           - target: darwin-arm64
-            runner: macos-14
+            runner: macos-15
             archive_name: devcontainer-native-${{ needs.prepare.outputs.version }}-darwin-arm64.tar.gz
             checksum_cmd: shasum -a 256
     runs-on: ${{ matrix.runner }}
