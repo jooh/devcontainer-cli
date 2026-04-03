@@ -375,7 +375,7 @@ install_cli() {
     version_dir="$cli_dir/$CLI_VERSION"
 
     # Check if already installed
-    if [ -d "$version_dir/package" ] && [ -f "$version_dir/package/devcontainer.js" ]; then
+    if [ -d "$version_dir/package" ] && [ -f "$version_dir/package/upstream/devcontainer.js" ]; then
         say "Dev Containers CLI v$CLI_VERSION is already installed"
     else
         say "Downloading Dev Containers CLI v$CLI_VERSION..."
@@ -435,7 +435,7 @@ INSTALL_DIR="$(dirname "$SCRIPT_DIR")"
 
 # Paths to bundled components
 NODE_BIN="$INSTALL_DIR/node/current/bin/node"
-CLI_ENTRY="$INSTALL_DIR/cli/current/package/devcontainer.js"
+CLI_ENTRY="$INSTALL_DIR/cli/current/package/upstream/devcontainer.js"
 
 # Verify Node.js exists
 if [ ! -x "$NODE_BIN" ]; then
@@ -465,7 +465,7 @@ verify_installation() {
     say "Verifying installation..."
 
     node_bin="$INSTALL_PREFIX/node/current/bin/node"
-    cli_entry="$INSTALL_PREFIX/cli/current/package/devcontainer.js"
+    cli_entry="$INSTALL_PREFIX/cli/current/package/upstream/devcontainer.js"
     wrapper="$INSTALL_PREFIX/bin/devcontainer"
 
     if [ ! -x "$node_bin" ]; then
