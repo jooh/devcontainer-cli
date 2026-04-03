@@ -192,10 +192,14 @@ Move all vendored upstream TypeScript CLI sources out of repo root and treat `up
   - `.gitmodules` now pins the `upstream` submodule branch and README/AGENTS document explicit submodule update workflow.
 
 ### 2) Build/test path migration
-- [ ] Audit all test fixtures, scripts, and build commands that currently reference root-level upstream paths.
-- [ ] Rewrite references to point at `upstream/...` explicitly (including npm/yarn commands, fixture paths, and script helpers).
-- [ ] Introduce shared path helpers (where practical) to avoid hardcoded duplicate path strings in tests.
-- [ ] Ensure CI jobs execute against `upstream/` sources and fail fast when submodule is missing/uninitialized.
+- [x] Audit all test fixtures, scripts, and build commands that currently reference root-level upstream paths.
+  - Added `collectRootLevelUpstreamPathReferences(...)` plus fixture coverage in `src/test/upstreamSubmoduleCutoverReadiness.test.ts` to automatically detect root-level references when an equivalent asset exists under `upstream/...`.
+- [x] Rewrite references to point at `upstream/...` explicitly (including npm/yarn commands, fixture paths, and script helpers).
+  - Updated npm container test commands in `package.json` to execute against `upstream/src/test/...` and `upstream/src/test/tsconfig.json`.
+- [x] Introduce shared path helpers (where practical) to avoid hardcoded duplicate path strings in tests.
+  - Added `src/spec-node/migration/upstreamPaths.ts` and adopted `buildUpstreamPath(...)` in cutover readiness tests.
+- [x] Ensure CI jobs execute against `upstream/` sources and fail fast when submodule is missing/uninitialized.
+  - Added `build/check-upstream-submodule.js` and `npm run check-upstream-submodule` so CI can fail fast when `upstream/` is missing/uninitialized.
 
 ### 3) Compatibility target versioning
 - [x] Define the compatibility contract as: “this repo targets the exact commit pinned in `upstream/`.”
