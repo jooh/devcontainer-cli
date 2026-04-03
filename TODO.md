@@ -204,9 +204,12 @@ Move all vendored upstream TypeScript CLI sources out of repo root and treat `up
 ### 3) Compatibility target versioning
 - [x] Define the compatibility contract as: “this repo targets the exact commit pinned in `upstream/`.”
   - Added `resolvePinnedUpstreamCommit(...)` and `formatUpstreamCompatibilityContract(...)` helpers (with tests) to make the pinned-commit contract explicit and machine-resolvable.
-- [ ] Expose the pinned upstream commit in test output/logging for traceability.
-- [ ] Add a dedicated CI check that reports diffs/regressions when submodule commit changes.
-- [ ] Create an “update upstream” workflow (bump submodule -> run parity suite -> fix breakages -> merge).
+- [x] Expose the pinned upstream commit in test output/logging for traceability.
+  - Added `formatUpstreamCommitTraceLine(...)` and a CI-emitted `[upstream-compat] pinned upstream commit: ...` log line so pinned commit traces appear in automated output.
+- [x] Add a dedicated CI check that reports diffs/regressions when submodule commit changes.
+  - Added `build/check-upstream-compatibility.js`, baseline metadata in `docs/upstream/compatibility-baseline.json`, npm script `check-upstream-compatibility`, and wired it into the CI workflow.
+- [x] Create an “update upstream” workflow (bump submodule -> run parity suite -> fix breakages -> merge).
+  - Expanded `README.md` with a concrete command sequence for submodule bump, compatibility checks, parity tests, and baseline update expectations.
 
 ### 4) Documentation updates
 - [ ] Update `README.md` with:

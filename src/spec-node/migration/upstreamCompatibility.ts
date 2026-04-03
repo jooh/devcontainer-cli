@@ -29,3 +29,31 @@ export function resolvePinnedUpstreamCommit(options: ResolvePinnedUpstreamCommit
 export function formatUpstreamCompatibilityContract(commit: string) {
 	return `This repository targets upstream/ at commit ${commit}.`;
 }
+
+export function formatUpstreamCommitTraceLine(commit: string) {
+	return `[upstream-compat] pinned upstream commit: ${commit}`;
+}
+
+interface UpstreamCommitRegressionInput {
+	recordedCommit: string;
+	currentCommit: string;
+}
+
+interface UpstreamCommitRegressionReport {
+	hasRegression: boolean;
+	summary: string;
+}
+
+export function reportUpstreamCommitRegression(input: UpstreamCommitRegressionInput): UpstreamCommitRegressionReport {
+	if (input.recordedCommit === input.currentCommit) {
+		return {
+			hasRegression: false,
+			summary: `Pinned upstream commit unchanged at ${input.currentCommit}.`,
+		};
+	}
+
+	return {
+		hasRegression: true,
+		summary: `Pinned upstream commit changed from ${input.recordedCommit} to ${input.currentCommit}.`,
+	};
+}
