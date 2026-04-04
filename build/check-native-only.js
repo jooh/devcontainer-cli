@@ -52,10 +52,10 @@ function assertFailure(label, result, pattern) {
 }
 
 function sanitizedPath() {
-	const segments = (process.env.PATH || '')
-		.split(path.delimiter)
-		.filter(segment => segment && !/node/i.test(segment));
-	return segments.join(path.delimiter);
+	const defaultSegments = process.platform === 'win32'
+		? [process.env.SystemRoot ? path.join(process.env.SystemRoot, 'System32') : 'C:\\Windows\\System32']
+		: ['/usr/bin', '/bin', '/usr/sbin', '/sbin'];
+	return defaultSegments.join(path.delimiter);
 }
 
 const buildResult = run('cargo', ['build', '--manifest-path', path.join('cmd', 'devcontainer', 'Cargo.toml')]);
@@ -81,7 +81,7 @@ assertSuccess('native templates list without node', run(binaryPath, ['templates'
 
 assertFailure(
 	'native-only fallback block',
-	run(binaryPath, ['build', '--workspace-folder', workspaceFolder], {
+	run(binaryPath, ['features', 'apply'], {
 		env: {
 			...env,
 			DEVCONTAINER_NATIVE_ONLY: '1',

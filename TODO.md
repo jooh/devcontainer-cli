@@ -118,13 +118,13 @@ Top-level commands in scope for full native parity:
 - [x] Implement subprocess wrappers with controlled stdio capture and streaming.
 
 ## Phase 3 (PR #31) — Port core commands first
-- [ ] `read-configuration` full parity (all flags and metadata inclusion options).
-- [ ] `build` parity (including BuildKit toggles, cache options, labels, Dockerfile/Compose paths).
-- [ ] `up` parity (container lifecycle + post-commands + mounts/env handling).
-- [ ] `set-up`, `run-user-commands`, and `outdated` parity.
-- [ ] `exec` parity with staged gates:
-  - [ ] GA gate: non-interactive CI behavior parity.
-  - [ ] post-GA hardening gate: interactive TTY/PTY fidelity.
+- [x] `read-configuration` full parity (all flags and metadata inclusion options).
+- [x] `build` parity (including BuildKit toggles, cache options, labels, Dockerfile/Compose paths).
+- [x] `up` parity (container lifecycle + post-commands + mounts/env handling).
+- [x] `set-up`, `run-user-commands`, and `outdated` parity.
+- [x] `exec` parity with staged gates:
+  - [x] GA gate: non-interactive CI behavior parity.
+  - [x] post-GA hardening gate: interactive TTY/PTY fidelity.
 
 ## Phase 4 (PR #32) — Port collection and publishing flows
 - [ ] `features`: `resolve-dependencies`, `info`, `test`, `package`, `publish`, `generate-docs`.
