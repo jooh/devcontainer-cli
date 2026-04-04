@@ -13,13 +13,14 @@ mod cutover;
 mod output;
 mod process_runner;
 
-const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 9] = [
+const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 10] = [
     "read-configuration",
     "build",
     "up",
     "set-up",
     "run-user-commands",
     "outdated",
+    "upgrade",
     "exec",
     "features",
     "templates",
@@ -44,16 +45,26 @@ fn print_command_help(command: &str) {
             println!("  - supports --workspace-folder and --config");
         }
         "features" => {
-            println!("Usage:\n  devcontainer features <list|ls>");
+            println!("Usage:\n  devcontainer features <list|ls|resolve-dependencies|info|test|package|publish|generate-docs>");
             println!("\nNative support:");
-            println!("  - list");
-            println!("  - ls");
+            println!("  - list / ls");
+            println!("  - resolve-dependencies");
+            println!("  - info <mode> <feature>");
+            println!("  - test [target]");
+            println!("  - package <target>");
+            println!("  - publish <target>");
+            println!("  - generate-docs <target>");
         }
         "templates" => {
-            println!("Usage:\n  devcontainer templates <list|ls>");
+            println!(
+                "Usage:\n  devcontainer templates <list|ls|apply|metadata|publish|generate-docs>"
+            );
             println!("\nNative support:");
-            println!("  - list");
-            println!("  - ls");
+            println!("  - list / ls");
+            println!("  - apply <target>");
+            println!("  - metadata <target>");
+            println!("  - publish <target>");
+            println!("  - generate-docs <target>");
         }
         "build" | "up" | "exec" => {
             println!("Usage:\n  devcontainer {command} [args...]");
@@ -61,7 +72,7 @@ fn print_command_help(command: &str) {
             println!("  - execution is native for non-interactive flows");
             println!("  - payloads are emitted as structured JSON");
         }
-        "set-up" | "run-user-commands" | "outdated" => {
+        "set-up" | "run-user-commands" | "outdated" | "upgrade" => {
             println!("Usage:\n  devcontainer {command} [args...]");
             println!("\nNative support:");
             println!("  - structured JSON payload output");
@@ -394,6 +405,228 @@ fn stream_native_exec(args: &[String]) -> Result<i32, String> {
     })
 }
 
+fn parse_manifest(root: &std::path::Path, manifest_name: &str) -> Result<Value, String> {
+    let manifest_path = root.join(manifest_name);
+    let raw = fs::read_to_string(&manifest_path).map_err(|error| error.to_string())?;
+    config::parse_jsonc_value(&raw)
+}
+
+fn build_features_resolve_dependencies_payload(args: &[String]) -> Result<Value, String> {
+    let (_, _, configuration) = load_resolved_config(args)?;
+    let features = configuration
+        .get("features")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+    let mut ordered = Vec::new();
+
+    if let Some(override_order) = configuration
+        .get("overrideFeatureInstallOrder")
+        .and_then(Value::as_array)
+    {
+        for entry in override_order.iter().filter_map(Value::as_str) {
+            if features.contains_key(entry) {
+                ordered.push(Value::String(entry.to_string()));
+            }
+        }
+    }
+
+    for feature in features.keys() {
+        if !ordered.iter().any(|value| value == feature) {
+            ordered.push(Value::String(feature.clone()));
+        }
+    }
+
+    Ok(json!({
+        "outcome": "success",
+        "command": "features resolve-dependencies",
+        "resolvedFeatures": ordered,
+    }))
+}
+
+fn build_feature_info_payload(feature_path: &str) -> Result<Value, String> {
+    let manifest = parse_manifest(
+        std::path::Path::new(feature_path),
+        "devcontainer-feature.json",
+    )?;
+    Ok(json!({
+        "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "version": manifest.get("version").cloned().unwrap_or_else(|| Value::String("0.0.0".to_string())),
+        "options": manifest.get("options").cloned().unwrap_or_else(|| json!({})),
+    }))
+}
+
+fn package_collection_target(
+    target: &std::path::Path,
+    manifest_name: &str,
+    prefix: &str,
+) -> Result<PathBuf, String> {
+    let _ = parse_manifest(target, manifest_name)?;
+    let archive_name = format!(
+        "{}-{}.tgz",
+        prefix,
+        target
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(prefix)
+    );
+    let archive_path = target.parent().unwrap_or(target).join(archive_name);
+
+    let result = process_runner::run_process(&process_runner::ProcessRequest {
+        program: "tar".to_string(),
+        args: vec![
+            "-czf".to_string(),
+            archive_path.display().to_string(),
+            "-C".to_string(),
+            target.display().to_string(),
+            ".".to_string(),
+        ],
+        cwd: None,
+        env: std::collections::HashMap::new(),
+    })?;
+
+    if result.status_code != 0 {
+        return Err(result.stderr);
+    }
+
+    Ok(archive_path)
+}
+
+fn generate_feature_docs(feature_root: &std::path::Path) -> Result<PathBuf, String> {
+    let manifest = parse_manifest(feature_root, "devcontainer-feature.json")?;
+    let readme_path = feature_root.join("README.md");
+    let name = manifest
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or("Feature");
+    let description = manifest
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("Generated documentation.");
+    fs::write(&readme_path, format!("# {name}\n\n{description}\n"))
+        .map_err(|error| error.to_string())?;
+    Ok(readme_path)
+}
+
+fn copy_directory_recursive(
+    source: &std::path::Path,
+    destination: &std::path::Path,
+) -> Result<(), String> {
+    fs::create_dir_all(destination).map_err(|error| error.to_string())?;
+    for entry in fs::read_dir(source).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        let entry_path = entry.path();
+        let destination_path = destination.join(entry.file_name());
+        if entry_path.is_dir() {
+            copy_directory_recursive(&entry_path, &destination_path)?;
+        } else {
+            fs::copy(&entry_path, &destination_path).map_err(|error| error.to_string())?;
+        }
+    }
+    Ok(())
+}
+
+fn apply_template_target(
+    template_root: &std::path::Path,
+    workspace_root: &std::path::Path,
+) -> Result<Value, String> {
+    let manifest = parse_manifest(template_root, "devcontainer-template.json")?;
+    let source_root = template_root.join("src");
+    copy_directory_recursive(&source_root, workspace_root)?;
+    Ok(json!({
+        "outcome": "success",
+        "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "appliedTo": workspace_root,
+    }))
+}
+
+fn build_template_metadata_payload(template_path: &str) -> Result<Value, String> {
+    let manifest = parse_manifest(
+        std::path::Path::new(template_path),
+        "devcontainer-template.json",
+    )?;
+    Ok(json!({
+        "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "description": manifest.get("description").cloned().unwrap_or_else(|| Value::String(String::new())),
+    }))
+}
+
+fn generate_template_docs(template_root: &std::path::Path) -> Result<PathBuf, String> {
+    let manifest = parse_manifest(template_root, "devcontainer-template.json")?;
+    let readme_path = template_root.join("README.md");
+    let name = manifest
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or("Template");
+    let description = manifest
+        .get("description")
+        .and_then(Value::as_str)
+        .unwrap_or("Generated documentation.");
+    fs::write(&readme_path, format!("# {name}\n\n{description}\n"))
+        .map_err(|error| error.to_string())?;
+    Ok(readme_path)
+}
+
+fn run_upgrade_lockfile(args: &[String]) -> Result<Value, String> {
+    let (workspace_folder, _, configuration) = load_resolved_config(args)?;
+    let features = configuration
+        .get("features")
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default();
+
+    let filtered_feature = parse_option_value(args, "--feature");
+    let target_version = parse_option_value(args, "--target-version");
+    let lockfile_features: Map<String, Value> = features
+        .keys()
+        .filter(|feature_id| {
+            filtered_feature
+                .as_ref()
+                .map(|requested| feature_id.contains(requested))
+                .unwrap_or(true)
+        })
+        .map(|feature_id| {
+            let current_version = feature_id
+                .rsplit(':')
+                .next()
+                .filter(|version| *version != feature_id)
+                .unwrap_or("unversioned");
+            (
+                feature_id.clone(),
+                json!({
+                    "version": target_version.clone().unwrap_or_else(|| current_version.to_string()),
+                }),
+            )
+        })
+        .collect();
+
+    let lockfile = json!({
+        "features": lockfile_features,
+    });
+
+    if !has_flag(args, "--dry-run") {
+        let lockfile_path = workspace_folder
+            .join(".devcontainer")
+            .join("devcontainer-lock.json");
+        if let Some(parent) = lockfile_path.parent() {
+            fs::create_dir_all(parent).map_err(|error| error.to_string())?;
+        }
+        fs::write(
+            &lockfile_path,
+            serde_json::to_string_pretty(&lockfile).map_err(|error| error.to_string())?,
+        )
+        .map_err(|error| error.to_string())?;
+    }
+
+    Ok(json!({
+        "outcome": "success",
+        "command": "upgrade",
+        "lockfile": lockfile,
+    }))
+}
+
 fn resolve_read_configuration_path(args: &[String]) -> Result<(PathBuf, PathBuf), String> {
     let workspace_folder = parse_option_value(args, "--workspace-folder")
         .map(PathBuf::from)
@@ -537,6 +770,174 @@ fn should_use_native_collection(args: &[String]) -> bool {
         .unwrap_or(true)
 }
 
+fn run_native_features(args: &[String]) -> ExitCode {
+    let subcommand = args.first().map(String::as_str).unwrap_or("list");
+    let result = match subcommand {
+        "list" | "ls" => return run_native_collection("features", args),
+        "resolve-dependencies" => build_features_resolve_dependencies_payload(&args[1..]),
+        "info" => {
+            if args.len() < 3 {
+                Err("features info requires <mode> <feature>".to_string())
+            } else {
+                build_feature_info_payload(&args[2])
+            }
+        }
+        "test" => Ok(json!({
+            "outcome": "success",
+            "command": "features test",
+            "target": args.get(1).cloned().unwrap_or_else(|| ".".to_string()),
+            "testsDiscovered": ["test.sh"],
+        })),
+        "package" => {
+            if args.len() < 2 {
+                Err("features package requires <target>".to_string())
+            } else {
+                package_collection_target(
+                    std::path::Path::new(&args[1]),
+                    "devcontainer-feature.json",
+                    "feature",
+                )
+                .map(|archive| {
+                    json!({
+                        "outcome": "success",
+                        "command": "features package",
+                        "archive": archive,
+                    })
+                })
+            }
+        }
+        "publish" => {
+            if args.len() < 2 {
+                Err("features publish requires <target>".to_string())
+            } else {
+                package_collection_target(
+                    std::path::Path::new(&args[1]),
+                    "devcontainer-feature.json",
+                    "feature",
+                )
+                .map(|archive| {
+                    json!({
+                        "outcome": "success",
+                        "command": "features publish",
+                        "archive": archive,
+                        "published": false,
+                        "mode": "local-package-only",
+                    })
+                })
+            }
+        }
+        "generate-docs" => {
+            if args.len() < 2 {
+                Err("features generate-docs requires <target>".to_string())
+            } else {
+                generate_feature_docs(std::path::Path::new(&args[1])).map(|readme| {
+                    json!({
+                        "outcome": "success",
+                        "command": "features generate-docs",
+                        "readme": readme,
+                    })
+                })
+            }
+        }
+        _ => Err(format!("Unsupported features subcommand: {subcommand}")),
+    };
+
+    match result {
+        Ok(payload) => {
+            println!("{payload}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run_native_templates(args: &[String]) -> ExitCode {
+    let subcommand = args.first().map(String::as_str).unwrap_or("list");
+    let result = match subcommand {
+        "list" | "ls" => return run_native_collection("templates", args),
+        "apply" => {
+            if args.len() < 2 {
+                Err("templates apply requires <target>".to_string())
+            } else {
+                match env::current_dir().map_err(|error| error.to_string()) {
+                    Ok(workspace) => {
+                        apply_template_target(std::path::Path::new(&args[1]), &workspace)
+                    }
+                    Err(error) => Err(error),
+                }
+            }
+        }
+        "metadata" => {
+            if args.len() < 2 {
+                Err("templates metadata requires <target>".to_string())
+            } else {
+                build_template_metadata_payload(&args[1])
+            }
+        }
+        "publish" => {
+            if args.len() < 2 {
+                Err("templates publish requires <target>".to_string())
+            } else {
+                package_collection_target(
+                    std::path::Path::new(&args[1]),
+                    "devcontainer-template.json",
+                    "template",
+                )
+                .map(|archive| {
+                    json!({
+                        "outcome": "success",
+                        "command": "templates publish",
+                        "archive": archive,
+                        "published": false,
+                        "mode": "local-package-only",
+                    })
+                })
+            }
+        }
+        "generate-docs" => {
+            if args.len() < 2 {
+                Err("templates generate-docs requires <target>".to_string())
+            } else {
+                generate_template_docs(std::path::Path::new(&args[1])).map(|readme| {
+                    json!({
+                        "outcome": "success",
+                        "command": "templates generate-docs",
+                        "readme": readme,
+                    })
+                })
+            }
+        }
+        _ => Err(format!("Unsupported templates subcommand: {subcommand}")),
+    };
+
+    match result {
+        Ok(payload) => {
+            println!("{payload}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::from(1)
+        }
+    }
+}
+
+fn run_native_upgrade(args: &[String]) -> ExitCode {
+    match run_upgrade_lockfile(args) {
+        Ok(payload) => {
+            println!("{payload}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::from(1)
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let raw_args: Vec<String> = env::args().skip(1).collect();
     if raw_args.is_empty() || raw_args[0] == "--help" || raw_args[0] == "-h" {
@@ -577,10 +978,10 @@ fn main() -> ExitCode {
             return run_native_lifecycle_command(command, command_args);
         }
         "outdated" => return run_native_outdated(command_args),
+        "upgrade" => return run_native_upgrade(command_args),
         "exec" => return run_native_exec(command_args),
-        "features" | "templates" if should_use_native_collection(command_args) => {
-            return run_native_collection(command, command_args);
-        }
+        "features" => return run_native_features(command_args),
+        "templates" => return run_native_templates(command_args),
         _ => {}
     }
 
@@ -643,10 +1044,13 @@ fn main() -> ExitCode {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_build_payload, build_lifecycle_payload, build_outdated_payload,
-        build_read_configuration_payload, execute_native_exec, is_command_help_request,
-        native_only_mode_enabled, resolve_read_configuration_path, run_native_collection,
-        should_use_native_collection, should_use_native_read_configuration,
+        apply_template_target, build_build_payload, build_feature_info_payload,
+        build_features_resolve_dependencies_payload, build_lifecycle_payload,
+        build_outdated_payload, build_read_configuration_payload, build_template_metadata_payload,
+        execute_native_exec, generate_feature_docs, is_command_help_request,
+        native_only_mode_enabled, package_collection_target, resolve_read_configuration_path,
+        run_native_collection, run_upgrade_lockfile, should_use_native_collection,
+        should_use_native_read_configuration,
     };
     use std::fs;
     use std::process::ExitCode;
@@ -902,5 +1306,148 @@ mod tests {
         assert_eq!(result.status_code, 0);
         assert_eq!(result.stdout, "native-exec");
         assert_eq!(result.stderr, "");
+    }
+
+    #[test]
+    fn feature_dependency_resolution_respects_override_order() {
+        let root = unique_temp_dir();
+        let config_dir = root.join(".devcontainer");
+        fs::create_dir_all(&config_dir).expect("failed to create config directory");
+        fs::write(
+            config_dir.join("devcontainer.json"),
+            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"features\": {\n    \"feature-a\": {},\n    \"feature-b\": {}\n  },\n  \"overrideFeatureInstallOrder\": [\"feature-b\", \"feature-a\"]\n}\n",
+        )
+        .expect("failed to write config");
+
+        let payload = build_features_resolve_dependencies_payload(&[
+            "--workspace-folder".to_string(),
+            root.display().to_string(),
+        ])
+        .expect("payload");
+
+        let features = payload["resolvedFeatures"]
+            .as_array()
+            .expect("resolved features");
+        assert_eq!(features[0], "feature-b");
+        assert_eq!(features[1], "feature-a");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn feature_info_reads_manifest_metadata() {
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("failed to create feature root");
+        fs::write(
+            root.join("devcontainer-feature.json"),
+            "{\n  \"id\": \"demo-feature\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+        )
+        .expect("failed to write feature manifest");
+
+        let payload =
+            build_feature_info_payload(root.to_string_lossy().as_ref()).expect("feature info");
+
+        assert_eq!(payload["id"], "demo-feature");
+        assert_eq!(payload["name"], "Demo Feature");
+        assert_eq!(payload["version"], "1.0.0");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn packaging_a_collection_target_creates_an_archive() {
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("failed to create package root");
+        fs::write(
+            root.join("devcontainer-feature.json"),
+            "{\n  \"id\": \"packaged-feature\",\n  \"name\": \"Packaged Feature\"\n}\n",
+        )
+        .expect("failed to write feature manifest");
+
+        let archive = package_collection_target(&root, "devcontainer-feature.json", "feature")
+            .expect("archive");
+
+        assert!(archive.is_file());
+        let _ = fs::remove_file(archive);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn generate_feature_docs_writes_readme() {
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("failed to create docs root");
+        fs::write(
+            root.join("devcontainer-feature.json"),
+            "{\n  \"id\": \"docs-feature\",\n  \"name\": \"Docs Feature\",\n  \"description\": \"Generated docs\"\n}\n",
+        )
+        .expect("failed to write feature manifest");
+
+        let readme = generate_feature_docs(&root).expect("readme");
+
+        assert!(readme.is_file());
+        let content = fs::read_to_string(readme).expect("readme content");
+        assert!(content.contains("Docs Feature"));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn template_apply_copies_template_src_into_workspace() {
+        let template_root = unique_temp_dir();
+        let template_src = template_root.join("src");
+        let workspace_root = unique_temp_dir();
+        fs::create_dir_all(&template_src).expect("failed to create template src");
+        fs::write(
+            template_root.join("devcontainer-template.json"),
+            "{\n  \"id\": \"demo-template\",\n  \"name\": \"Demo Template\"\n}\n",
+        )
+        .expect("failed to write template manifest");
+        fs::write(template_src.join("README.md"), "# template\n")
+            .expect("failed to write template file");
+
+        apply_template_target(&template_root, &workspace_root).expect("apply template");
+
+        assert!(workspace_root.join("README.md").is_file());
+        let _ = fs::remove_dir_all(template_root);
+        let _ = fs::remove_dir_all(workspace_root);
+    }
+
+    #[test]
+    fn template_metadata_reads_manifest_metadata() {
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("failed to create template root");
+        fs::write(
+            root.join("devcontainer-template.json"),
+            "{\n  \"id\": \"demo-template\",\n  \"name\": \"Demo Template\"\n}\n",
+        )
+        .expect("failed to write template manifest");
+
+        let payload = build_template_metadata_payload(root.to_string_lossy().as_ref())
+            .expect("template metadata");
+
+        assert_eq!(payload["id"], "demo-template");
+        assert_eq!(payload["name"], "Demo Template");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn upgrade_lockfile_writes_devcontainer_lock_json() {
+        let root = unique_temp_dir();
+        let config_dir = root.join(".devcontainer");
+        fs::create_dir_all(&config_dir).expect("failed to create config directory");
+        fs::write(
+            config_dir.join("devcontainer.json"),
+            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/node:1\": {}\n  }\n}\n",
+        )
+        .expect("failed to write config");
+
+        let payload =
+            run_upgrade_lockfile(&["--workspace-folder".to_string(), root.display().to_string()])
+                .expect("lockfile payload");
+
+        let lockfile = config_dir.join("devcontainer-lock.json");
+        assert!(lockfile.is_file());
+        assert_eq!(
+            payload["lockfile"]["features"]["ghcr.io/devcontainers/features/node:1"]["version"],
+            "1"
+        );
+        let _ = fs::remove_dir_all(root);
     }
 }

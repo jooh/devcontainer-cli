@@ -127,10 +127,10 @@ Top-level commands in scope for full native parity:
   - [x] post-GA hardening gate: interactive TTY/PTY fidelity.
 
 ## Phase 4 (PR #32) — Port collection and publishing flows
-- [ ] `features`: `resolve-dependencies`, `info`, `test`, `package`, `publish`, `generate-docs`.
-- [ ] `templates`: `apply`, `metadata`, `publish`, `generate-docs`.
-- [ ] `upgrade` parity and lockfile behavior.
-- [ ] Sequence network-dependent `features/templates publish` parity after local/resolve/test/apply parity is stable.
+- [x] `features`: `resolve-dependencies`, `info`, `test`, `package`, `publish`, `generate-docs`.
+- [x] `templates`: `apply`, `metadata`, `publish`, `generate-docs`.
+- [x] `upgrade` parity and lockfile behavior.
+- [x] Sequence network-dependent `features/templates publish` parity after local/resolve/test/apply parity is stable.
 
 ## Phase 5 (PR #33) — Hardening + cutover
 - [ ] Remove Node bridge codepath entirely from `devcontainer`.

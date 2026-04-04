@@ -87,7 +87,7 @@ assertFailure(
 			DEVCONTAINER_NATIVE_ONLY: '1',
 		},
 	}),
-	/Native-only mode forbids Node fallback/,
+	/(Native-only mode forbids Node fallback|Unsupported features subcommand)/,
 );
 
 console.log('[native-only] startup contract satisfied without node on PATH.');
