@@ -31,6 +31,7 @@
 		"compile-watch": "node esbuild.js --watch",
 		"tsc-b": "tsc -b",
 		"tsc-b-w": "tsc -b -w",
+		"install-git-hooks": "./scripts/install-git-hooks.sh",
 		"precommit": "node build/hygiene.js",
 		"lint": "eslint --max-warnings 0 ./src",
 		"npm-pack": "npm pack",

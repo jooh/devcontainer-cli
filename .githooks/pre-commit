@@ -1,0 +1,6 @@
+#!/bin/sh
+
+set -eu
+
+echo "Running cargo fmt --check..."
+cargo fmt --manifest-path cmd/devcontainer/Cargo.toml --all -- --check
