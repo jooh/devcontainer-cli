@@ -20,7 +20,9 @@ pub fn resolve_config_path(
             workspace_folder.join(config)
         }
     } else {
-        let modern = workspace_folder.join(".devcontainer").join("devcontainer.json");
+        let modern = workspace_folder
+            .join(".devcontainer")
+            .join("devcontainer.json");
         let legacy = workspace_folder.join(".devcontainer.json");
         if modern.is_file() {
             modern
@@ -170,11 +172,7 @@ fn substitute_string(input: &str, context: &ConfigContext) -> String {
             break;
         };
         let variable_name = &remainder[..end_offset];
-        let replacement = context
-            .env
-            .get(variable_name)
-            .cloned()
-            .unwrap_or_default();
+        let replacement = context.env.get(variable_name).cloned().unwrap_or_default();
         let end = start + "${localEnv:".len() + end_offset + 1;
         output.replace_range(start..end, &replacement);
     }
@@ -228,13 +226,17 @@ mod tests {
 
         let resolved = resolve_config_path(&root, None).expect("expected config path");
 
-        assert_eq!(resolved, fs::canonicalize(config_path).expect("failed to canonicalize"));
+        assert_eq!(
+            resolved,
+            fs::canonicalize(config_path).expect("failed to canonicalize")
+        );
         let _ = fs::remove_dir_all(root);
     }
 
     #[test]
     fn parses_jsonc_with_comments_and_trailing_commas() {
-        let parsed = parse_jsonc_value("{\n  // comment\n  \"name\": \"demo\",\n}\n").expect("expected parse");
+        let parsed = parse_jsonc_value("{\n  // comment\n  \"name\": \"demo\",\n}\n")
+            .expect("expected parse");
         assert_eq!(parsed["name"], "demo");
     }
 
