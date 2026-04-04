@@ -4,6 +4,8 @@ This repository hosts a **project-owned native migration** of the Dev Containers
 
 The distributed CLI runtime is now the Rust binary in `cmd/devcontainer`; Node/TypeScript assets remain in the repository for parity tracking against `upstream/`, not for runtime execution.
 
+Node-based scripts in `package.json` are compatibility tooling only. Native release/distribution flows use the Rust crate, the standalone build scripts, and the GitHub Releases workflow.
+
 ## Repository layout and upstream compatibility
 
 `upstream/` exists so we can track the canonical upstream sources at an exact pinned commit while keeping native-port and migration work reviewable in this repository.
@@ -66,6 +68,8 @@ Run focused migration/readiness checks:
 
 ```bash
 npm test -- --grep "upstream submodule cutover"
+node build/check-parity-harness.js
+node build/check-no-node-runtime.js
 ```
 
 ## Project status

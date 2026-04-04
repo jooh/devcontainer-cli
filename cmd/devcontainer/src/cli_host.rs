@@ -3,11 +3,13 @@ use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
+#[allow(dead_code)]
 pub struct CliHost {
     pub cwd: PathBuf,
     pub env: HashMap<String, String>,
 }
 
+#[allow(dead_code)]
 impl CliHost {
     pub fn from_env() -> Result<Self, String> {
         let cwd = env::current_dir().map_err(|error| error.to_string())?;

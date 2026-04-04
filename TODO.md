@@ -142,9 +142,9 @@ Top-level commands in scope for full native parity:
 - [x] Update cutover docs continuously as implementation status changes (no “completed” claims ahead of verified parity).
 
 ## Phase 6 — Repository cleanup after successful cutover
-- [ ] Move TS/Node build/test assets to compatibility-only role (or separate tooling repo) if no longer needed for distribution.
-- [ ] Keep npm/bin metadata out of the native release path while GitHub Releases remains the distribution channel.
-- [ ] Keep `upstream/` as reference baseline and parity fixture source.
+- [x] Move TS/Node build/test assets to compatibility-only role (or separate tooling repo) if no longer needed for distribution.
+- [x] Keep npm/bin metadata out of the native release path while GitHub Releases remains the distribution channel.
+- [x] Keep `upstream/` as reference baseline and parity fixture source.
 
 ---
 
