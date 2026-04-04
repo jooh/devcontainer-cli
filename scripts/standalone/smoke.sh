@@ -17,3 +17,6 @@ fi
 "$binary" up --help >/dev/null
 "$binary" build --help >/dev/null
 "$binary" exec --help >/dev/null
+"$binary" features list >/dev/null
+"$binary" templates list >/dev/null
+"$binary" upgrade --help >/dev/null

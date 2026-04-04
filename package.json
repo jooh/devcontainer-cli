@@ -42,6 +42,7 @@
 		"generate-command-matrix": "node build/generate-command-matrix.js",
 		"check-command-matrix": "node build/generate-command-matrix.js --check",
 		"check-parity-harness": "node build/check-parity-harness.js",
+		"check-no-node-runtime": "node build/check-no-node-runtime.js",
 		"check-spec-drift": "node build/check-spec-drift.js",
 		"test-container-features": "env TS_NODE_PROJECT=upstream/src/test/tsconfig.json mocha -r ts-node/register --exit upstream/src/test/container-features/*.test.ts",
 		"test-container-features-cli": "env TS_NODE_PROJECT=upstream/src/test/tsconfig.json mocha -r ts-node/register --exit upstream/src/test/container-features/featuresCLICommands.test.ts",

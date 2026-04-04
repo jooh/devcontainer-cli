@@ -133,13 +133,13 @@ Top-level commands in scope for full native parity:
 - [x] Sequence network-dependent `features/templates publish` parity after local/resolve/test/apply parity is stable.
 
 ## Phase 5 (PR #33) — Hardening + cutover
-- [ ] Remove Node bridge codepath entirely from `devcontainer`.
-- [ ] Remove runtime assumptions about `dist/spec-node/devContainersSpecCLI.js`.
-- [ ] Add release CI lanes for multi-platform Rust binaries.
-- [ ] Publish release artifacts via **GitHub Releases** (no npm publication for current rollout).
-- [ ] Introduce compatibility dashboard keyed to pinned `upstream` commit.
-- [ ] Switch default distributed executable to native binary.
-- [ ] Update cutover docs continuously as implementation status changes (no “completed” claims ahead of verified parity).
+- [x] Remove Node bridge codepath entirely from `devcontainer`.
+- [x] Remove runtime assumptions about `dist/spec-node/devContainersSpecCLI.js`.
+- [x] Add release CI lanes for multi-platform Rust binaries.
+- [x] Publish release artifacts via **GitHub Releases** (no npm publication for current rollout).
+- [x] Introduce compatibility dashboard keyed to pinned `upstream` commit.
+- [x] Switch default distributed executable to native binary.
+- [x] Update cutover docs continuously as implementation status changes (no “completed” claims ahead of verified parity).
 
 ## Phase 6 (PR #34) — Repository cleanup after successful cutover
 - [ ] Move TS/Node build/test assets to compatibility-only role (or separate tooling repo) if no longer needed for distribution.

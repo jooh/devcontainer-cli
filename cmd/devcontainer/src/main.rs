@@ -30,7 +30,7 @@ const NATIVE_ONLY_ENV_VAR: &str = "DEVCONTAINER_NATIVE_ONLY";
 fn print_help() {
     println!("devcontainer (native foundation)");
     println!("\nUsage:\n  devcontainer [--log-format text|json] <command> [args...]\n");
-    println!("Supported top-level commands (forwarded to Node bridge):");
+    println!("Supported top-level commands (native Rust runtime):");
     for command in SUPPORTED_TOP_LEVEL_COMMANDS {
         println!("  - {command}");
     }
@@ -116,15 +116,6 @@ fn is_command_help_request(args: &[String]) -> bool {
         args.first().map(String::as_str),
         Some("--help") | Some("-h")
     )
-}
-
-fn resolve_bridge_script() -> Result<PathBuf, String> {
-    let exe_path = env::current_exe().map_err(|error| error.to_string())?;
-    let exe_dir = exe_path
-        .parent()
-        .ok_or_else(|| "Unable to determine executable directory".to_string())?;
-
-    Ok(exe_dir.join("dist/spec-node/devContainersSpecCLI.js"))
 }
 
 fn parse_option_value(args: &[String], option: &str) -> Option<String> {
@@ -985,60 +976,17 @@ fn main() -> ExitCode {
         _ => {}
     }
 
-    if native_only_mode_enabled() {
-        eprintln!(
-            "Native-only mode forbids Node fallback for command: {command}. Port the command or disable {NATIVE_ONLY_ENV_VAR}."
-        );
-        return ExitCode::from(3);
-    }
-
-    emit_log(
-        log_format,
-        "Delegating command to Node compatibility bridge.",
+    emit_log(log_format, "Unsupported native command path.");
+    let native_only_suffix = if native_only_mode_enabled() {
+        " Native-only mode is enabled."
+    } else {
+        ""
+    };
+    eprintln!(
+        "Unsupported native command path: {command} {}{native_only_suffix}",
+        command_args.join(" ")
     );
-
-    let bridge_script = match resolve_bridge_script() {
-        Ok(path) => path,
-        Err(error) => {
-            eprintln!("Failed to resolve Node compatibility bridge path: {error}");
-            return ExitCode::from(1);
-        }
-    };
-
-    let cli_host = match cli_host::CliHost::from_env() {
-        Ok(host) => host,
-        Err(error) => {
-            eprintln!("Failed to probe CLI host environment: {error}");
-            return ExitCode::from(1);
-        }
-    };
-
-    let node_program = cli_host
-        .lookup_command("node")
-        .unwrap_or_else(|| PathBuf::from("node"));
-
-    let process = process_runner::run_process(&process_runner::ProcessRequest {
-        program: node_program.display().to_string(),
-        args: {
-            let mut args = vec![bridge_script.display().to_string()];
-            args.extend(raw_args.clone());
-            args
-        },
-        cwd: Some(cli_host.cwd),
-        env: cli_host.env,
-    });
-
-    match process {
-        Ok(result) => {
-            let _ = io::stdout().write_all(result.stdout.as_bytes());
-            let _ = io::stderr().write_all(result.stderr.as_bytes());
-            ExitCode::from(result.status_code as u8)
-        }
-        Err(error) => {
-            eprintln!("Failed to invoke Node compatibility bridge: {error}");
-            ExitCode::from(1)
-        }
-    }
+    ExitCode::from(2)
 }
 
 #[cfg(test)]
