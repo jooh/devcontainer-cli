@@ -92,13 +92,19 @@ fn native_only_mode_enabled() -> bool {
     env::var(NATIVE_ONLY_ENV_VAR)
         .map(|value| {
             let normalized = value.trim().to_ascii_lowercase();
-            !normalized.is_empty() && normalized != "0" && normalized != "false" && normalized != "no"
+            !normalized.is_empty()
+                && normalized != "0"
+                && normalized != "false"
+                && normalized != "no"
         })
         .unwrap_or(false)
 }
 
 fn is_command_help_request(args: &[String]) -> bool {
-    matches!(args.first().map(String::as_str), Some("--help") | Some("-h"))
+    matches!(
+        args.first().map(String::as_str),
+        Some("--help") | Some("-h")
+    )
 }
 
 fn resolve_bridge_script() -> Result<PathBuf, String> {
