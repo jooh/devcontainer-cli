@@ -148,12 +148,12 @@ function runNativeReadConfiguration(workspaceFolder) {
 
 function runReferenceReadConfiguration(workspaceFolder) {
 	const configPath = path.join(workspaceFolder, '.devcontainer', 'devcontainer.json');
+	const configuration = parseJsonc(fs.readFileSync(configPath, 'utf8'));
 	return {
-		configuration: {
+		configuration,
+		metadata: {
 			workspaceFolder: fs.realpathSync(workspaceFolder),
 			configFile: fs.realpathSync(configPath),
-		},
-		metadata: {
 			format: 'jsonc',
 			pathResolution: 'native-rust',
 		},

@@ -1,6 +1,13 @@
 use std::collections::HashSet;
 
-pub const REQUIRED_EXECUTION_COMMANDS: [&str; 3] = ["build", "up", "exec"];
+pub const REQUIRED_EXECUTION_COMMANDS: [&str; 6] = [
+    "build",
+    "up",
+    "set-up",
+    "run-user-commands",
+    "outdated",
+    "exec",
+];
 pub const REQUIRED_COLLECTION_COMMANDS: [&str; 2] = ["features", "templates"];
 
 pub struct IntrospectionPortingInput {

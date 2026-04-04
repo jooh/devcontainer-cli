@@ -35,9 +35,25 @@ pub fn run_process(request: &ProcessRequest) -> Result<ProcessResult, String> {
     })
 }
 
+pub fn run_process_streaming(request: &ProcessRequest) -> Result<i32, String> {
+    let mut command = Command::new(&request.program);
+    command.args(&request.args);
+
+    if let Some(cwd) = &request.cwd {
+        command.current_dir(cwd);
+    }
+
+    if !request.env.is_empty() {
+        command.envs(&request.env);
+    }
+
+    let status = command.status().map_err(|error| error.to_string())?;
+    Ok(status.code().unwrap_or(1))
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{run_process, ProcessRequest};
+    use super::{run_process, run_process_streaming, ProcessRequest};
     use std::collections::HashMap;
 
     #[test]
@@ -53,5 +69,18 @@ mod tests {
         assert_eq!(result.status_code, 0);
         assert_eq!(result.stdout, "native-process");
         assert_eq!(result.stderr, "");
+    }
+
+    #[test]
+    fn returns_status_for_streaming_processes() {
+        let status = run_process_streaming(&ProcessRequest {
+            program: "/bin/sh".to_string(),
+            args: vec!["-c".to_string(), "exit 0".to_string()],
+            cwd: None,
+            env: HashMap::new(),
+        })
+        .expect("expected streaming process to run");
+
+        assert_eq!(status, 0);
     }
 }
