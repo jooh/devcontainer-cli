@@ -56,7 +56,9 @@ fn print_command_help(command: &str) {
             println!("  - generate-docs <target>");
         }
         "templates" => {
-            println!("Usage:\n  devcontainer templates <list|ls|apply|metadata|publish|generate-docs>");
+            println!(
+                "Usage:\n  devcontainer templates <list|ls|apply|metadata|publish|generate-docs>"
+            );
             println!("\nNative support:");
             println!("  - list / ls");
             println!("  - apply <target>");
@@ -443,7 +445,10 @@ fn build_features_resolve_dependencies_payload(args: &[String]) -> Result<Value,
 }
 
 fn build_feature_info_payload(feature_path: &str) -> Result<Value, String> {
-    let manifest = parse_manifest(std::path::Path::new(feature_path), "devcontainer-feature.json")?;
+    let manifest = parse_manifest(
+        std::path::Path::new(feature_path),
+        "devcontainer-feature.json",
+    )?;
     Ok(json!({
         "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
         "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
@@ -466,10 +471,7 @@ fn package_collection_target(
             .and_then(|name| name.to_str())
             .unwrap_or(prefix)
     );
-    let archive_path = target
-        .parent()
-        .unwrap_or(target)
-        .join(archive_name);
+    let archive_path = target.parent().unwrap_or(target).join(archive_name);
 
     let result = process_runner::run_process(&process_runner::ProcessRequest {
         program: "tar".to_string(),
@@ -494,20 +496,23 @@ fn package_collection_target(
 fn generate_feature_docs(feature_root: &std::path::Path) -> Result<PathBuf, String> {
     let manifest = parse_manifest(feature_root, "devcontainer-feature.json")?;
     let readme_path = feature_root.join("README.md");
-    let name = manifest.get("name").and_then(Value::as_str).unwrap_or("Feature");
+    let name = manifest
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or("Feature");
     let description = manifest
         .get("description")
         .and_then(Value::as_str)
         .unwrap_or("Generated documentation.");
-    fs::write(
-        &readme_path,
-        format!("# {name}\n\n{description}\n"),
-    )
-    .map_err(|error| error.to_string())?;
+    fs::write(&readme_path, format!("# {name}\n\n{description}\n"))
+        .map_err(|error| error.to_string())?;
     Ok(readme_path)
 }
 
-fn copy_directory_recursive(source: &std::path::Path, destination: &std::path::Path) -> Result<(), String> {
+fn copy_directory_recursive(
+    source: &std::path::Path,
+    destination: &std::path::Path,
+) -> Result<(), String> {
     fs::create_dir_all(destination).map_err(|error| error.to_string())?;
     for entry in fs::read_dir(source).map_err(|error| error.to_string())? {
         let entry = entry.map_err(|error| error.to_string())?;
@@ -537,7 +542,10 @@ fn apply_template_target(
 }
 
 fn build_template_metadata_payload(template_path: &str) -> Result<Value, String> {
-    let manifest = parse_manifest(std::path::Path::new(template_path), "devcontainer-template.json")?;
+    let manifest = parse_manifest(
+        std::path::Path::new(template_path),
+        "devcontainer-template.json",
+    )?;
     Ok(json!({
         "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
         "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
@@ -548,7 +556,10 @@ fn build_template_metadata_payload(template_path: &str) -> Result<Value, String>
 fn generate_template_docs(template_root: &std::path::Path) -> Result<PathBuf, String> {
     let manifest = parse_manifest(template_root, "devcontainer-template.json")?;
     let readme_path = template_root.join("README.md");
-    let name = manifest.get("name").and_then(Value::as_str).unwrap_or("Template");
+    let name = manifest
+        .get("name")
+        .and_then(Value::as_str)
+        .unwrap_or("Template");
     let description = manifest
         .get("description")
         .and_then(Value::as_str)
@@ -781,37 +792,51 @@ fn run_native_features(args: &[String]) -> ExitCode {
             if args.len() < 2 {
                 Err("features package requires <target>".to_string())
             } else {
-                package_collection_target(std::path::Path::new(&args[1]), "devcontainer-feature.json", "feature")
-                    .map(|archive| json!({
+                package_collection_target(
+                    std::path::Path::new(&args[1]),
+                    "devcontainer-feature.json",
+                    "feature",
+                )
+                .map(|archive| {
+                    json!({
                         "outcome": "success",
                         "command": "features package",
                         "archive": archive,
-                    }))
+                    })
+                })
             }
         }
         "publish" => {
             if args.len() < 2 {
                 Err("features publish requires <target>".to_string())
             } else {
-                package_collection_target(std::path::Path::new(&args[1]), "devcontainer-feature.json", "feature")
-                    .map(|archive| json!({
+                package_collection_target(
+                    std::path::Path::new(&args[1]),
+                    "devcontainer-feature.json",
+                    "feature",
+                )
+                .map(|archive| {
+                    json!({
                         "outcome": "success",
                         "command": "features publish",
                         "archive": archive,
                         "published": false,
                         "mode": "local-package-only",
-                    }))
+                    })
+                })
             }
         }
         "generate-docs" => {
             if args.len() < 2 {
                 Err("features generate-docs requires <target>".to_string())
             } else {
-                generate_feature_docs(std::path::Path::new(&args[1])).map(|readme| json!({
-                    "outcome": "success",
-                    "command": "features generate-docs",
-                    "readme": readme,
-                }))
+                generate_feature_docs(std::path::Path::new(&args[1])).map(|readme| {
+                    json!({
+                        "outcome": "success",
+                        "command": "features generate-docs",
+                        "readme": readme,
+                    })
+                })
             }
         }
         _ => Err(format!("Unsupported features subcommand: {subcommand}")),
@@ -838,7 +863,9 @@ fn run_native_templates(args: &[String]) -> ExitCode {
                 Err("templates apply requires <target>".to_string())
             } else {
                 match env::current_dir().map_err(|error| error.to_string()) {
-                    Ok(workspace) => apply_template_target(std::path::Path::new(&args[1]), &workspace),
+                    Ok(workspace) => {
+                        apply_template_target(std::path::Path::new(&args[1]), &workspace)
+                    }
                     Err(error) => Err(error),
                 }
             }
@@ -854,25 +881,33 @@ fn run_native_templates(args: &[String]) -> ExitCode {
             if args.len() < 2 {
                 Err("templates publish requires <target>".to_string())
             } else {
-                package_collection_target(std::path::Path::new(&args[1]), "devcontainer-template.json", "template")
-                    .map(|archive| json!({
+                package_collection_target(
+                    std::path::Path::new(&args[1]),
+                    "devcontainer-template.json",
+                    "template",
+                )
+                .map(|archive| {
+                    json!({
                         "outcome": "success",
                         "command": "templates publish",
                         "archive": archive,
                         "published": false,
                         "mode": "local-package-only",
-                    }))
+                    })
+                })
             }
         }
         "generate-docs" => {
             if args.len() < 2 {
                 Err("templates generate-docs requires <target>".to_string())
             } else {
-                generate_template_docs(std::path::Path::new(&args[1])).map(|readme| json!({
-                    "outcome": "success",
-                    "command": "templates generate-docs",
-                    "readme": readme,
-                }))
+                generate_template_docs(std::path::Path::new(&args[1])).map(|readme| {
+                    json!({
+                        "outcome": "success",
+                        "command": "templates generate-docs",
+                        "readme": readme,
+                    })
+                })
             }
         }
         _ => Err(format!("Unsupported templates subcommand: {subcommand}")),
@@ -1290,7 +1325,9 @@ mod tests {
         ])
         .expect("payload");
 
-        let features = payload["resolvedFeatures"].as_array().expect("resolved features");
+        let features = payload["resolvedFeatures"]
+            .as_array()
+            .expect("resolved features");
         assert_eq!(features[0], "feature-b");
         assert_eq!(features[1], "feature-a");
         let _ = fs::remove_dir_all(root);
@@ -1325,8 +1362,8 @@ mod tests {
         )
         .expect("failed to write feature manifest");
 
-        let archive =
-            package_collection_target(&root, "devcontainer-feature.json", "feature").expect("archive");
+        let archive = package_collection_target(&root, "devcontainer-feature.json", "feature")
+            .expect("archive");
 
         assert!(archive.is_file());
         let _ = fs::remove_file(archive);
@@ -1362,7 +1399,8 @@ mod tests {
             "{\n  \"id\": \"demo-template\",\n  \"name\": \"Demo Template\"\n}\n",
         )
         .expect("failed to write template manifest");
-        fs::write(template_src.join("README.md"), "# template\n").expect("failed to write template file");
+        fs::write(template_src.join("README.md"), "# template\n")
+            .expect("failed to write template file");
 
         apply_template_target(&template_root, &workspace_root).expect("apply template");
 
@@ -1381,8 +1419,8 @@ mod tests {
         )
         .expect("failed to write template manifest");
 
-        let payload =
-            build_template_metadata_payload(root.to_string_lossy().as_ref()).expect("template metadata");
+        let payload = build_template_metadata_payload(root.to_string_lossy().as_ref())
+            .expect("template metadata");
 
         assert_eq!(payload["id"], "demo-template");
         assert_eq!(payload["name"], "Demo Template");
@@ -1400,11 +1438,9 @@ mod tests {
         )
         .expect("failed to write config");
 
-        let payload = run_upgrade_lockfile(&[
-            "--workspace-folder".to_string(),
-            root.display().to_string(),
-        ])
-        .expect("lockfile payload");
+        let payload =
+            run_upgrade_lockfile(&["--workspace-folder".to_string(), root.display().to_string()])
+                .expect("lockfile payload");
 
         let lockfile = config_dir.join("devcontainer-lock.json");
         assert!(lockfile.is_file());
