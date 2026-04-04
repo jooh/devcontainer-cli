@@ -1,0 +1,6 @@
+{
+	"name": "invalid-missing-container",
+	"features": {
+		"ghcr.io/devcontainers/features/git:1": {}
+	}
+}

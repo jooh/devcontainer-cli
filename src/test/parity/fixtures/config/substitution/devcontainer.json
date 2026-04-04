@@ -1,0 +1,7 @@
+{
+	"name": "config-substitution",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	"containerEnv": {
+		"USER_NAME": "${localEnv:USER}"
+	}
+}

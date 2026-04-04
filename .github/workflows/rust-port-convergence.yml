@@ -21,6 +21,11 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
@@ -32,6 +37,15 @@ jobs:
 
       - name: Native-only startup contract
         run: node build/check-native-only.js
+
+      - name: Command matrix drift check
+        run: node build/generate-command-matrix.js --check
+
+      - name: Schema drift check
+        run: node build/check-spec-drift.js
+
+      - name: Parity harness
+        run: node build/check-parity-harness.js
 
   upstream-convergence:
     name: Upstream Convergence Baseline

@@ -96,20 +96,20 @@ Top-level commands in scope for full native parity:
 - [x] Add startup/runtime contract test: running binary with `PATH` excluding Node still supports implemented commands.
 
 ## Phase 1 (PR #29) — Build parity harness against upstream
-- [ ] Auto-generate command/option matrix from upstream yargs definitions for drift detection.
-- [ ] Ensure parity matrix includes full upstream top-level scope: `up`, `set-up`, `build`, `run-user-commands`, `read-configuration`, `outdated`, `upgrade`, `features`, `templates`, `exec`.
-- [ ] Build golden test corpus from upstream fixtures for:
+- [x] Auto-generate command/option matrix from upstream yargs definitions for drift detection.
+- [x] Ensure parity matrix includes full upstream top-level scope: `up`, `set-up`, `build`, `run-user-commands`, `read-configuration`, `outdated`, `upgrade`, `features`, `templates`, `exec`.
+- [x] Build golden test corpus from upstream fixtures for:
   - `read-configuration`
   - config substitution/merge behavior
   - Docker command construction
   - JSON output schemas
-- [ ] Build schema contract tests against pinned `spec/` submodule:
-  - [ ] Validate accepted configs against `spec/schemas/devContainer.base.schema.json`.
-  - [ ] Validate known-invalid configs fail with expected error categories/messages.
-  - [ ] Track schema revision provenance in test output (`git rev-parse HEAD:spec`).
-- [ ] Add dual-run test harness: execute same scenario against upstream CLI and Rust CLI, diff outputs/exit codes.
-- [ ] Treat text/log/output parity as **semantic equivalence** unless a contract explicitly requires byte-level matching.
-- [ ] Add a schema drift check that fails when pinned `HEAD:spec` changes without corresponding schema-parity fixture/test updates.
+- [x] Build schema contract tests against pinned `spec/` submodule:
+  - [x] Validate accepted configs against `spec/schemas/devContainer.base.schema.json`.
+  - [x] Validate known-invalid configs fail with expected error categories/messages.
+  - [x] Track schema revision provenance in test output (`git rev-parse HEAD:spec`).
+- [x] Add dual-run test harness: execute same scenario against upstream CLI and Rust CLI, diff outputs/exit codes.
+- [x] Treat text/log/output parity as **semantic equivalence** unless a contract explicitly requires byte-level matching.
+- [x] Add a schema drift check that fails when pinned `HEAD:spec` changes without corresponding schema-parity fixture/test updates.
 
 ## Phase 2 (PR #30) — Port foundational libraries (non-command-specific)
 - [ ] Implement Rust logging/event primitives compatible with upstream formats (`text`/`json`).

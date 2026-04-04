@@ -1,0 +1,5 @@
+{
+	// JSONC comments are allowed by the pinned spec schema.
+	"name": "valid-image-fixture",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu"
+}

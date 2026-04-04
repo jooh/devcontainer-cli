@@ -1,0 +1,411 @@
+{
+	"upstreamCommit": "39685cf1aa58b5b11e90085bd32562fad61f4103",
+	"sourcePath": "upstream/src/spec-node/devContainersSpecCLI.ts",
+	"topLevel": [
+		"up",
+		"set-up",
+		"build",
+		"run-user-commands",
+		"read-configuration",
+		"outdated",
+		"upgrade",
+		"features",
+		"templates",
+		"exec"
+	],
+	"commands": [
+		{
+			"group": null,
+			"path": "up",
+			"description": "Create and run dev container",
+			"optionsBuilder": "provisionOptions",
+			"options": [
+				"additional-features",
+				"build-no-cache",
+				"buildkit",
+				"cache-from",
+				"cache-to",
+				"config",
+				"container-data-folder",
+				"container-session-data-folder",
+				"container-system-data-folder",
+				"default-user-env-probe",
+				"docker-compose-path",
+				"docker-path",
+				"dotfiles-install-command",
+				"dotfiles-repository",
+				"dotfiles-target-path",
+				"expect-existing-container",
+				"experimental-frozen-lockfile",
+				"experimental-lockfile",
+				"gpu-availability",
+				"id-label",
+				"include-configuration",
+				"include-merged-configuration",
+				"log-format",
+				"log-level",
+				"mount",
+				"mount-git-worktree-common-dir",
+				"mount-workspace-git-root",
+				"omit-config-remote-env-from-metadata",
+				"omit-syntax-directive",
+				"override-config",
+				"remote-env",
+				"remove-existing-container",
+				"secrets-file",
+				"skip-feature-auto-mapping",
+				"skip-non-blocking-commands",
+				"skip-post-attach",
+				"skip-post-create",
+				"terminal-columns",
+				"terminal-rows",
+				"update-remote-user-uid-default",
+				"user-data-folder",
+				"workspace-folder",
+				"workspace-mount-consistency"
+			]
+		},
+		{
+			"group": null,
+			"path": "set-up",
+			"description": "Set up an existing container as a dev container",
+			"optionsBuilder": "setUpOptions",
+			"options": [
+				"config",
+				"container-data-folder",
+				"container-id",
+				"container-session-data-folder",
+				"container-system-data-folder",
+				"default-user-env-probe",
+				"docker-path",
+				"dotfiles-install-command",
+				"dotfiles-repository",
+				"dotfiles-target-path",
+				"include-configuration",
+				"include-merged-configuration",
+				"log-format",
+				"log-level",
+				"remote-env",
+				"skip-non-blocking-commands",
+				"skip-post-create",
+				"terminal-columns",
+				"terminal-rows",
+				"user-data-folder"
+			]
+		},
+		{
+			"group": null,
+			"path": "build",
+			"description": "Build a dev container image",
+			"optionsBuilder": "buildOptions",
+			"options": [
+				"additional-features",
+				"buildkit",
+				"cache-from",
+				"cache-to",
+				"config",
+				"docker-compose-path",
+				"docker-path",
+				"experimental-frozen-lockfile",
+				"experimental-lockfile",
+				"image-name",
+				"label",
+				"log-format",
+				"log-level",
+				"no-cache",
+				"omit-syntax-directive",
+				"output",
+				"platform",
+				"push",
+				"skip-feature-auto-mapping",
+				"skip-persisting-customizations-from-features",
+				"user-data-folder",
+				"workspace-folder"
+			]
+		},
+		{
+			"group": null,
+			"path": "run-user-commands",
+			"description": "Run user commands",
+			"optionsBuilder": "runUserCommandsOptions",
+			"options": [
+				"config",
+				"container-data-folder",
+				"container-id",
+				"container-session-data-folder",
+				"container-system-data-folder",
+				"default-user-env-probe",
+				"docker-compose-path",
+				"docker-path",
+				"dotfiles-install-command",
+				"dotfiles-repository",
+				"dotfiles-target-path",
+				"id-label",
+				"log-format",
+				"log-level",
+				"mount-git-worktree-common-dir",
+				"mount-workspace-git-root",
+				"override-config",
+				"remote-env",
+				"secrets-file",
+				"skip-feature-auto-mapping",
+				"skip-non-blocking-commands",
+				"skip-post-attach",
+				"stop-for-personalization",
+				"terminal-columns",
+				"terminal-rows",
+				"user-data-folder",
+				"workspace-folder"
+			]
+		},
+		{
+			"group": null,
+			"path": "read-configuration",
+			"description": "Read configuration",
+			"optionsBuilder": "readConfigurationOptions",
+			"options": [
+				"additional-features",
+				"config",
+				"container-id",
+				"docker-compose-path",
+				"docker-path",
+				"id-label",
+				"include-features-configuration",
+				"include-merged-configuration",
+				"log-format",
+				"log-level",
+				"mount-git-worktree-common-dir",
+				"mount-workspace-git-root",
+				"override-config",
+				"skip-feature-auto-mapping",
+				"terminal-columns",
+				"terminal-rows",
+				"user-data-folder",
+				"workspace-folder"
+			]
+		},
+		{
+			"group": null,
+			"path": "outdated",
+			"description": "Show current and available versions",
+			"optionsBuilder": "outdatedOptions",
+			"options": [
+				"config",
+				"log-format",
+				"log-level",
+				"output-format",
+				"terminal-columns",
+				"terminal-rows",
+				"user-data-folder",
+				"workspace-folder"
+			]
+		},
+		{
+			"group": null,
+			"path": "upgrade",
+			"description": "Upgrade lockfile",
+			"optionsBuilder": "featuresUpgradeOptions",
+			"options": [
+				"config",
+				"docker-compose-path",
+				"docker-path",
+				"dry-run",
+				"feature",
+				"log-level",
+				"target-version",
+				"workspace-folder"
+			]
+		},
+		{
+			"group": null,
+			"path": "features",
+			"description": "Features commands",
+			"optionsBuilder": null,
+			"options": []
+		},
+		{
+			"group": "features",
+			"path": "features test",
+			"description": "Test Features",
+			"optionsBuilder": "featuresTestOptions",
+			"options": [
+				"base-image",
+				"features",
+				"filter",
+				"global-scenarios-only",
+				"log-level",
+				"permit-randomization",
+				"preserve-test-containers",
+				"project-folder",
+				"quiet",
+				"remote-user",
+				"skip-autogenerated",
+				"skip-duplicated",
+				"skip-scenarios"
+			]
+		},
+		{
+			"group": "features",
+			"path": "features package",
+			"description": "Package Features",
+			"optionsBuilder": "featuresPackageOptions",
+			"options": []
+		},
+		{
+			"group": "features",
+			"path": "features publish",
+			"description": "Package and publish Features",
+			"optionsBuilder": "featuresPublishOptions",
+			"options": []
+		},
+		{
+			"group": "features",
+			"path": "features info",
+			"description": "Fetch metadata for a published Feature",
+			"optionsBuilder": "featuresInfoOptions",
+			"options": [
+				"log-level",
+				"output-format"
+			]
+		},
+		{
+			"group": "features",
+			"path": "features resolve-dependencies",
+			"description": "Read and resolve dependency graph from a configuration",
+			"optionsBuilder": "featuresResolveDependenciesOptions",
+			"options": [
+				"log-level",
+				"workspace-folder"
+			]
+		},
+		{
+			"group": "features",
+			"path": "features generate-docs",
+			"description": "Generate documentation",
+			"optionsBuilder": "featuresGenerateDocsOptions",
+			"options": [
+				"github-owner",
+				"github-repo",
+				"log-level",
+				"namespace",
+				"project-folder",
+				"registry"
+			]
+		},
+		{
+			"group": null,
+			"path": "templates",
+			"description": "Templates commands",
+			"optionsBuilder": null,
+			"options": []
+		},
+		{
+			"group": "templates",
+			"path": "templates apply",
+			"description": "Apply a template to the project",
+			"optionsBuilder": "templateApplyOptions",
+			"options": [
+				"features",
+				"log-level",
+				"omit-paths",
+				"template-args",
+				"template-id",
+				"tmp-dir",
+				"workspace-folder"
+			]
+		},
+		{
+			"group": "templates",
+			"path": "templates publish",
+			"description": "Package and publish templates",
+			"optionsBuilder": "templatesPublishOptions",
+			"options": []
+		},
+		{
+			"group": "templates",
+			"path": "templates metadata",
+			"description": "Fetch a published Template\\'s metadata",
+			"optionsBuilder": "templateMetadataOptions",
+			"options": [
+				"log-level"
+			]
+		},
+		{
+			"group": "templates",
+			"path": "templates generate-docs",
+			"description": "Generate documentation",
+			"optionsBuilder": "templatesGenerateDocsOptions",
+			"options": [
+				"github-owner",
+				"github-repo",
+				"log-level",
+				"project-folder"
+			]
+		},
+		{
+			"group": null,
+			"path": "exec",
+			"description": "Execute a command on a running dev container",
+			"optionsBuilder": "execOptions",
+			"options": [
+				"config",
+				"container-data-folder",
+				"container-id",
+				"container-system-data-folder",
+				"default-user-env-probe",
+				"docker-compose-path",
+				"docker-path",
+				"id-label",
+				"log-format",
+				"log-level",
+				"mount-git-worktree-common-dir",
+				"mount-workspace-git-root",
+				"override-config",
+				"remote-env",
+				"skip-feature-auto-mapping",
+				"terminal-columns",
+				"terminal-rows",
+				"user-data-folder",
+				"workspace-folder"
+			]
+		}
+	],
+	"allCommandPaths": [
+		"up",
+		"set-up",
+		"build",
+		"run-user-commands",
+		"read-configuration",
+		"outdated",
+		"upgrade",
+		"features",
+		"features test",
+		"features package",
+		"features publish",
+		"features info",
+		"features resolve-dependencies",
+		"features generate-docs",
+		"templates",
+		"templates apply",
+		"templates publish",
+		"templates metadata",
+		"templates generate-docs",
+		"exec"
+	],
+	"subcommandsByGroup": {
+		"features": [
+			"features test",
+			"features package",
+			"features publish",
+			"features info",
+			"features resolve-dependencies",
+			"features generate-docs"
+		],
+		"templates": [
+			"templates apply",
+			"templates publish",
+			"templates metadata",
+			"templates generate-docs"
+		]
+	}
+}
