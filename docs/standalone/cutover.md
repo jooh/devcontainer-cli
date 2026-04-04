@@ -1,19 +1,20 @@
 # Hardening and cutover report
 
-This report tracks cutover progress against the hardening and cutover TODO items. The repository is not yet at full cutover:
+This report tracks cutover progress against the hardening and cutover TODO items.
 
-- Integration parity coverage is still being expanded command-by-command.
-- The Node compatibility bridge still exists for unported command paths.
-- Native-only mode is now enforced as a guardrail for CI and local validation.
+- The runtime Node compatibility bridge has been removed from `cmd/devcontainer`.
+- Native-only mode and no-node-runtime checks now enforce the cutover in CI and local validation.
+- Compatibility status is tracked against the pinned upstream/spec revisions in `docs/upstream/compatibility-dashboard.md`.
 
 ## Integration parity suite
 
 - Baseline: Node CLI behavior compared against `devcontainer` command flows.
-- Coverage scope target: `read-configuration`, `build`, `up`, `exec`, `features`, and `templates`.
+- Coverage scope target: `read-configuration`, `build`, `up`, `set-up`, `run-user-commands`, `outdated`, `upgrade`, `exec`, `features`, and `templates`.
 - Automation entrypoints:
   - `src/test/cutoverReadiness.test.ts` (readiness gating checks)
   - `cmd/devcontainer/src/cutover.rs` tests (native progress checks)
   - `build/check-native-only.js` (native startup contract without Node on `PATH`)
+  - `build/check-no-node-runtime.js` (source-level guard against runtime bridge regressions)
 
 ## Performance and resource benchmark targets
 
@@ -24,9 +25,9 @@ This report tracks cutover progress against the hardening and cutover TODO items
 
 ## Cutover and fallback policy
 
-- Default release mode target: native binary.
-- Current fallback mode: Node bridge retained until core and collection command parity is complete.
-- Removal policy target: remove fallback after sustained parity confidence and no Sev1 regressions across two consecutive releases.
+- Default release mode: native binary.
+- Fallback mode: none in the Rust runtime path.
+- Removal policy target: keep Node/TypeScript assets limited to compatibility tooling, not runtime distribution.
 
 ## Upstream submodule cutover migration note
 

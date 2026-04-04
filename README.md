@@ -2,6 +2,8 @@
 
 This repository hosts a **project-owned native migration** of the Dev Containers CLI, with compatibility targeted against the upstream TypeScript implementation stored in the `upstream/` git submodule.
 
+The distributed CLI runtime is now the Rust binary in `cmd/devcontainer`; Node/TypeScript assets remain in the repository for parity tracking against `upstream/`, not for runtime execution.
+
 ## Repository layout and upstream compatibility
 
 `upstream/` exists so we can track the canonical upstream sources at an exact pinned commit while keeping native-port and migration work reviewable in this repository.
@@ -57,6 +59,7 @@ Install dependencies and run project tests:
 ```bash
 npm install
 npm test
+cargo test --manifest-path cmd/devcontainer/Cargo.toml
 ```
 
 Run focused migration/readiness checks:
@@ -69,8 +72,8 @@ npm test -- --grep "upstream submodule cutover"
 
 Current work focuses on:
 
-- native CLI migration and parity tracking,
-- upstream submodule cutover guardrails,
-- compatibility baseline visibility and CI checks.
+- native CLI parity tracking against pinned upstream/spec baselines,
+- standalone Rust binary release and smoke coverage,
+- compatibility guardrails that prevent reintroducing a runtime Node bridge.
 
 See `TODO.md` for phased migration/cutover tracking.

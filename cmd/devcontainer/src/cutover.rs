@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 
-pub const REQUIRED_CUTOVER_PARITY_COMMANDS: [&str; 6] = [
+pub const REQUIRED_CUTOVER_PARITY_COMMANDS: [&str; 10] = [
     "read-configuration",
     "build",
     "up",
+    "set-up",
+    "run-user-commands",
+    "outdated",
+    "upgrade",
     "exec",
     "features",
     "templates",

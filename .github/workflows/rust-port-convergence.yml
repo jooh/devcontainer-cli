@@ -47,6 +47,9 @@ jobs:
       - name: Parity harness
         run: node build/check-parity-harness.js
 
+      - name: No Node runtime bridge
+        run: node build/check-no-node-runtime.js
+
   upstream-convergence:
     name: Upstream Convergence Baseline
     runs-on: ubuntu-latest
