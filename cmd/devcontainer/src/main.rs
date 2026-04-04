@@ -2,10 +2,14 @@ use std::env;
 use std::fs;
 use std::io::{self, Write};
 use std::path::PathBuf;
-use std::process::{Command, ExitCode};
+use std::process::ExitCode;
 
+mod cli_host;
 mod command_porting;
+mod config;
 mod cutover;
+mod output;
+mod process_runner;
 
 const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 6] = [
     "read-configuration",
@@ -66,13 +70,11 @@ fn parse_log_format(args: &[String]) -> (&str, usize) {
 }
 
 fn emit_log(log_format: &str, message: &str) {
-    match log_format {
-        "json" => println!(
-            "{{\"level\":\"info\",\"message\":\"{}\"}}",
-            message.replace('"', "\\\"")
-        ),
-        _ => println!("{message}"),
-    }
+    let format = match log_format {
+        "json" => output::LogFormat::Json,
+        _ => output::LogFormat::Text,
+    };
+    println!("{}", output::render_log(format, "info", message));
 }
 
 fn native_only_mode_enabled() -> bool {
@@ -115,33 +117,11 @@ fn resolve_read_configuration_path(args: &[String]) -> Result<(PathBuf, PathBuf)
         .or_else(|| env::current_dir().ok())
         .ok_or_else(|| "Unable to determine workspace folder".to_string())?;
 
-    let config_path = if let Some(config) = parse_option_value(args, "--config") {
-        let explicit = PathBuf::from(config);
-        if explicit.is_absolute() {
-            explicit
-        } else {
-            workspace_folder.join(explicit)
-        }
-    } else {
-        let modern = workspace_folder.join(".devcontainer/devcontainer.json");
-        let legacy = workspace_folder.join(".devcontainer.json");
-        if modern.is_file() {
-            modern
-        } else {
-            legacy
-        }
-    };
-
-    if !config_path.is_file() {
-        return Err(format!(
-            "Unable to locate a dev container config at {}",
-            config_path.display()
-        ));
-    }
+    let explicit_config = parse_option_value(args, "--config").map(PathBuf::from);
+    let config_path = config::resolve_config_path(&workspace_folder, explicit_config.as_deref())?;
 
     let resolved_workspace = fs::canonicalize(&workspace_folder).unwrap_or(workspace_folder);
-    let resolved_config = fs::canonicalize(&config_path).unwrap_or(config_path);
-    Ok((resolved_workspace, resolved_config))
+    Ok((resolved_workspace, config_path))
 }
 
 fn run_native_read_configuration(args: &[String]) -> ExitCode {
@@ -265,16 +245,35 @@ fn main() -> ExitCode {
         }
     };
 
-    let status = Command::new("node")
-        .arg(bridge_script)
-        .args(&raw_args)
-        .status();
+    let cli_host = match cli_host::CliHost::from_env() {
+        Ok(host) => host,
+        Err(error) => {
+            eprintln!("Failed to probe CLI host environment: {error}");
+            return ExitCode::from(1);
+        }
+    };
 
-    match status {
-        Ok(exit_status) => match exit_status.code() {
-            Some(code) => ExitCode::from(code as u8),
-            None => ExitCode::from(1),
+    let node_program = cli_host
+        .lookup_command("node")
+        .unwrap_or_else(|| PathBuf::from("node"));
+
+    let process = process_runner::run_process(&process_runner::ProcessRequest {
+        program: node_program.display().to_string(),
+        args: {
+            let mut args = vec![bridge_script.display().to_string()];
+            args.extend(raw_args.clone());
+            args
         },
+        cwd: Some(cli_host.cwd),
+        env: cli_host.env,
+    });
+
+    match process {
+        Ok(result) => {
+            let _ = io::stdout().write_all(result.stdout.as_bytes());
+            let _ = io::stderr().write_all(result.stderr.as_bytes());
+            ExitCode::from(result.status_code as u8)
+        }
         Err(error) => {
             eprintln!("Failed to invoke Node compatibility bridge: {error}");
             ExitCode::from(1)
