@@ -64,6 +64,14 @@ npm test
 cargo test --manifest-path cmd/devcontainer/Cargo.toml
 ```
 
+Enable the repository-managed Git pre-commit hook:
+
+```bash
+npm run install-git-hooks
+```
+
+The hook blocks commits when `cargo fmt --manifest-path cmd/devcontainer/Cargo.toml --all -- --check` fails.
+
 Run focused migration/readiness checks:
 
 ```bash
