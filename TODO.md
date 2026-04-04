@@ -53,13 +53,12 @@ Top-level commands in scope for full native parity:
 ## Specification reference analysis (`spec/` baseline)
 
 ### Scope snapshot
-- `spec/` now exists as a pinned submodule reference for normative schema/docs.
+- `spec/` is a pinned submodule reference for normative schema/docs.
 - Primary machine-readable schema baseline is `spec/schemas/devContainer.base.schema.json`.
 - Aggregated schema (`spec/schemas/devContainer.schema.json`) layers in editor/tool overlays and is still useful for compatibility visibility.
 - Behavioral semantics that are not fully captured by schema shape live in `spec/docs/specs/devcontainerjson-reference.md` and related docs.
 
 ### Planning impact
-- The overall migration plan still holds.
 - We should explicitly treat schema compatibility as a first-class parity lane alongside upstream CLI behavior parity.
 - We can and should consume schemas directly from `spec/schemas/...` for validation tests/fixtures rather than maintaining duplicated local schema copies.
 
@@ -91,12 +90,12 @@ Top-level commands in scope for full native parity:
 
 ## Execution plan
 
-## Phase 0 — Reset and truth alignment
-- [ ] Mark the current Node-bridge state as transitional in docs/readiness checks.
-- [ ] Add explicit CI check that fails when any command path shells out to Node in “native-only” mode.
-- [ ] Add startup/runtime contract test: running binary with `PATH` excluding Node still supports implemented commands.
+## Phase 0 (PR #28) — Reset and truth alignment
+- [x] Mark the current Node-bridge state as transitional in docs/readiness checks.
+- [x] Add explicit CI check that fails when any command path shells out to Node in “native-only” mode.
+- [x] Add startup/runtime contract test: running binary with `PATH` excluding Node still supports implemented commands.
 
-## Phase 1 — Build parity harness against upstream
+## Phase 1 (PR #29) — Build parity harness against upstream
 - [ ] Auto-generate command/option matrix from upstream yargs definitions for drift detection.
 - [ ] Ensure parity matrix includes full upstream top-level scope: `up`, `set-up`, `build`, `run-user-commands`, `read-configuration`, `outdated`, `upgrade`, `features`, `templates`, `exec`.
 - [ ] Build golden test corpus from upstream fixtures for:
@@ -112,13 +111,13 @@ Top-level commands in scope for full native parity:
 - [ ] Treat text/log/output parity as **semantic equivalence** unless a contract explicitly requires byte-level matching.
 - [ ] Add a schema drift check that fails when pinned `HEAD:spec` changes without corresponding schema-parity fixture/test updates.
 
-## Phase 2 — Port foundational libraries (non-command-specific)
+## Phase 2 (PR #30) — Port foundational libraries (non-command-specific)
 - [ ] Implement Rust logging/event primitives compatible with upstream formats (`text`/`json`).
 - [ ] Implement config discovery + JSONC parsing + substitution semantics.
 - [ ] Implement CLI host/environment probing abstractions currently in `spec-common`.
 - [ ] Implement subprocess wrappers with controlled stdio capture and streaming.
 
-## Phase 3 — Port core commands first
+## Phase 3 (PR #31) — Port core commands first
 - [ ] `read-configuration` full parity (all flags and metadata inclusion options).
 - [ ] `build` parity (including BuildKit toggles, cache options, labels, Dockerfile/Compose paths).
 - [ ] `up` parity (container lifecycle + post-commands + mounts/env handling).
@@ -127,13 +126,13 @@ Top-level commands in scope for full native parity:
   - [ ] GA gate: non-interactive CI behavior parity.
   - [ ] post-GA hardening gate: interactive TTY/PTY fidelity.
 
-## Phase 4 — Port collection and publishing flows
+## Phase 4 (PR #32) — Port collection and publishing flows
 - [ ] `features`: `resolve-dependencies`, `info`, `test`, `package`, `publish`, `generate-docs`.
 - [ ] `templates`: `apply`, `metadata`, `publish`, `generate-docs`.
 - [ ] `upgrade` parity and lockfile behavior.
 - [ ] Sequence network-dependent `features/templates publish` parity after local/resolve/test/apply parity is stable.
 
-## Phase 5 — Hardening + cutover
+## Phase 5 (PR #33) — Hardening + cutover
 - [ ] Remove Node bridge codepath entirely from `devcontainer`.
 - [ ] Remove runtime assumptions about `dist/spec-node/devContainersSpecCLI.js`.
 - [ ] Add release CI lanes for multi-platform Rust binaries.
@@ -142,18 +141,10 @@ Top-level commands in scope for full native parity:
 - [ ] Switch default distributed executable to native binary.
 - [ ] Update cutover docs continuously as implementation status changes (no “completed” claims ahead of verified parity).
 
-## Phase 6 — Repository cleanup after successful cutover
+## Phase 6 (PR #34) — Repository cleanup after successful cutover
 - [ ] Move TS/Node build/test assets to compatibility-only role (or separate tooling repo) if no longer needed for distribution.
 - [ ] Keep npm/bin metadata out of the native release path while GitHub Releases remains the distribution channel.
 - [ ] Keep `upstream/` as reference baseline and parity fixture source.
-
----
-
-## Suggested implementation order (first 4 weeks)
-1. **Week 1:** parity harness + config semantics foundation.
-2. **Week 2:** full `read-configuration` parity and exhaustive fixtures; establish semantic parity assertions for logs/text output.
-3. **Week 3:** `build` + `set-up` + `run-user-commands` parity for mainstream Dockerfile and Compose flows.
-4. **Week 4:** `up`, `exec` (non-interactive parity gate), and `outdated`; begin post-GA TTY hardening backlog.
 
 ---
 

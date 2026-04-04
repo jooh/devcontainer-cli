@@ -1,6 +1,6 @@
-# Native foundation report (Rust) (completed)
+# Native foundation report (Rust) (transitional)
 
-Date completed: 2026-04-01
+Status updated: 2026-04-03
 
 ## Rust crate foundation
 - Added an in-repo Rust crate at `cmd/devcontainer`.
@@ -23,12 +23,12 @@ Date completed: 2026-04-01
 - Evaluator also requires exit code parity verification to pass (`exitCodeParity`).
 
 ## Compatibility bridge checks
-- Added compatibility-bridge gating for unported commands, requiring:
-  - bridge enabled
-  - non-empty fallback Node command
-  - verified behavior for unported command delegation
+- The compatibility bridge remains transitional.
+- `DEVCONTAINER_NATIVE_ONLY=1` now forces the binary to fail fast instead of attempting Node fallback for unported command paths.
+- Native subcommand help is available for currently tracked top-level commands so startup/help flows do not require Node.
 
 ## Test coverage
 - Added native foundation readiness unit tests covering:
   - successful completion when all checks pass
   - failure mode when compatibility bridge requirements are not met
+- Added a startup contract check that builds the Rust binary and verifies native help plus implemented commands with `PATH` excluding Node.
