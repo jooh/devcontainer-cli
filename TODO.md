@@ -112,10 +112,10 @@ Top-level commands in scope for full native parity:
 - [x] Add a schema drift check that fails when pinned `HEAD:spec` changes without corresponding schema-parity fixture/test updates.
 
 ## Phase 2 — Port foundational libraries (non-command-specific)
-- [ ] Implement Rust logging/event primitives compatible with upstream formats (`text`/`json`).
-- [ ] Implement config discovery + JSONC parsing + substitution semantics.
-- [ ] Implement CLI host/environment probing abstractions currently in `spec-common`.
-- [ ] Implement subprocess wrappers with controlled stdio capture and streaming.
+- [x] Implement Rust logging/event primitives compatible with upstream formats (`text`/`json`).
+- [x] Implement config discovery + JSONC parsing + substitution semantics.
+- [x] Implement CLI host/environment probing abstractions currently in `spec-common`.
+- [x] Implement subprocess wrappers with controlled stdio capture and streaming.
 
 ## Phase 3 — Port core commands first
 - [ ] `read-configuration` full parity (all flags and metadata inclusion options).
