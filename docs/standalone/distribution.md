@@ -25,6 +25,7 @@ Status updated: 2026-04-03
 - Standalone release guidance documents artifact usage, verification, and known limitations.
 - GitHub Releases is the active distribution channel for the native binary.
 - npm remains compatibility-only and is not part of the native release path.
+- `package.json` is marked private and no longer exposes a runtime `bin` entry for distribution.
 
 ## Experimental publication channel
 - Standalone artifacts are published on an experimental channel using `-standalone` naming.
