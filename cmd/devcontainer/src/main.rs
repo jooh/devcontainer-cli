@@ -180,7 +180,11 @@ fn lifecycle_commands(configuration: &Value) -> Vec<Value> {
         "postAttachCommand",
     ]
     .iter()
-    .filter_map(|key| configuration.get(*key).map(|value| json!({ "name": key, "value": value })))
+    .filter_map(|key| {
+        configuration
+            .get(*key)
+            .map(|value| json!({ "name": key, "value": value }))
+    })
     .collect()
 }
 
@@ -216,7 +220,10 @@ fn build_read_configuration_payload(args: &[String]) -> Result<Value, String> {
 
 fn build_build_payload(args: &[String]) -> Result<Value, String> {
     let (workspace_folder, config_file, configuration) = load_resolved_config(args)?;
-    let build_section = configuration.get("build").cloned().unwrap_or_else(|| json!({}));
+    let build_section = configuration
+        .get("build")
+        .cloned()
+        .unwrap_or_else(|| json!({}));
     let dockerfile = build_section
         .get("dockerfile")
         .or_else(|| build_section.get("dockerFile"))
@@ -430,7 +437,9 @@ fn should_use_native_read_configuration(args: &[String]) -> bool {
         if !SUPPORTED_OPTIONS.contains(&arg.as_str()) {
             return false;
         }
-        index += if arg == "--include-merged-configuration" || arg == "--include-features-configuration" {
+        index += if arg == "--include-merged-configuration"
+            || arg == "--include-features-configuration"
+        {
             1
         } else {
             2
@@ -812,8 +821,12 @@ mod tests {
         let docker_args = payload["docker"]["args"].as_array().expect("docker args");
 
         assert!(docker_args.iter().any(|value| value == "--no-cache"));
-        assert!(docker_args.iter().any(|value| value == "ghcr.io/example/cache"));
-        assert!(docker_args.iter().any(|value| value == "devcontainer.test=true"));
+        assert!(docker_args
+            .iter()
+            .any(|value| value == "ghcr.io/example/cache"));
+        assert!(docker_args
+            .iter()
+            .any(|value| value == "devcontainer.test=true"));
         assert_eq!(payload["buildKit"], "never");
         let _ = fs::remove_dir_all(root);
     }
