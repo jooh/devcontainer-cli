@@ -1,6 +1,6 @@
 {
 	"name": "config-substitution",
-	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	"image": "debian:bookworm",
 	"containerEnv": {
 		"USER_NAME": "${localEnv:USER}"
 	}

@@ -20,4 +20,4 @@ devcontainer up $remove_flag --mount "type=bind,source=$(pwd)/server,target=/ser
 devcontainer exec --workspace-folder ../workspace /server/init-vim.sh
 
 # Connect
-ssh -t -i server/temp-ssh-key -o NoHostAuthenticationForLocalhost=yes -o UserKnownHostsFile=/dev/null -o GlobalKnownHostsFile=/dev/null -p 2222 vscode@localhost exec bash -c vim
+ssh -t -i server/temp-ssh-key -o NoHostAuthenticationForLocalhost=yes -o UserKnownHostsFile=/dev/null -o GlobalKnownHostsFile=/dev/null -p 2222 node@localhost exec bash -c vim
