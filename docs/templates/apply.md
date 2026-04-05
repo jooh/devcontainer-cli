@@ -6,7 +6,7 @@ The CLI can be used to apply (download) a [Dev Container Template](https://conta
 
 Templates can be published via the `templates publish` command - see [the template-starter repo](https://github.com/devcontainers/template-starter) for more information.
 
-To see all the available options, run `devcontainers templates apply --help`.
+To see all the available options, run `devcontainer templates apply --help`.
 
 ## Example
 
@@ -20,7 +20,6 @@ To apply the [debian template](https://github.com/devcontainers/templates/tree/m
                  -a '{"imageVariant": "buster"}' \
                  -w ./my-project
 
-[0 ms] @devcontainers/cli 0.28.0. Node.js v19.3.0. darwin 21.6.0 arm64.
 {"files":["./.devcontainer/devcontainer.json"]}
 
 [/tmp]$ tree -a my-project

@@ -29,6 +29,9 @@ jobs:
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
       - name: Rust fmt
         run: cargo fmt --manifest-path cmd/devcontainer/Cargo.toml --all -- --check
 
@@ -40,6 +43,9 @@ jobs:
 
       - name: Rust tests
         run: cargo test --manifest-path cmd/devcontainer/Cargo.toml
+
+      - name: Rust coverage
+        run: cargo llvm-cov --manifest-path cmd/devcontainer/Cargo.toml --lcov --output-path cmd/devcontainer/target/coverage.lcov
 
       - name: Native-only startup contract
         run: node build/check-native-only.js
@@ -71,4 +77,4 @@ jobs:
           node-version: '20.x'
 
       - name: Verify pinned upstream compatibility baseline
-        run: npm run check-upstream-compatibility
+        run: node build/check-upstream-compatibility.js

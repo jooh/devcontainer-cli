@@ -1,32 +1,18 @@
-# Standalone distribution report (in progress)
+# Native distribution
 
-Status updated: 2026-04-03
+## Release artifacts
 
-## Reproducible standalone build pipeline
-- Added a deterministic standalone release workflow for Linux x64 and macOS (x64 + arm64) artifacts.
-- Build inputs are pinned and reproducibility is enforced via deterministic bundle + artifact checksums.
-- Workflow path: `.github/workflows/devcontainer-release.yml`.
-- Local standalone build entrypoint: `scripts/standalone/build.sh`.
+- GitHub Releases is the active distribution channel.
+- `.github/workflows/devcontainer-release.yml` builds release archives for Linux x64, macOS x64, and macOS arm64.
+- Each release artifact currently includes a compressed archive and a SHA-256 checksum file.
 
-## Signing strategy
-- Standalone artifacts are signed using keyless Sigstore/Cosign in CI.
-- Public checksums and signature material are published with each standalone release target.
-- macOS notarization remains deferred while the channel is marked experimental.
+## Local build flow
 
-## Packaged executable smoke/integration lane
-- Added a native-only startup contract lane that executes the Rust binary with `PATH` excluding Node.
-- Required smoke commands include:
-  - `read-configuration`
-  - `build`
-  - `up`
-  - `exec`
+- `scripts/standalone/build.sh <target>` builds the Rust release binary and places it under `dist/standalone/`.
+- `scripts/standalone/smoke.sh <binary>` runs the repo-owned smoke commands against a built artifact.
 
-## Release docs and fallback installer path
-- Standalone release guidance documents artifact usage, verification, and known limitations.
-- GitHub Releases is the active distribution channel for the native binary.
-- npm remains compatibility-only and is not part of the native release path.
-- `package.json` is marked private and no longer exposes a runtime `bin` entry for distribution.
+## Current limitations
 
-## Experimental publication channel
-- Standalone artifacts are published on an experimental channel using `-standalone` naming.
-- Channel is intentionally marked experimental while cross-platform support and TTY parity mature.
+- The repository no longer ships or maintains the old bundled-Node installer path.
+- Release automation does not currently sign artifacts or notarize macOS builds.
+- Compatibility tooling in `package.json` is not part of the runtime distribution path.

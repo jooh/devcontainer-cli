@@ -14,7 +14,7 @@ There are additional 'modes' that run an additional set of tests per Feature if 
 | Scenarios | Define more complicated test scenarios.  Use a scenario to test Feature options or >1 Feature in a container.  | [Details](#scenarios)| `--skip-scenarios`
 | Duplicate Tests | A mode that will generate a dev container installing the same Feature twice with different options | [Details](#duplicate-style-tests)| `--skip-duplicated`
 
-The source code of the sub-command is [here](../../src/spec-node/featuresCLI/test.ts). An example of the command being used in CI can be [found in the `devcontainers/feature-starter` repo](https://github.com/devcontainers/feature-starter/blob/main/.github/workflows/test.yaml) and the [`devcontainers/features` repo](https://github.com/devcontainers/features).
+The authoritative upstream implementation of the sub-command is [here](../../upstream/src/spec-node/featuresCLI/test.ts). An example of the command being used in CI can be [found in the `devcontainers/feature-starter` repo](https://github.com/devcontainers/feature-starter/blob/main/.github/workflows/test.yaml) and the [`devcontainers/features` repo](https://github.com/devcontainers/features).
 
 For more information on the `test` command, run `devcontainer features test --help`.
 
