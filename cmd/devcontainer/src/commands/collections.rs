@@ -21,12 +21,7 @@ pub(crate) fn run_features(args: &[String]) -> ExitCode {
                 build_feature_info_payload(&args[1], &args[2])
             }
         }
-        "test" => Ok(json!({
-            "outcome": "success",
-            "command": "features test",
-            "target": args.get(1).cloned().unwrap_or_else(|| ".".to_string()),
-            "testsDiscovered": ["test.sh"],
-        })),
+        "test" => Err("Native features test is not implemented".to_string()),
         "package" => {
             if args.len() < 2 {
                 Err("features package requires <target>".to_string())
@@ -252,11 +247,12 @@ pub(crate) fn build_template_metadata_payload(template_path: &str) -> Result<Val
 mod tests {
     use super::{
         apply_template_target, build_feature_info_payload,
-        build_features_resolve_dependencies_payload, build_template_metadata_payload,
+        build_features_resolve_dependencies_payload, build_template_metadata_payload, run_features,
     };
     use crate::commands::common::{generate_manifest_docs, package_collection_target};
     use std::fs;
     use std::path::PathBuf;
+    use std::process::ExitCode;
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_temp_dir() -> PathBuf {
@@ -328,6 +324,13 @@ mod tests {
             "Unsupported features info mode: tags"
         );
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn features_test_returns_failure_until_native_implementation_exists() {
+        let status = run_features(&["test".to_string()]);
+
+        assert_eq!(status, ExitCode::from(1));
     }
 
     #[test]

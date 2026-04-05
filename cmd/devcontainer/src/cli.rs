@@ -40,10 +40,10 @@ pub fn print_command_help(command: &str) {
             println!("  - list / ls");
             println!("  - resolve-dependencies");
             println!("  - info manifest <feature>");
-            println!("  - test [target]");
             println!("  - package <target>");
             println!("  - publish <target>");
             println!("  - generate-docs <target>");
+            println!("  - test is not yet implemented natively");
         }
         "templates" => {
             println!(
