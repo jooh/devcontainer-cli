@@ -7,8 +7,10 @@ use std::process::ExitCode;
 use serde_json::{json, Map, Value};
 
 mod cli_host;
+#[allow(dead_code)]
 mod command_porting;
 mod config;
+#[allow(dead_code)]
 mod cutover;
 mod output;
 mod process_runner;
@@ -145,7 +147,7 @@ fn has_flag(args: &[String], flag: &str) -> bool {
 fn parse_mounts(args: &[String]) -> Vec<Value> {
     parse_option_values(args, "--mount")
         .into_iter()
-        .map(|mount| Value::String(mount))
+        .map(Value::String)
         .collect()
 }
 
@@ -755,6 +757,7 @@ fn run_native_collection(command: &str, args: &[String]) -> ExitCode {
     ExitCode::SUCCESS
 }
 
+#[allow(dead_code)]
 fn should_use_native_collection(args: &[String]) -> bool {
     args.first()
         .map(|arg| arg == "list" || arg == "ls")
