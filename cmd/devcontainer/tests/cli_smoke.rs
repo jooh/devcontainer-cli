@@ -173,7 +173,7 @@ fn read_configuration_applies_upstream_style_local_substitution_defaults() {
     );
     assert_eq!(
         payload["configuration"]["containerEnv"]["DEFAULT_WITH_COLONS"],
-        "fallback:with:colons"
+        "fallback"
     );
     assert_eq!(
         payload["configuration"]["containerEnv"]["MISSING_WITHOUT_DEFAULT"],

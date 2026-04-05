@@ -160,23 +160,66 @@ pub fn parse_jsonc_value(text: &str) -> Result<Value, String> {
     serde_json::from_str(&sanitized).map_err(|error| error.to_string())
 }
 
-fn substitute_string(input: &str, context: &ConfigContext) -> String {
-    let mut output = input.replace(
-        "${localWorkspaceFolder}",
-        context.workspace_folder.to_string_lossy().as_ref(),
-    );
+fn parse_variable(input: &str) -> (&str, Vec<&str>) {
+    let parts: Vec<&str> = input.split(':').collect();
+    if parts.len() > 1 {
+        (parts[0], parts[1..].to_vec())
+    } else {
+        (input, Vec::new())
+    }
+}
 
-    while let Some(start) = output.find("${localEnv:") {
-        let remainder = &output[start + "${localEnv:".len()..];
-        let Some(end_offset) = remainder.find('}') else {
-            break;
+fn replace_variable(variable: &str, context: &ConfigContext) -> Option<String> {
+    let (name, args) = parse_variable(variable);
+    match name {
+        "localWorkspaceFolder" => Some(context.workspace_folder.to_string_lossy().into_owned()),
+        "localWorkspaceFolderBasename" => Some(
+            context
+                .workspace_folder
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| context.workspace_folder.to_string_lossy().into_owned()),
+        ),
+        "env" | "localEnv" => args.first().map(|variable_name| {
+            context
+                .env
+                .get(*variable_name)
+                .cloned()
+                .or_else(|| args.get(1).map(|value| (*value).to_string()))
+                .unwrap_or_default()
+        }),
+        _ => None,
+    }
+}
+
+fn substitute_string(input: &str, context: &ConfigContext) -> String {
+    let mut output = String::with_capacity(input.len());
+    let mut remaining = input;
+
+    while let Some(start) = remaining.find("${") {
+        output.push_str(&remaining[..start]);
+
+        let variable_start = start + 2;
+        let after_start = &remaining[variable_start..];
+        let Some(end_offset) = after_start.find('}') else {
+            output.push_str(&remaining[start..]);
+            return output;
         };
-        let variable_name = &remainder[..end_offset];
-        let replacement = context.env.get(variable_name).cloned().unwrap_or_default();
-        let end = start + "${localEnv:".len() + end_offset + 1;
-        output.replace_range(start..end, &replacement);
+
+        let variable = &after_start[..end_offset];
+        if let Some(replacement) = replace_variable(variable, context) {
+            output.push_str(&replacement);
+        } else {
+            output.push_str("${");
+            output.push_str(variable);
+            output.push('}');
+        }
+
+        remaining = &after_start[end_offset + 1..];
     }
 
+    output.push_str(remaining);
     output
 }
 
@@ -259,5 +302,31 @@ mod tests {
 
         assert_eq!(substituted["containerEnv"]["USER_NAME"], "johan");
         assert_eq!(substituted["containerEnv"]["WORKSPACE"], "/workspace/demo");
+    }
+
+    #[test]
+    fn substitutes_workspace_basename_and_defaulted_env_tokens() {
+        let context = ConfigContext {
+            workspace_folder: PathBuf::from("/workspace/demo"),
+            env: HashMap::new(),
+        };
+        let value = json!({
+            "containerEnv": {
+                "BASENAME": "${localWorkspaceFolderBasename}",
+                "DEFAULTED": "${localEnv:USER:fallback}",
+                "DEFAULT_WITH_EXTRA_SEGMENTS": "${env:USER:fallback:ignored}",
+                "MISSING": "before-${localEnv:UNSET}-after"
+            }
+        });
+
+        let substituted = substitute_local_context(&value, &context);
+
+        assert_eq!(substituted["containerEnv"]["BASENAME"], "demo");
+        assert_eq!(substituted["containerEnv"]["DEFAULTED"], "fallback");
+        assert_eq!(
+            substituted["containerEnv"]["DEFAULT_WITH_EXTRA_SEGMENTS"],
+            "fallback"
+        );
+        assert_eq!(substituted["containerEnv"]["MISSING"], "before--after");
     }
 }
