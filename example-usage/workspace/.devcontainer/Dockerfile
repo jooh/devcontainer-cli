@@ -1,1 +1,1 @@
-FROM mcr.microsoft.com/devcontainers/base:1-bookworm
+FROM node:18-bookworm

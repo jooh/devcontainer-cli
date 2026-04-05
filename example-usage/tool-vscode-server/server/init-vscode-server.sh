@@ -4,13 +4,13 @@ INSTALL_LOCATION="$HOME/.local/bin"
 INSTALL_TARGET=unknown-linux-gnu
 
 if [ ! -e "$INSTALL_LOCATION"/code-server ]; then
-    # Adapted from https://aka.ms/install-vscode-server/setup.sh
+    # Adapted from the official VS Code Server setup workflow.
     install_arch=x86_64
     arch=$(uname -m)
     if [ $arch = "aarch64" ] || [ $arch = "arm64" ]; then
         install_arch=aarch64
     fi
-    install_url=https://aka.ms/vscode-server-launcher/$install_arch-$INSTALL_TARGET
+    install_url=https://update.code.visualstudio.com/latest/server-linux-$install_arch/stable
     echo "Installing from $install_url"
     mkdir -p "$INSTALL_LOCATION"
     if type curl > /dev/null 2>&1; then

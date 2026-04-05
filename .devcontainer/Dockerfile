@@ -1,7 +1,7 @@
-#  Copyright (c) Microsoft Corporation. All rights reserved.
-#  Licensed under the MIT License. See License.txt in the project root for license information.
+#  Copyright (c) devcontainer-rs contributors.
+#  Licensed under the MIT License.
 ARG VARIANT="16-bullseye"
-FROM mcr.microsoft.com/devcontainers/typescript-node:1-${VARIANT}
+FROM node:${VARIANT}
 
 RUN mkdir -p /workspaces && chown node:node /workspaces
 

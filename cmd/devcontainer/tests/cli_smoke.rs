@@ -56,7 +56,7 @@ fn read_configuration_command_returns_configuration_payload() {
     fs::create_dir_all(&config_dir).expect("config dir");
     fs::write(
         config_dir.join("devcontainer.json"),
-        "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\"\n}\n",
+        "{\n  \"image\": \"debian:bookworm\"\n}\n",
     )
     .expect("config write");
 

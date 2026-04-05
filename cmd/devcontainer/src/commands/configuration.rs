@@ -336,7 +336,7 @@ mod tests {
         fs::create_dir_all(&config_dir).expect("failed to create config directory");
         fs::write(
             config_dir.join("devcontainer.json"),
-            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"features\": { \"ghcr.io/devcontainers/features/git:1\": {} }\n}\n",
+            "{\n  \"image\": \"debian:bookworm\",\n  \"features\": { \"ghcr.io/devcontainers/features/git:1\": {} }\n}\n",
         )
         .expect("failed to write config");
 
@@ -348,14 +348,8 @@ mod tests {
         ];
         let payload = build_read_configuration_payload(&args).expect("payload");
 
-        assert_eq!(
-            payload["configuration"]["image"],
-            "mcr.microsoft.com/devcontainers/base:ubuntu"
-        );
-        assert_eq!(
-            payload["mergedConfiguration"]["image"],
-            "mcr.microsoft.com/devcontainers/base:ubuntu"
-        );
+        assert_eq!(payload["configuration"]["image"], "debian:bookworm");
+        assert_eq!(payload["mergedConfiguration"]["image"], "debian:bookworm");
         assert!(payload["featuresConfiguration"]["features"]
             .as_object()
             .expect("features object")
@@ -406,7 +400,7 @@ mod tests {
         fs::create_dir_all(&config_dir).expect("failed to create config directory");
         fs::write(
             config_dir.join("devcontainer.json"),
-            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"onCreateCommand\": \"echo create\",\n  \"postCreateCommand\": \"echo post\"\n}\n",
+            "{\n  \"image\": \"debian:bookworm\",\n  \"onCreateCommand\": \"echo create\",\n  \"postCreateCommand\": \"echo post\"\n}\n",
         )
         .expect("failed to write config");
 
@@ -440,7 +434,7 @@ mod tests {
         fs::create_dir_all(&config_dir).expect("failed to create config directory");
         fs::write(
             config_dir.join("devcontainer.json"),
-            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/node:1\": {}\n  }\n}\n",
+            "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/node:1\": {}\n  }\n}\n",
         )
         .expect("failed to write config");
 
@@ -465,7 +459,7 @@ mod tests {
         fs::create_dir_all(&config_dir).expect("failed to create config directory");
         fs::write(
             config_dir.join("devcontainer.json"),
-            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/node:1\": {}\n  }\n}\n",
+            "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/node:1\": {}\n  }\n}\n",
         )
         .expect("failed to write config");
 

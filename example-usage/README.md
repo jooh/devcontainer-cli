@@ -32,7 +32,7 @@ When switching between examples, pass `true` in as an argument to get the contai
 
 In the first two examples, you'll be instructed to go to `http://localhost:8000` in a browser.
 
-This also adds a desktop to the container that can be accessed from a web browser at `http://localhost:6080` and you can connect using the password `vscode`.
+This also adds a desktop to the container that can be accessed from a web browser at `http://localhost:6080` and you can connect using the password `node`.
 
 #### How the tool examples work
 

@@ -1,7 +1,7 @@
 {
 	// Adapted from upstream variable substitution cases.
 	"name": "upstream-style-substitution",
-	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	"image": "debian:bookworm",
 	"containerEnv": {
 		"WORKSPACE_PATH": "${localWorkspaceFolder}",
 		"WORKSPACE_BASENAME": "${localWorkspaceFolderBasename}",
