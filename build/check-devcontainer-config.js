@@ -96,7 +96,11 @@ function main() {
 	assert.equal(config.build?.context, '..', 'devcontainer build context must remain repository root');
 	assert.equal(config.remoteUser, 'dev', 'devcontainer should use the repo-owned dev user');
 	assert.equal(config.updateRemoteUserUID, true, 'devcontainer should keep host UID/GID alignment enabled');
-	assert.equal(config.postCreateCommand, 'git submodule update --init --recursive', 'postCreateCommand should initialize pinned submodules');
+	assert.equal(
+		config.postCreateCommand,
+		'git config --global --add safe.directory ${containerWorkspaceFolder} && git submodule update --init --recursive',
+		'postCreateCommand should trust the mounted workspace before initializing pinned submodules',
+	);
 	assert(!('features' in config), 'devcontainer should not depend on external devcontainer features');
 	assert(!('customizations' in config), 'devcontainer should not carry editor-specific customizations');
 

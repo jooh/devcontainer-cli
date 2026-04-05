@@ -4,7 +4,7 @@
 		"context": "..",
 		"dockerfile": "Containerfile"
 	},
-	"postCreateCommand": "git submodule update --init --recursive",
+	"postCreateCommand": "git config --global --add safe.directory ${containerWorkspaceFolder} && git submodule update --init --recursive",
 	"remoteUser": "dev",
 	"updateRemoteUserUID": true
 }
