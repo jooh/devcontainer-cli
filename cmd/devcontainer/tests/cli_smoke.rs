@@ -134,10 +134,11 @@ fn read_configuration_uses_current_directory_with_upstream_fixture() {
         payload["configuration"]["remoteEnv"]["CONTAINER_PATH"],
         "${containerEnv:PATH}"
     );
-    assert!(payload["configuration"]["remoteEnv"]["LOCAL_PATH"]
+    let local_path = payload["configuration"]["remoteEnv"]["LOCAL_PATH"]
         .as_str()
-        .expect("local path")
-        .starts_with('/'));
+        .expect("local path");
+    let expected_local_path = std::env::var_os("PATH").expect("PATH env set");
+    assert_eq!(local_path, expected_local_path.to_string_lossy().as_ref());
 }
 
 #[test]
