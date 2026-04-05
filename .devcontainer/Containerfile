@@ -1,0 +1,45 @@
+#  Copyright (c) devcontainer-rs contributors.
+#  Licensed under the MIT License.
+
+FROM docker.io/library/rust:1-bookworm
+
+ARG NODE_VERSION=20.19.0
+ARG USERNAME=dev
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+RUN set -eux \
+	&& apt-get update \
+	&& apt-get install --yes --no-install-recommends \
+		ca-certificates \
+		curl \
+		git \
+		less \
+		openssh-client \
+		sudo \
+		xz-utils \
+	&& rm -rf /var/lib/apt/lists/* \
+	&& arch="$(dpkg --print-architecture)" \
+	&& case "${arch}" in \
+		amd64) node_arch='x64' ;; \
+		arm64) node_arch='arm64' ;; \
+		*) echo "unsupported architecture: ${arch}" >&2; exit 1 ;; \
+	esac \
+	&& curl --fail --silent --show-error --location \
+		"https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${node_arch}.tar.xz" \
+		--output /tmp/node.tar.xz \
+	&& tar --extract --xz --file /tmp/node.tar.xz --directory /usr/local --strip-components=1 --no-same-owner \
+	&& rm /tmp/node.tar.xz \
+	&& rustup component add clippy rustfmt \
+	&& groupadd --gid "${USER_GID}" "${USERNAME}" \
+	&& useradd --create-home --shell /bin/bash --uid "${USER_UID}" --gid "${USER_GID}" "${USERNAME}" \
+	&& usermod --append --groups sudo "${USERNAME}" \
+	&& echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" > "/etc/sudoers.d/${USERNAME}" \
+	&& chmod 0440 "/etc/sudoers.d/${USERNAME}" \
+	&& printf '%s\n' 'export PATH=/usr/local/cargo/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' > /etc/profile.d/devcontainer-rs-path.sh \
+	&& chmod 0644 /etc/profile.d/devcontainer-rs-path.sh \
+	&& mkdir -p /workspaces \
+	&& chown -R "${USERNAME}:${USERNAME}" /workspaces
+
+USER ${USERNAME}
+WORKDIR /workspaces/devcontainer-rs
