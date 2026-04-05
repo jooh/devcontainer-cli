@@ -19,6 +19,8 @@
 
 ## Guardrails
 
+- `cargo test --manifest-path cmd/devcontainer/Cargo.toml`
+- `npm test`
 - `node build/check-native-only.js`
 - `node build/check-parity-harness.js`
 - `node build/check-spec-drift.js`

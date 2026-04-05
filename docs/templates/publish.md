@@ -6,7 +6,7 @@
 
 The CLI can be used to publish [Dev Container Template](https://containers.dev/implementors/templates/) artifacts to an OCI registry (that supports the [artifacts specification](https://oras.land/implementors/)).
 
-To see all the available options, run `devcontainers templates publish --help`.
+To see all the available options, run `devcontainer templates publish --help`.
 
 ## Example
 

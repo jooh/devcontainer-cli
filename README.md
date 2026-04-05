@@ -1,43 +1,59 @@
 # devcontainer-rs
 
-This repository hosts a **project-owned native migration** of the Dev Containers CLI, with compatibility targeted against the upstream TypeScript implementation stored in the `upstream/` git submodule.
+This repository hosts a native Rust implementation of the Dev Containers CLI, with compatibility tracked against the pinned upstream TypeScript sources in `upstream/` and the pinned specification assets in `spec/`.
 
-The distributed CLI runtime is now the Rust binary in `cmd/devcontainer`; Node/TypeScript assets remain in the repository for parity tracking against `upstream/`, not for runtime execution.
+The shipped runtime is the Rust binary in `cmd/devcontainer`. Node is kept only for lightweight compatibility tooling such as upstream/spec drift checks, the command-matrix generator, and the parity smoke harness.
 
-Node-based scripts in `package.json` are compatibility tooling only. Native release/distribution flows use the Rust crate, the standalone build scripts, and the GitHub Releases workflow.
+## Repository layout
 
-## Repository layout and upstream compatibility
+- `cmd/devcontainer/`: native Rust CLI crate.
+- `upstream/`: canonical upstream `devcontainers/cli` baseline.
+- `spec/`: canonical upstream `devcontainers/spec` schemas and docs.
+- `build/`: repo-owned compatibility guard scripts.
+- `src/test/parity/`: parity fixtures and golden files for repo-owned checks.
+- `docs/`: contributor and release documentation for the native CLI.
 
-`upstream/` exists so we can track the canonical upstream sources at an exact pinned commit while keeping native-port and migration work reviewable in this repository.
+Compatibility contract: this repository targets the exact submodule revision pinned at `HEAD:upstream`.
 
-- `upstream/`: canonical upstream devcontainers/cli TypeScript baseline.
-- `spec/`: canonical upstream devcontainers/spec reference (schemas + normative docs).
-- repository root: project-owned native implementation, migration checks, docs, and readiness tests.
+Specification contract: schema-sensitive behavior targets the exact submodule revision pinned at `HEAD:spec`.
 
-Compatibility contract: this repository targets the **exact** submodule revision pinned at `HEAD:upstream`.
-Specification contract: schema and behavioral validation should reference the **exact** submodule revision pinned at `HEAD:spec`.
+## Submodules
 
-## Submodule initialization and recovery
-
-If you clone this repository without submodules, initialize them before running checks/builds:
+Initialize submodules before running checks or editing compatibility-sensitive code:
 
 ```bash
 git submodule update --init --recursive
 ```
 
-If tooling reports that `upstream/` or `spec/` is missing/uninitialized, run the same command again and re-run checks.
+If `upstream/` or `spec/` is missing or uninitialized, run the same command again and rerun the checks.
 
-## Spec reference workflow (`spec/`)
+## Local development
 
-When implementing or validating `read-configuration`/config semantics:
+Rust validation:
 
-- Use `spec/schemas/devContainer.base.schema.json` as the primary schema baseline.
-- Use `spec/schemas/devContainer.schema.json` for the aggregate schema view (including editor-specific overlays).
-- Use normative docs in `spec/docs/specs/` (especially `devcontainerjson-reference.md`) for behavioral interpretation not fully captured by schema shape.
+```bash
+cargo fmt --manifest-path cmd/devcontainer/Cargo.toml --all -- --check
+cargo clippy --manifest-path cmd/devcontainer/Cargo.toml -- -D warnings
+cargo test --manifest-path cmd/devcontainer/Cargo.toml
+```
 
-## Upstream compatibility workflow
+Compatibility/tooling validation:
 
-When updating upstream, use an explicit bump-and-verify flow:
+```bash
+npm test
+```
+
+The Node-based checks do not require installing project dependencies; they use built-in Node modules only. Node 20+ is still required to run them.
+
+Enable the repository-managed pre-commit hook:
+
+```bash
+npm run install-git-hooks
+```
+
+## Upstream and spec workflow
+
+When updating upstream compatibility baselines:
 
 ```bash
 git submodule update --init --recursive
@@ -47,45 +63,21 @@ git add upstream
 git rev-parse HEAD:upstream
 npm run check-upstream-submodule
 npm run check-upstream-compatibility
-npm test
+npm run check-command-matrix
+npm run check-parity-harness
 ```
 
-If the compatibility baseline check reports a commit delta, update:
-
-- `docs/upstream/compatibility-baseline.json`
-
-## Local development
-
-Install dependencies and run project tests:
+When changing schema-sensitive behavior, also verify:
 
 ```bash
-npm install
-npm test
-cargo test --manifest-path cmd/devcontainer/Cargo.toml
+git rev-parse HEAD:spec
+npm run check-spec-drift
 ```
 
-Enable the repository-managed Git pre-commit hook:
+If a pinned submodule revision changes, update the matching baseline files in `docs/upstream/`.
 
-```bash
-npm run install-git-hooks
-```
+## Contributor notes
 
-The hook blocks commits when any of the following fail: `cargo fmt --manifest-path cmd/devcontainer/Cargo.toml --all -- --check`, `cargo clippy --manifest-path cmd/devcontainer/Cargo.toml -- -D warnings`, or `cargo check --manifest-path cmd/devcontainer/Cargo.toml`.
-
-Run focused migration/readiness checks:
-
-```bash
-npm test -- --grep "upstream submodule cutover"
-node build/check-parity-harness.js
-node build/check-no-node-runtime.js
-```
-
-## Project status
-
-Current work focuses on:
-
-- native CLI parity tracking against pinned upstream/spec baselines,
-- standalone Rust binary release and smoke coverage,
-- compatibility guardrails that prevent reintroducing a runtime Node bridge.
-
-See `TODO.md` for phased migration/cutover tracking.
+- Architecture and crate layout: `docs/architecture.md`
+- Native distribution and release notes: `docs/standalone/distribution.md`
+- Runtime and compatibility guardrails: `docs/standalone/cutover.md`
