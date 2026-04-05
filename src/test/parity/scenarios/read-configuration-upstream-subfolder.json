@@ -1,0 +1,8 @@
+{
+	"name": "read-configuration-upstream-subfolder",
+	"workspaceFolderPath": "upstream/src/test/configs/dockerfile-without-features",
+	"args": [
+		"--config",
+		"upstream/src/test/configs/dockerfile-without-features/.devcontainer/subfolder/devcontainer.json"
+	]
+}

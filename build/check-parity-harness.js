@@ -17,7 +17,7 @@ const repositoryRoot = path.join(__dirname, '..');
 const crateManifestPath = path.join(repositoryRoot, 'cmd', 'devcontainer', 'Cargo.toml');
 const binaryPath = path.join(repositoryRoot, 'cmd', 'devcontainer', 'target', 'debug', process.platform === 'win32' ? 'devcontainer.exe' : 'devcontainer');
 const schemaPath = path.join(repositoryRoot, 'spec', 'schemas', 'devContainer.base.schema.json');
-const scenarioPath = path.join(repositoryRoot, 'src', 'test', 'parity', 'scenarios', 'read-configuration-basic.json');
+const scenariosDirectory = path.join(repositoryRoot, 'src', 'test', 'parity', 'scenarios');
 const outputGoldenPath = path.join(repositoryRoot, 'src', 'test', 'parity', 'golden', 'read-configuration-basic.json');
 
 function run(command, args, options = {}) {
@@ -131,25 +131,134 @@ function validateConfigAgainstSpecSchema(relativePath) {
 }
 
 function normalizeReadConfigurationOutput(stdout) {
-	const parsed = JSON.parse(stdout);
-	return {
-		configuration: parsed.configuration,
-		metadata: parsed.metadata,
-	};
+	return JSON.parse(stdout);
 }
 
-function runNativeReadConfiguration(workspaceFolder) {
-	const result = run('cargo', ['run', '--quiet', '--manifest-path', crateManifestPath, '--', 'read-configuration', '--workspace-folder', workspaceFolder]);
+function loadScenarios() {
+	return fs.readdirSync(scenariosDirectory)
+		.filter(name => name.endsWith('.json'))
+		.sort()
+		.map(name => JSON.parse(fs.readFileSync(path.join(scenariosDirectory, name), 'utf8')));
+}
+
+function materializeScenarioWorkspace(scenario) {
+	if (scenario.workspaceFolderPath) {
+		return {
+			workspaceFolder: path.join(repositoryRoot, scenario.workspaceFolderPath),
+			cleanup: () => {},
+		};
+	}
+
+	if (scenario.fixtureConfigPath) {
+		const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'devcontainer-parity-'));
+		const workspaceFolder = path.join(tempRoot, 'workspace');
+		const configFolder = path.join(workspaceFolder, '.devcontainer');
+		fs.mkdirSync(configFolder, { recursive: true });
+		fs.writeFileSync(
+			path.join(configFolder, 'devcontainer.json'),
+			fs.readFileSync(path.join(repositoryRoot, scenario.fixtureConfigPath), 'utf8'),
+		);
+		return {
+			workspaceFolder,
+			cleanup: () => fs.rmSync(tempRoot, { recursive: true, force: true }),
+		};
+	}
+
+	throw new Error(`scenario ${scenario.name} is missing workspaceFolderPath or fixtureConfigPath`);
+}
+
+function normalizeScenarioArgs(args = []) {
+	const normalized = [...args];
+	for (let index = 0; index < normalized.length - 1; index += 1) {
+		if (normalized[index] === '--config' && !path.isAbsolute(normalized[index + 1])) {
+			normalized[index + 1] = path.join(repositoryRoot, normalized[index + 1]);
+		}
+	}
+	return normalized;
+}
+
+function runNativeReadConfiguration(workspaceFolder, args = []) {
+	const result = run('cargo', ['run', '--quiet', '--manifest-path', crateManifestPath, '--', 'read-configuration', '--workspace-folder', workspaceFolder, ...args]);
 	if (result.status !== 0) {
 		throw new Error(`native read-configuration failed:\n${result.stderr}`);
 	}
 	return normalizeReadConfigurationOutput(result.stdout);
 }
 
-function runReferenceReadConfiguration(workspaceFolder) {
-	const configPath = path.join(workspaceFolder, '.devcontainer', 'devcontainer.json');
-	const configuration = parseJsonc(fs.readFileSync(configPath, 'utf8'));
-	return {
+function parseOptionValue(args, option) {
+	const index = args.indexOf(option);
+	if (index === -1 || index === args.length - 1) {
+		return undefined;
+	}
+	return args[index + 1];
+}
+
+function hasFlag(args, flag) {
+	return args.includes(flag);
+}
+
+function resolveConfigPath(workspaceFolder, explicitConfigPath) {
+	if (explicitConfigPath) {
+		return path.isAbsolute(explicitConfigPath)
+			? explicitConfigPath
+			: path.join(workspaceFolder, explicitConfigPath);
+	}
+
+	const modern = path.join(workspaceFolder, '.devcontainer', 'devcontainer.json');
+	if (fs.existsSync(modern)) {
+		return modern;
+	}
+	return path.join(workspaceFolder, '.devcontainer.json');
+}
+
+function substituteString(input, workspaceFolder, env) {
+	let output = input.replaceAll('${localWorkspaceFolder}', workspaceFolder);
+
+	while (true) {
+		const start = output.indexOf('${localEnv:');
+		if (start === -1) {
+			break;
+		}
+		const remainder = output.slice(start + '${localEnv:'.length);
+		const endOffset = remainder.indexOf('}');
+		if (endOffset === -1) {
+			break;
+		}
+		const variableName = remainder.slice(0, endOffset);
+		const replacement = env[variableName] || '';
+		const end = start + '${localEnv:'.length + endOffset + 1;
+		output = `${output.slice(0, start)}${replacement}${output.slice(end)}`;
+	}
+
+	return output;
+}
+
+function substituteLocalContext(value, workspaceFolder, env) {
+	if (typeof value === 'string') {
+		return substituteString(value, workspaceFolder, env);
+	}
+	if (Array.isArray(value)) {
+		return value.map(item => substituteLocalContext(item, workspaceFolder, env));
+	}
+	if (value && typeof value === 'object') {
+		return Object.fromEntries(
+			Object.entries(value).map(([key, nested]) => [
+				key,
+				substituteLocalContext(nested, workspaceFolder, env),
+			]),
+		);
+	}
+	return value;
+}
+
+function runReferenceReadConfiguration(workspaceFolder, args = [], env = process.env) {
+	const configPath = resolveConfigPath(workspaceFolder, parseOptionValue(args, '--config'));
+	const configuration = substituteLocalContext(
+		parseJsonc(fs.readFileSync(configPath, 'utf8')),
+		fs.realpathSync(workspaceFolder),
+		env,
+	);
+	const payload = {
 		configuration,
 		metadata: {
 			workspaceFolder: fs.realpathSync(workspaceFolder),
@@ -158,6 +267,15 @@ function runReferenceReadConfiguration(workspaceFolder) {
 			pathResolution: 'native-rust',
 		},
 	};
+	if (hasFlag(args, '--include-merged-configuration')) {
+		payload.mergedConfiguration = configuration;
+	}
+	if (hasFlag(args, '--include-features-configuration')) {
+		payload.featuresConfiguration = {
+			features: configuration.features || {},
+		};
+	}
+	return payload;
 }
 
 function ensureRequiredCommands(matrix) {
@@ -205,30 +323,32 @@ function main() {
 	assert.equal(invalidResult.ok, false, 'invalid config fixture should fail schema contract');
 	assert.equal(invalidResult.category, 'missing-container-definition');
 
-	const scenario = JSON.parse(fs.readFileSync(scenarioPath, 'utf8'));
-	const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'devcontainer-parity-'));
-	const workspaceFolder = path.join(tempRoot, 'workspace');
-	const configFolder = path.join(workspaceFolder, '.devcontainer');
-	fs.mkdirSync(configFolder, { recursive: true });
-	fs.writeFileSync(path.join(configFolder, 'devcontainer.json'), fs.readFileSync(path.join(repositoryRoot, scenario.fixtureConfigPath), 'utf8'));
-
 	const buildResult = run('cargo', ['build', '--manifest-path', crateManifestPath]);
 	assert.equal(buildResult.status, 0, buildResult.stderr);
 
-	const reference = runReferenceReadConfiguration(workspaceFolder);
-	const native = runNativeReadConfiguration(workspaceFolder);
-	assert.deepEqual(native, reference, 'native output should be semantically equivalent to the reference scenario');
-
 	const golden = JSON.parse(fs.readFileSync(outputGoldenPath, 'utf8'));
-	for (const key of golden.requiredTopLevelKeys) {
-		assert(Object.prototype.hasOwnProperty.call(native, key), `native output missing top-level key ${key}`);
-	}
-	for (const key of golden.requiredMetadataKeys) {
-		assert(Object.prototype.hasOwnProperty.call(native.metadata, key), `native output missing metadata key ${key}`);
+
+	for (const scenario of loadScenarios()) {
+		const { workspaceFolder, cleanup } = materializeScenarioWorkspace(scenario);
+		const args = normalizeScenarioArgs(scenario.args);
+		try {
+			const native = runNativeReadConfiguration(workspaceFolder, args);
+			const reference = runReferenceReadConfiguration(workspaceFolder, args);
+			assert.deepEqual(native, reference, `native output should be semantically equivalent to scenario ${scenario.name}`);
+
+			for (const key of golden.requiredTopLevelKeys) {
+				assert(Object.prototype.hasOwnProperty.call(native, key), `native output missing top-level key ${key} for scenario ${scenario.name}`);
+			}
+			for (const key of golden.requiredMetadataKeys) {
+				assert(Object.prototype.hasOwnProperty.call(native.metadata, key), `native output missing metadata key ${key} for scenario ${scenario.name}`);
+			}
+		} finally {
+			cleanup();
+		}
 	}
 
 	console.log(`[spec-parity] pinned spec commit: ${cp.execFileSync('git', ['rev-parse', 'HEAD:spec'], { cwd: repositoryRoot, encoding: 'utf8' }).trim()}`);
-	console.log(`[parity-harness] semantic parity checks passed for scenario ${scenario.name}.`);
+	console.log('[parity-harness] semantic parity checks passed for all read-configuration scenarios.');
 }
 
 main();

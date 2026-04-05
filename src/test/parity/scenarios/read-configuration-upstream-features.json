@@ -1,0 +1,5 @@
+{
+	"name": "read-configuration-upstream-features",
+	"workspaceFolderPath": "upstream/src/test/configs/image-with-features",
+	"args": ["--include-features-configuration"]
+}

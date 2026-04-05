@@ -1,0 +1,5 @@
+{
+	"name": "read-configuration-upstream-image-merged",
+	"workspaceFolderPath": "upstream/src/test/configs/image",
+	"args": ["--include-merged-configuration"]
+}
