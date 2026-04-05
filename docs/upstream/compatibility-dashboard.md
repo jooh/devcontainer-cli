@@ -6,21 +6,22 @@
 
 ## Native command status
 
-- `read-configuration`: native
-- `build`: native
-- `up`: native
-- `set-up`: native
-- `run-user-commands`: native
-- `outdated`: native
-- `upgrade`: native
-- `exec`: native
-- `features`: native local flows
-- `templates`: native local flows
+- `read-configuration`: parity-tested for the current repo-owned scenarios
+- `build`: native runtime foundation for image/dockerfile flows
+- `up`: native runtime foundation for image/dockerfile flows
+- `set-up`: native lifecycle foundation for existing containers
+- `run-user-commands`: native lifecycle foundation for existing containers
+- `outdated`: partial native implementation
+- `upgrade`: partial native implementation
+- `exec`: native in-container execution foundation
+- `features`: native local flows, OCI parity still pending
+- `templates`: native local flows, OCI parity still pending
 
 ## Guardrails
 
 - `cargo test --manifest-path cmd/devcontainer/Cargo.toml`
 - `npm test`
+- `node build/generate-cli-reference.js --check`
 - `node build/check-native-only.js`
 - `node build/check-parity-harness.js`
 - `node build/check-spec-drift.js`

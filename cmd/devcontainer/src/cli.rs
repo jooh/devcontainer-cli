@@ -13,16 +13,35 @@ pub const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 10] = [
     "templates",
 ];
 
+fn command_description(command: &str) -> &'static str {
+    match command {
+        "up" => "Create and run dev container",
+        "set-up" => "Set up an existing container as a dev container",
+        "build" => "Build a dev container image",
+        "run-user-commands" => "Run user commands",
+        "read-configuration" => "Read configuration",
+        "outdated" => "Show current and available versions",
+        "upgrade" => "Upgrade lockfile",
+        "exec" => "Execute a command on a running dev container",
+        "features" => "Features commands",
+        "templates" => "Templates commands",
+        _ => "Native devcontainer command",
+    }
+}
+
 pub fn print_help() {
     println!("devcontainer (native Rust CLI)");
     println!("\nUsage:\n  devcontainer [--log-format text|json] <command> [args...]\n");
     println!("Supported top-level commands:");
     for command in SUPPORTED_TOP_LEVEL_COMMANDS {
-        println!("  - {command}");
+        println!("  - {command}: {}", command_description(command));
     }
+    println!("\nReference:");
+    println!("  - docs/cli/command-reference.md (generated from pinned upstream metadata)");
 }
 
 pub fn print_command_help(command: &str) {
+    println!("{}", command_description(command));
     match command {
         "read-configuration" => {
             println!(
@@ -59,19 +78,21 @@ pub fn print_command_help(command: &str) {
         "build" | "up" | "exec" => {
             println!("Usage:\n  devcontainer {command} [args...]");
             println!("\nCurrent state:");
-            println!("  - execution is native for non-interactive flows");
-            println!("  - payloads are emitted as structured JSON");
+            println!("  - build / up invoke the native container runtime directly");
+            println!("  - exec runs inside the resolved container");
         }
         "set-up" | "run-user-commands" | "outdated" | "upgrade" => {
             println!("Usage:\n  devcontainer {command} [args...]");
             println!("\nNative support:");
-            println!("  - structured JSON payload output");
-            println!("  - config-driven lifecycle planning");
+            println!("  - set-up / run-user-commands invoke lifecycle hooks in-container");
+            println!("  - outdated / upgrade are still partial relative to upstream");
         }
         _ => {
             println!("Usage:\n  devcontainer {command} [args...]");
         }
     }
+    println!("\nReference:");
+    println!("  - docs/cli/command-reference.md");
 }
 
 pub fn parse_log_format(args: &[String]) -> (&str, usize) {
