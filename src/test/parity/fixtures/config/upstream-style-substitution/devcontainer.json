@@ -1,0 +1,12 @@
+{
+	// Adapted from upstream variable substitution cases.
+	"name": "upstream-style-substitution",
+	"image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+	"containerEnv": {
+		"WORKSPACE_PATH": "${localWorkspaceFolder}",
+		"WORKSPACE_BASENAME": "${localWorkspaceFolderBasename}",
+		"DEFAULTED_ENV": "${localEnv:DOES_NOT_EXIST:fallback-value}",
+		"DEFAULT_WITH_COLONS": "${localEnv:ALSO_MISSING:fallback:with:colons}",
+		"MISSING_WITHOUT_DEFAULT": "before-${localEnv:UNSET_VALUE}-after"
+	}
+}

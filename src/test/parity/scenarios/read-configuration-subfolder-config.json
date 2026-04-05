@@ -1,0 +1,7 @@
+{
+	"name": "read-configuration-subfolder-config",
+	"fixtureConfigPath": "upstream/src/test/configs/dockerfile-without-features/.devcontainer/subfolder/devcontainer.json",
+	"workspaceConfigPath": ".devcontainer/subfolder/devcontainer.json",
+	"explicitConfigPath": ".devcontainer/subfolder/devcontainer.json",
+	"outputGoldenPath": "src/test/parity/golden/read-configuration-basic.json"
+}
