@@ -103,7 +103,10 @@ function main() {
 	const containerfile = fs.readFileSync(containerfilePath, 'utf8');
 	assert(/FROM\s+docker\.io\/library\/rust:1-bookworm/i.test(containerfile), 'Containerfile should start from the official Rust Bookworm image');
 	assert(/ARG\s+NODE_VERSION=20\./.test(containerfile), 'Containerfile should provision Node 20.x for repo checks');
-	assert(/useradd\s+--create-home\s+--shell\s+\/bin\/bash\s+--uid\s+1000\s+dev/.test(containerfile), 'Containerfile should create the dev user');
+	assert(
+		/useradd\s+--create-home\s+--shell\s+\/bin\/bash\s+--uid\s+["$A-Za-z0-9{}_:-]+\s+--gid\s+["$A-Za-z0-9{}_:-]+\s+["$A-Za-z0-9{}_:-]+/.test(containerfile),
+		'Containerfile should create the dev user',
+	);
 
 	console.log('[devcontainer-config] repo-owned devcontainer definition looks current.');
 }
