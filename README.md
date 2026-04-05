@@ -70,7 +70,7 @@ Enable the repository-managed Git pre-commit hook:
 npm run install-git-hooks
 ```
 
-The hook blocks commits when `cargo fmt --manifest-path cmd/devcontainer/Cargo.toml --all -- --check` fails.
+The hook blocks commits when any of the following fail: `cargo fmt --manifest-path cmd/devcontainer/Cargo.toml --all -- --check`, `cargo clippy --manifest-path cmd/devcontainer/Cargo.toml -- -D warnings`, or `cargo check --manifest-path cmd/devcontainer/Cargo.toml`.
 
 Run focused migration/readiness checks:
 

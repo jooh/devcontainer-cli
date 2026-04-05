@@ -32,6 +32,12 @@ jobs:
       - name: Rust fmt
         run: cargo fmt --manifest-path cmd/devcontainer/Cargo.toml --all -- --check
 
+      - name: Rust clippy
+        run: cargo clippy --manifest-path cmd/devcontainer/Cargo.toml -- -D warnings
+
+      - name: Rust check
+        run: cargo check --manifest-path cmd/devcontainer/Cargo.toml
+
       - name: Rust tests
         run: cargo test --manifest-path cmd/devcontainer/Cargo.toml
 
