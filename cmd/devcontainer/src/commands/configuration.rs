@@ -289,6 +289,16 @@ mod tests {
     }
 
     #[test]
+    fn fails_when_workspace_folder_option_is_missing_a_value() {
+        let result = resolve_read_configuration_path(&["--workspace-folder".to_string()]);
+
+        assert_eq!(
+            result.expect_err("expected missing option value"),
+            "Missing value for option: --workspace-folder"
+        );
+    }
+
+    #[test]
     fn resolves_relative_config_against_workspace_folder() {
         let root = unique_temp_dir();
         let config = root.join("relative.devcontainer.json");

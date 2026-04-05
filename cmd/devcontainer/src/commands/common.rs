@@ -14,6 +14,20 @@ pub(crate) fn parse_option_value(args: &[String], option: &str) -> Option<String
         .map(|window| window[1].clone())
 }
 
+pub(crate) fn validate_option_values(args: &[String], options: &[&str]) -> Result<(), String> {
+    for (index, arg) in args.iter().enumerate() {
+        if options.contains(&arg.as_str())
+            && args
+                .get(index + 1)
+                .is_none_or(|next| next.starts_with("--"))
+        {
+            return Err(format!("Missing value for option: {arg}"));
+        }
+    }
+
+    Ok(())
+}
+
 pub(crate) fn parse_option_values(args: &[String], option: &str) -> Vec<String> {
     let mut values = Vec::new();
     let mut index = 0;
@@ -59,6 +73,8 @@ pub(crate) fn remote_env_overrides(args: &[String]) -> HashMap<String, String> {
 pub(crate) fn resolve_read_configuration_path(
     args: &[String],
 ) -> Result<(PathBuf, PathBuf), String> {
+    validate_option_values(args, &["--workspace-folder", "--config"])?;
+
     let workspace_folder = parse_option_value(args, "--workspace-folder")
         .map(PathBuf::from)
         .or_else(|| env::current_dir().ok())
