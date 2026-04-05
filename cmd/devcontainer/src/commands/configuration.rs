@@ -62,6 +62,7 @@ pub(crate) fn should_use_native_read_configuration(args: &[String]) -> bool {
     true
 }
 
+#[cfg(test)]
 pub(crate) fn build_build_payload(args: &[String]) -> Result<Value, String> {
     let (workspace_folder, config_file, configuration) = common::load_resolved_config(args)?;
     let build_section = configuration
@@ -121,6 +122,7 @@ pub(crate) fn build_build_payload(args: &[String]) -> Result<Value, String> {
     }))
 }
 
+#[cfg(test)]
 pub(crate) fn build_lifecycle_payload(command: &str, args: &[String]) -> Result<Value, String> {
     let (workspace_folder, config_file, configuration) = common::load_resolved_config(args)?;
     Ok(json!({

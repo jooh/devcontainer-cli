@@ -6,6 +6,7 @@ pub mod commands;
 pub mod config;
 pub mod output;
 pub mod process_runner;
+pub mod runtime;
 
 pub const NATIVE_ONLY_ENV_VAR: &str = "DEVCONTAINER_NATIVE_ONLY";
 

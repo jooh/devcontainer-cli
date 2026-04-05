@@ -1,11 +1,13 @@
 mod collections;
-mod common;
+pub(crate) mod common;
 mod configuration;
 mod exec;
 
 use std::process::ExitCode;
 
 use serde_json::Value;
+
+use crate::runtime;
 
 pub enum DispatchResult {
     Complete(ExitCode),
@@ -23,12 +25,12 @@ pub fn dispatch(command: &str, args: &[String]) -> DispatchResult {
                 DispatchResult::UnsupportedNativePath
             }
         }
-        "build" => {
-            DispatchResult::Complete(print_json_result(configuration::build_build_payload(args)))
+        "build" => DispatchResult::Complete(print_json_result(runtime::run_build(args))),
+        "up" => DispatchResult::Complete(print_json_result(runtime::run_up(args))),
+        "set-up" => DispatchResult::Complete(print_json_result(runtime::run_set_up(args))),
+        "run-user-commands" => {
+            DispatchResult::Complete(print_json_result(runtime::run_user_commands(args)))
         }
-        "up" | "set-up" | "run-user-commands" => DispatchResult::Complete(print_json_result(
-            configuration::build_lifecycle_payload(command, args),
-        )),
         "outdated" => DispatchResult::Complete(print_json_result(
             configuration::build_outdated_payload(args),
         )),
