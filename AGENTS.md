@@ -3,10 +3,17 @@
 ## Scope
 These instructions apply to the entire repository tree rooted at this directory.
 
+## Development approach
+- Use red/green TDD
+- Commit your changes each time you complete a step in a list
+- If on `main`, checkout a feature branch before making commits. Keep using the existing branch if not on `main`
+- Push to origin before reporting back at the end of the turn
+- Do not create PRs unless asked. PRs should be opened in published, not draft form
+
 ## Upstream submodule policy
 - The `upstream/` directory is the canonical location for upstream `devcontainers/cli` TypeScript sources.
 - The `spec/` directory is the canonical location for upstream `devcontainers/spec` schemas and specification docs.
-- Do **not** introduce new copies of upstream-owned files at repository root.
+- Do **not** introduce new copies of upstream- or spec-owned files at repository root.
 - Keep project-owned implementation and migration work outside `upstream/` and `spec/` unless explicitly updating submodule pointers.
 
 ## Compatibility baseline

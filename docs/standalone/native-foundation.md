@@ -1,35 +1,19 @@
-# Native foundation report (Rust) (cutover runtime)
+# Native runtime notes
 
-Status updated: 2026-04-03
+The native CLI lives in `cmd/devcontainer` and is organized as a library crate with a thin binary entrypoint.
 
-## Rust crate foundation
-- Added an in-repo Rust crate at `cmd/devcontainer`.
-- Crate defines an initial native binary target named `devcontainer` to host incremental command ports.
+## Key pieces
 
-## Top-level CLI parity scaffold
-- Added a native foundation readiness evaluator that verifies parity coverage for required top-level command surfaces:
-  - `read-configuration`
-  - `build`
-  - `up`
-  - `exec`
-  - `features`
-  - `templates`
-- Evaluator includes help text parity gating (`helpParity`) so parity checks require both command presence and help alignment.
+- `src/lib.rs`: top-level argument flow and unsupported-path handling.
+- `src/cli.rs`: help and log-format handling.
+- `src/commands/`: command-family implementations.
+- `src/config.rs`: JSONC and config resolution helpers.
+- `src/process_runner.rs`: subprocess execution.
 
-## Logging and exit-code parity checks
-- Added explicit native foundation readiness gating for logging output formats:
-  - `text`
-  - `json`
-- Evaluator also requires exit code parity verification to pass (`exitCodeParity`).
+## Current command shape
 
-## Runtime cutover checks
-- The Rust runtime no longer invokes Node for command execution.
-- `DEVCONTAINER_NATIVE_ONLY=1` remains as a regression guard for unsupported paths and local validation.
-- Native subcommand help is available for the full tracked top-level command surface.
+- `read-configuration`, `build`, `up`, `set-up`, `run-user-commands`, `outdated`, `upgrade`, and `exec` are handled natively.
+- `features` and `templates` are native for local flows tracked by the crate today.
+- Node is no longer used as a runtime bridge for unsupported command paths.
 
-## Test coverage
-- Added native foundation readiness unit tests covering:
-  - successful completion when all checks pass
-  - failure mode when compatibility bridge requirements are not met
-- Added a startup contract check that builds the Rust binary and verifies native help plus implemented commands with `PATH` excluding Node.
-- Added a no-node-runtime guard that fails if runtime bridge references are reintroduced into `cmd/devcontainer` or the standalone build script.
+See `docs/architecture.md` for the current contributor-facing layout.

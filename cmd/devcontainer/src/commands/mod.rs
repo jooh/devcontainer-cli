@@ -1,0 +1,56 @@
+mod collections;
+mod common;
+mod configuration;
+mod exec;
+
+use std::process::ExitCode;
+
+use serde_json::Value;
+
+pub enum DispatchResult {
+    Complete(ExitCode),
+    UnsupportedNativePath,
+}
+
+pub fn dispatch(command: &str, args: &[String]) -> DispatchResult {
+    match command {
+        "read-configuration" => {
+            if configuration::should_use_native_read_configuration(args) {
+                DispatchResult::Complete(print_json_result(
+                    configuration::build_read_configuration_payload(args),
+                ))
+            } else {
+                DispatchResult::UnsupportedNativePath
+            }
+        }
+        "build" => {
+            DispatchResult::Complete(print_json_result(configuration::build_build_payload(args)))
+        }
+        "up" | "set-up" | "run-user-commands" => DispatchResult::Complete(print_json_result(
+            configuration::build_lifecycle_payload(command, args),
+        )),
+        "outdated" => DispatchResult::Complete(print_json_result(
+            configuration::build_outdated_payload(args),
+        )),
+        "upgrade" => {
+            DispatchResult::Complete(print_json_result(configuration::run_upgrade_lockfile(args)))
+        }
+        "exec" => DispatchResult::Complete(exec::run(args)),
+        "features" => DispatchResult::Complete(collections::run_features(args)),
+        "templates" => DispatchResult::Complete(collections::run_templates(args)),
+        _ => DispatchResult::UnsupportedNativePath,
+    }
+}
+
+fn print_json_result(result: Result<Value, String>) -> ExitCode {
+    match result {
+        Ok(payload) => {
+            println!("{payload}");
+            ExitCode::SUCCESS
+        }
+        Err(error) => {
+            eprintln!("{error}");
+            ExitCode::from(1)
+        }
+    }
+}
