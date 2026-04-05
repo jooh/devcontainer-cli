@@ -1,2 +1,3 @@
 dist/
 cmd/devcontainer/target/
+node_modules/
