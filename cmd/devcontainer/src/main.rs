@@ -1,7 +1,7 @@
 use std::env;
 use std::fs;
 use std::io::{self, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use serde_json::{json, Map, Value};
@@ -28,6 +28,50 @@ const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 10] = [
     "templates",
 ];
 const NATIVE_ONLY_ENV_VAR: &str = "DEVCONTAINER_NATIVE_ONLY";
+const PICK_CONFIG_PROPERTIES: [&str; 20] = [
+    "onCreateCommand",
+    "updateContentCommand",
+    "postCreateCommand",
+    "postStartCommand",
+    "postAttachCommand",
+    "waitFor",
+    "customizations",
+    "mounts",
+    "containerEnv",
+    "containerUser",
+    "init",
+    "privileged",
+    "capAdd",
+    "securityOpt",
+    "remoteUser",
+    "userEnvProbe",
+    "remoteEnv",
+    "overrideCommand",
+    "portsAttributes",
+    "otherPortsAttributes",
+];
+const PICK_FEATURE_PROPERTIES: [&str; 10] = [
+    "onCreateCommand",
+    "updateContentCommand",
+    "postCreateCommand",
+    "postStartCommand",
+    "postAttachCommand",
+    "init",
+    "privileged",
+    "capAdd",
+    "securityOpt",
+    "customizations",
+];
+const REPLACE_PROPERTIES: [&str; 8] = [
+    "customizations",
+    "entrypoint",
+    "onCreateCommand",
+    "updateContentCommand",
+    "postCreateCommand",
+    "postStartCommand",
+    "postAttachCommand",
+    "shutdownAction",
+];
 
 fn print_help() {
     println!("devcontainer (native foundation)");
@@ -192,9 +236,348 @@ fn lifecycle_commands(configuration: &Value) -> Vec<Value> {
     .collect()
 }
 
+fn pick_properties(value: &Value, keys: &[&str]) -> Map<String, Value> {
+    let Some(object) = value.as_object() else {
+        return Map::new();
+    };
+
+    keys.iter()
+        .filter_map(|key| {
+            object
+                .get(*key)
+                .map(|value| ((*key).to_string(), value.clone()))
+        })
+        .collect()
+}
+
+fn merge_legacy_feature_customizations(feature: &mut Map<String, Value>) {
+    let extensions = feature.remove("extensions");
+    let settings = feature.remove("settings");
+    if extensions.is_none() && settings.is_none() {
+        return;
+    }
+
+    let customizations = feature
+        .entry("customizations".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    let Some(customizations_object) = customizations.as_object_mut() else {
+        return;
+    };
+    let vscode = customizations_object
+        .entry("vscode".to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    let Some(vscode_object) = vscode.as_object_mut() else {
+        return;
+    };
+
+    if let Some(Value::Array(mut extension_values)) = extensions {
+        let entry = vscode_object
+            .entry("extensions".to_string())
+            .or_insert_with(|| Value::Array(Vec::new()));
+        if let Some(existing) = entry.as_array_mut() {
+            existing.append(&mut extension_values);
+        }
+    }
+
+    if let Some(Value::Object(settings_object)) = settings {
+        let entry = vscode_object
+            .entry("settings".to_string())
+            .or_insert_with(|| Value::Object(Map::new()));
+        if let Some(existing) = entry.as_object_mut() {
+            let mut merged = settings_object;
+            for (key, value) in existing.clone() {
+                merged.insert(key, value);
+            }
+            *existing = merged;
+        }
+    }
+}
+
+fn build_features_configuration(
+    workspace_folder: &Path,
+    config_file: &Path,
+    configuration: &Value,
+) -> Result<Option<Value>, String> {
+    let Some(features) = configuration.get("features").and_then(Value::as_object) else {
+        return Ok(None);
+    };
+
+    let allowed_parent = fs::canonicalize(workspace_folder.join(".devcontainer"))
+        .unwrap_or_else(|_| workspace_folder.join(".devcontainer"));
+    let config_dir = config_file
+        .parent()
+        .ok_or_else(|| format!("config file has no parent: {}", config_file.display()))?;
+    let mut feature_sets = Vec::new();
+
+    for (user_feature_id, user_value) in features {
+        let feature_path = Path::new(user_feature_id);
+        if feature_path.is_absolute() || !user_feature_id.starts_with('.') {
+            return Err(format!(
+                "native read-configuration currently supports only local relative features for --include-features-configuration (unsupported: {user_feature_id})"
+            ));
+        }
+
+        let feature_folder = fs::canonicalize(config_dir.join(feature_path))
+            .unwrap_or_else(|_| config_dir.join(feature_path));
+        if !feature_folder.starts_with(&allowed_parent) {
+            return Err(format!(
+                "local feature path must remain under {} (resolved: {})",
+                allowed_parent.display(),
+                feature_folder.display()
+            ));
+        }
+
+        let metadata_path = feature_folder.join("devcontainer-feature.json");
+        let feature_json = config::parse_jsonc_value(
+            &fs::read_to_string(&metadata_path).map_err(|error| error.to_string())?,
+        )?;
+        let mut feature = feature_json.as_object().cloned().ok_or_else(|| {
+            format!(
+                "feature metadata must be an object: {}",
+                metadata_path.display()
+            )
+        })?;
+        feature.insert(
+            "id".to_string(),
+            Value::String(
+                feature_path
+                    .file_name()
+                    .map(|value| value.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| user_feature_id.to_string()),
+            ),
+        );
+        feature.insert(
+            "name".to_string(),
+            Value::String(user_feature_id.to_string()),
+        );
+        feature.insert("value".to_string(), user_value.clone());
+        feature.insert("included".to_string(), Value::Bool(true));
+        merge_legacy_feature_customizations(&mut feature);
+
+        feature_sets.push(json!({
+            "sourceInformation": {
+                "type": "file-path",
+                "resolvedFilePath": feature_folder,
+                "userFeatureId": user_feature_id,
+            },
+            "features": [Value::Object(feature)],
+            "internalVersion": "2",
+        }));
+    }
+
+    Ok(Some(json!({
+        "featureSets": feature_sets,
+    })))
+}
+
+fn merge_object_property(entries: &[Value], key: &str) -> Map<String, Value> {
+    let mut merged = Map::new();
+    for entry in entries {
+        if let Some(values) = entry.get(key).and_then(Value::as_object) {
+            for (name, value) in values {
+                merged.insert(name.clone(), value.clone());
+            }
+        }
+    }
+    merged
+}
+
+fn collect_property_values(entries: &[Value], key: &str) -> Option<Value> {
+    let collected: Vec<Value> = entries
+        .iter()
+        .filter_map(|entry| entry.get(key).cloned())
+        .collect();
+    if collected.is_empty() {
+        None
+    } else {
+        Some(Value::Array(collected))
+    }
+}
+
+fn merge_unique_array_property(entries: &[Value], key: &str) -> Option<Value> {
+    let mut collected = Vec::new();
+    for entry in entries {
+        if let Some(values) = entry.get(key).and_then(Value::as_array) {
+            for value in values {
+                if !collected.iter().any(|existing: &Value| existing == value) {
+                    collected.push(value.clone());
+                }
+            }
+        }
+    }
+    if collected.is_empty() {
+        None
+    } else {
+        Some(Value::Array(collected))
+    }
+}
+
+fn find_last_property(entries: &[Value], key: &str) -> Option<Value> {
+    entries
+        .iter()
+        .rev()
+        .find_map(|entry| entry.get(key).cloned())
+}
+
+fn merge_customizations(entries: &[Value]) -> Option<Value> {
+    let mut merged = Map::new();
+    for entry in entries {
+        let Some(customizations) = entry.get("customizations").and_then(Value::as_object) else {
+            continue;
+        };
+        for (key, value) in customizations {
+            let bucket = merged
+                .entry(key.clone())
+                .or_insert_with(|| Value::Array(Vec::new()));
+            if let Some(values) = bucket.as_array_mut() {
+                values.push(value.clone());
+            }
+        }
+    }
+
+    if merged.is_empty() {
+        None
+    } else {
+        Some(Value::Object(merged))
+    }
+}
+
+fn feature_metadata_entries(features_configuration: Option<&Value>) -> Vec<Value> {
+    let mut entries = Vec::new();
+    let Some(feature_sets) = features_configuration
+        .and_then(|value| value.get("featureSets"))
+        .and_then(Value::as_array)
+    else {
+        return entries;
+    };
+
+    for feature_set in feature_sets {
+        let user_feature_id = feature_set
+            .get("sourceInformation")
+            .and_then(|value| value.get("userFeatureId"))
+            .cloned();
+        let Some(features) = feature_set.get("features").and_then(Value::as_array) else {
+            continue;
+        };
+        for feature in features {
+            let mut picked = pick_properties(feature, &PICK_FEATURE_PROPERTIES);
+            if let Some(user_feature_id) = user_feature_id.clone() {
+                picked.insert("id".to_string(), user_feature_id);
+            }
+            if !picked.is_empty() {
+                entries.push(Value::Object(picked));
+            }
+        }
+    }
+
+    entries
+}
+
+fn merge_configuration(configuration: &Value, features_configuration: Option<&Value>) -> Value {
+    let mut image_metadata = feature_metadata_entries(features_configuration);
+    let config_entry = pick_properties(configuration, &PICK_CONFIG_PROPERTIES);
+    if !config_entry.is_empty() {
+        image_metadata.push(Value::Object(config_entry));
+    }
+
+    let mut merged = configuration.as_object().cloned().unwrap_or_default();
+    for key in REPLACE_PROPERTIES {
+        merged.remove(key);
+    }
+
+    merged.insert(
+        "init".to_string(),
+        Value::Bool(
+            image_metadata
+                .iter()
+                .any(|entry| entry.get("init").and_then(Value::as_bool).unwrap_or(false)),
+        ),
+    );
+    merged.insert(
+        "privileged".to_string(),
+        Value::Bool(image_metadata.iter().any(|entry| {
+            entry
+                .get("privileged")
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+        })),
+    );
+    merged.insert(
+        "remoteEnv".to_string(),
+        Value::Object(merge_object_property(&image_metadata, "remoteEnv")),
+    );
+    merged.insert(
+        "containerEnv".to_string(),
+        Value::Object(merge_object_property(&image_metadata, "containerEnv")),
+    );
+    merged.insert(
+        "portsAttributes".to_string(),
+        Value::Object(merge_object_property(&image_metadata, "portsAttributes")),
+    );
+
+    if let Some(value) = merge_customizations(&image_metadata) {
+        merged.insert("customizations".to_string(), value);
+    }
+    if let Some(value) = merge_unique_array_property(&image_metadata, "capAdd") {
+        merged.insert("capAdd".to_string(), value);
+    }
+    if let Some(value) = merge_unique_array_property(&image_metadata, "securityOpt") {
+        merged.insert("securityOpt".to_string(), value);
+    }
+    if let Some(value) = collect_property_values(&image_metadata, "entrypoint") {
+        merged.insert("entrypoints".to_string(), value);
+    }
+    if let Some(value) = collect_property_values(&image_metadata, "onCreateCommand") {
+        merged.insert("onCreateCommands".to_string(), value);
+    }
+    if let Some(value) = collect_property_values(&image_metadata, "updateContentCommand") {
+        merged.insert("updateContentCommands".to_string(), value);
+    }
+    if let Some(value) = collect_property_values(&image_metadata, "postCreateCommand") {
+        merged.insert("postCreateCommands".to_string(), value);
+    }
+    if let Some(value) = collect_property_values(&image_metadata, "postStartCommand") {
+        merged.insert("postStartCommands".to_string(), value);
+    }
+    if let Some(value) = collect_property_values(&image_metadata, "postAttachCommand") {
+        merged.insert("postAttachCommands".to_string(), value);
+    }
+    if let Some(value) = find_last_property(&image_metadata, "waitFor") {
+        merged.insert("waitFor".to_string(), value);
+    }
+    if let Some(value) = find_last_property(&image_metadata, "remoteUser") {
+        merged.insert("remoteUser".to_string(), value);
+    }
+    if let Some(value) = find_last_property(&image_metadata, "containerUser") {
+        merged.insert("containerUser".to_string(), value);
+    }
+    if let Some(value) = find_last_property(&image_metadata, "userEnvProbe") {
+        merged.insert("userEnvProbe".to_string(), value);
+    }
+    if let Some(value) = find_last_property(&image_metadata, "overrideCommand") {
+        merged.insert("overrideCommand".to_string(), value);
+    }
+    if let Some(value) = find_last_property(&image_metadata, "otherPortsAttributes") {
+        merged.insert("otherPortsAttributes".to_string(), value);
+    }
+    if let Some(value) = find_last_property(&image_metadata, "shutdownAction") {
+        merged.insert("shutdownAction".to_string(), value);
+    }
+
+    Value::Object(merged)
+}
+
 fn build_read_configuration_payload(args: &[String]) -> Result<Value, String> {
     let (workspace_folder, config_file, configuration) = load_resolved_config(args)?;
     let mut payload = Map::new();
+    let features_configuration = if has_flag(args, "--include-features-configuration")
+        || has_flag(args, "--include-merged-configuration")
+    {
+        build_features_configuration(&workspace_folder, &config_file, &configuration)?
+    } else {
+        None
+    };
+
     payload.insert("configuration".to_string(), configuration.clone());
     payload.insert(
         "metadata".to_string(),
@@ -207,16 +590,16 @@ fn build_read_configuration_payload(args: &[String]) -> Result<Value, String> {
     );
 
     if has_flag(args, "--include-merged-configuration") {
-        payload.insert("mergedConfiguration".to_string(), configuration.clone());
+        payload.insert(
+            "mergedConfiguration".to_string(),
+            merge_configuration(&configuration, features_configuration.as_ref()),
+        );
     }
 
     if has_flag(args, "--include-features-configuration") {
-        payload.insert(
-            "featuresConfiguration".to_string(),
-            json!({
-                "features": configuration.get("features").cloned().unwrap_or_else(|| json!({})),
-            }),
-        );
+        if let Some(features_configuration) = features_configuration {
+            payload.insert("featuresConfiguration".to_string(), features_configuration);
+        }
     }
 
     Ok(Value::Object(payload))
@@ -295,7 +678,7 @@ fn build_lifecycle_payload(command: &str, args: &[String]) -> Result<Value, Stri
         "skipNonBlockingCommands": has_flag(args, "--skip-non-blocking-commands"),
         "lifecycleCommands": lifecycle_commands(&configuration),
         "configuration": if has_flag(args, "--include-configuration") { configuration.clone() } else { Value::Null },
-        "mergedConfiguration": if has_flag(args, "--include-merged-configuration") { configuration.clone() } else { Value::Null },
+        "mergedConfiguration": if has_flag(args, "--include-merged-configuration") { merge_configuration(&configuration, None) } else { Value::Null },
     }))
 }
 
@@ -1003,6 +1386,7 @@ mod tests {
         run_native_collection, run_upgrade_lockfile, should_use_native_collection,
         should_use_native_read_configuration,
     };
+    use serde_json::Value;
     use std::fs;
     use std::process::ExitCode;
     use std::time::{SystemTime, UNIX_EPOCH};
@@ -1119,13 +1503,18 @@ mod tests {
     #[test]
     fn read_configuration_payload_includes_optional_sections() {
         let root = unique_temp_dir();
-        let config_dir = root.join(".devcontainer");
-        fs::create_dir_all(&config_dir).expect("failed to create config directory");
+        let feature_dir = root.join(".devcontainer").join("localFeatureA");
+        fs::create_dir_all(&feature_dir).expect("failed to create feature directory");
         fs::write(
-            config_dir.join("devcontainer.json"),
-            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"features\": { \"ghcr.io/devcontainers/features/git:1\": {} }\n}\n",
+            root.join(".devcontainer.json"),
+            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"postCreateCommand\": \"echo ready\",\n  \"features\": { \"./.devcontainer/localFeatureA\": { \"greeting\": \"hello\" } }\n}\n",
         )
         .expect("failed to write config");
+        fs::write(
+            feature_dir.join("devcontainer-feature.json"),
+            "{\n  \"id\": \"localFeatureA\",\n  \"version\": \"1.0.0\",\n  \"customizations\": {\n    \"vscode\": {\n      \"extensions\": [\"dbaeumer.vscode-eslint\"]\n    }\n  }\n}\n",
+        )
+        .expect("failed to write feature metadata");
 
         let args = vec![
             "--workspace-folder".to_string(),
@@ -1140,13 +1529,63 @@ mod tests {
             "mcr.microsoft.com/devcontainers/base:ubuntu"
         );
         assert_eq!(
-            payload["mergedConfiguration"]["image"],
-            "mcr.microsoft.com/devcontainers/base:ubuntu"
+            payload["mergedConfiguration"]["postCreateCommands"][0],
+            "echo ready"
         );
-        assert!(payload["featuresConfiguration"]["features"]
-            .as_object()
-            .expect("features object")
-            .contains_key("ghcr.io/devcontainers/features/git:1"));
+        assert!(payload["mergedConfiguration"]
+            .get("postCreateCommand")
+            .is_none());
+        assert_eq!(payload["mergedConfiguration"]["init"], Value::Bool(false));
+        assert_eq!(
+            payload["featuresConfiguration"]["featureSets"][0]["features"][0]["id"],
+            "localFeatureA"
+        );
+        assert_eq!(
+            payload["featuresConfiguration"]["featureSets"][0]["features"][0]["customizations"]
+                ["vscode"]["extensions"][0],
+            "dbaeumer.vscode-eslint"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn read_configuration_feature_payload_normalizes_legacy_customizations() {
+        let root = unique_temp_dir();
+        let feature_dir = root.join(".devcontainer").join("localFeatureB");
+        fs::create_dir_all(&feature_dir).expect("failed to create feature directory");
+        fs::write(
+            root.join(".devcontainer.json"),
+            "{\n  \"image\": \"mcr.microsoft.com/devcontainers/base:ubuntu\",\n  \"features\": { \"./.devcontainer/localFeatureB\": { \"favorite\": \"gold\" } }\n}\n",
+        )
+        .expect("failed to write config");
+        fs::write(
+            feature_dir.join("devcontainer-feature.json"),
+            "{\n  \"id\": \"localFeatureB\",\n  \"version\": \"1.0.0\",\n  \"extensions\": [\"ms-dotnettools.csharp\"],\n  \"settings\": {\n    \"files.watcherExclude\": {\n      \"**/test/**\": true\n    }\n  }\n}\n",
+        )
+        .expect("failed to write feature metadata");
+
+        let args = vec![
+            "--workspace-folder".to_string(),
+            root.display().to_string(),
+            "--include-features-configuration".to_string(),
+        ];
+        let payload = build_read_configuration_payload(&args).expect("payload");
+
+        assert_eq!(
+            payload["featuresConfiguration"]["featureSets"][0]["features"][0]["customizations"]
+                ["vscode"]["extensions"][0],
+            "ms-dotnettools.csharp"
+        );
+        assert_eq!(
+            payload["featuresConfiguration"]["featureSets"][0]["features"][0]["customizations"]
+                ["vscode"]["settings"]["files.watcherExclude"]["**/test/**"],
+            Value::Bool(true)
+        );
+        assert!(
+            payload["featuresConfiguration"]["featureSets"][0]["features"][0]
+                .get("extensions")
+                .is_none()
+        );
         let _ = fs::remove_dir_all(root);
     }
 

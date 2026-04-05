@@ -197,6 +197,53 @@ function hasFlag(args, flag) {
 	return args.includes(flag);
 }
 
+const pickConfigProperties = [
+	'onCreateCommand',
+	'updateContentCommand',
+	'postCreateCommand',
+	'postStartCommand',
+	'postAttachCommand',
+	'waitFor',
+	'customizations',
+	'mounts',
+	'containerEnv',
+	'containerUser',
+	'init',
+	'privileged',
+	'capAdd',
+	'securityOpt',
+	'remoteUser',
+	'userEnvProbe',
+	'remoteEnv',
+	'overrideCommand',
+	'portsAttributes',
+	'otherPortsAttributes',
+];
+
+const pickFeatureProperties = [
+	'onCreateCommand',
+	'updateContentCommand',
+	'postCreateCommand',
+	'postStartCommand',
+	'postAttachCommand',
+	'init',
+	'privileged',
+	'capAdd',
+	'securityOpt',
+	'customizations',
+];
+
+const replaceProperties = [
+	'customizations',
+	'entrypoint',
+	'onCreateCommand',
+	'updateContentCommand',
+	'postCreateCommand',
+	'postStartCommand',
+	'postAttachCommand',
+	'shutdownAction',
+];
+
 function resolveConfigPath(workspaceFolder, explicitConfigPath) {
 	if (explicitConfigPath) {
 		return path.isAbsolute(explicitConfigPath)
@@ -209,6 +256,194 @@ function resolveConfigPath(workspaceFolder, explicitConfigPath) {
 		return modern;
 	}
 	return path.join(workspaceFolder, '.devcontainer.json');
+}
+
+function pickProperties(value, keys) {
+	return Object.fromEntries(
+		keys
+			.filter(key => Object.prototype.hasOwnProperty.call(value, key))
+			.map(key => [key, value[key]]),
+	);
+}
+
+function mergeLegacyFeatureCustomizations(feature) {
+	if (!feature.extensions && !feature.settings) {
+		return feature;
+	}
+	const copy = { ...feature };
+	const customizations = copy.customizations || (copy.customizations = {});
+	const vscode = customizations.vscode || (customizations.vscode = {});
+	if (copy.extensions) {
+		vscode.extensions = (vscode.extensions || []).concat(copy.extensions);
+		delete copy.extensions;
+	}
+	if (copy.settings) {
+		vscode.settings = {
+			...copy.settings,
+			...(vscode.settings || {}),
+		};
+		delete copy.settings;
+	}
+	return copy;
+}
+
+function buildFeaturesConfiguration(workspaceFolder, configPath, configuration) {
+	const features = configuration.features;
+	if (!features || typeof features !== 'object' || Array.isArray(features)) {
+		return undefined;
+	}
+
+	const allowedParent = path.join(workspaceFolder, '.devcontainer');
+	const configDir = path.dirname(configPath);
+	const featureSets = Object.entries(features).map(([userFeatureId, userValue]) => {
+		if (path.isAbsolute(userFeatureId) || !userFeatureId.startsWith('.')) {
+			throw new Error(`reference read-configuration only supports local relative features in parity scenarios (unsupported: ${userFeatureId})`);
+		}
+		const featureFolder = path.join(configDir, userFeatureId);
+		const relative = path.relative(allowedParent, featureFolder);
+		if (relative.startsWith('..') || path.isAbsolute(relative)) {
+			throw new Error(`local feature path must remain under ${allowedParent}: ${featureFolder}`);
+		}
+		const featureDefinition = parseJsonc(fs.readFileSync(path.join(featureFolder, 'devcontainer-feature.json'), 'utf8'));
+		const feature = mergeLegacyFeatureCustomizations({
+			...featureDefinition,
+			id: path.basename(userFeatureId),
+			name: userFeatureId,
+			value: userValue,
+			included: true,
+		});
+		return {
+			sourceInformation: {
+				type: 'file-path',
+				resolvedFilePath: featureFolder,
+				userFeatureId,
+			},
+			features: [feature],
+			internalVersion: '2',
+		};
+	});
+
+	return {
+		featureSets,
+	};
+}
+
+function mergeObjectProperty(entries, key) {
+	return Object.assign({}, ...entries.map(entry => entry[key] || {}));
+}
+
+function collectPropertyValues(entries, key) {
+	const values = entries
+		.map(entry => entry[key])
+		.filter(value => value !== undefined);
+	return values.length ? values : undefined;
+}
+
+function mergeUniqueArrayProperty(entries, key) {
+	const values = [];
+	for (const entry of entries) {
+		for (const value of entry[key] || []) {
+			if (!values.some(existing => JSON.stringify(existing) === JSON.stringify(value))) {
+				values.push(value);
+			}
+		}
+	}
+	return values.length ? values : undefined;
+}
+
+function mergeCustomizations(entries) {
+	const customizations = {};
+	for (const entry of entries) {
+		if (!entry.customizations) {
+			continue;
+		}
+		for (const [key, value] of Object.entries(entry.customizations)) {
+			(customizations[key] ||= []).push(value);
+		}
+	}
+	return Object.keys(customizations).length ? customizations : undefined;
+}
+
+function findLastProperty(entries, key) {
+	return [...entries].reverse().find(entry => entry[key] !== undefined)?.[key];
+}
+
+function featureMetadataEntries(featuresConfiguration) {
+	return (featuresConfiguration?.featureSets || []).flatMap(featureSet =>
+		featureSet.features.map(feature => ({
+			id: featureSet.sourceInformation.userFeatureId,
+			...pickProperties(feature, pickFeatureProperties),
+		})),
+	);
+}
+
+function mergeConfiguration(configuration, featuresConfiguration) {
+	const imageMetadata = [
+		...featureMetadataEntries(featuresConfiguration),
+		pickProperties(configuration, pickConfigProperties),
+	].filter(entry => Object.keys(entry).length);
+	const customizations = mergeCustomizations(imageMetadata);
+	const merged = { ...configuration };
+	for (const property of replaceProperties) {
+		delete merged[property];
+	}
+
+	merged.init = imageMetadata.some(entry => entry.init);
+	merged.privileged = imageMetadata.some(entry => entry.privileged);
+	merged.remoteEnv = mergeObjectProperty(imageMetadata, 'remoteEnv');
+	merged.containerEnv = mergeObjectProperty(imageMetadata, 'containerEnv');
+	merged.portsAttributes = mergeObjectProperty(imageMetadata, 'portsAttributes');
+
+	if (customizations) {
+		merged.customizations = customizations;
+	}
+	if (mergeUniqueArrayProperty(imageMetadata, 'capAdd')) {
+		merged.capAdd = mergeUniqueArrayProperty(imageMetadata, 'capAdd');
+	}
+	if (mergeUniqueArrayProperty(imageMetadata, 'securityOpt')) {
+		merged.securityOpt = mergeUniqueArrayProperty(imageMetadata, 'securityOpt');
+	}
+	if (collectPropertyValues(imageMetadata, 'entrypoint')) {
+		merged.entrypoints = collectPropertyValues(imageMetadata, 'entrypoint');
+	}
+	if (collectPropertyValues(imageMetadata, 'onCreateCommand')) {
+		merged.onCreateCommands = collectPropertyValues(imageMetadata, 'onCreateCommand');
+	}
+	if (collectPropertyValues(imageMetadata, 'updateContentCommand')) {
+		merged.updateContentCommands = collectPropertyValues(imageMetadata, 'updateContentCommand');
+	}
+	if (collectPropertyValues(imageMetadata, 'postCreateCommand')) {
+		merged.postCreateCommands = collectPropertyValues(imageMetadata, 'postCreateCommand');
+	}
+	if (collectPropertyValues(imageMetadata, 'postStartCommand')) {
+		merged.postStartCommands = collectPropertyValues(imageMetadata, 'postStartCommand');
+	}
+	if (collectPropertyValues(imageMetadata, 'postAttachCommand')) {
+		merged.postAttachCommands = collectPropertyValues(imageMetadata, 'postAttachCommand');
+	}
+	if (findLastProperty(imageMetadata, 'waitFor') !== undefined) {
+		merged.waitFor = findLastProperty(imageMetadata, 'waitFor');
+	}
+	if (findLastProperty(imageMetadata, 'remoteUser') !== undefined) {
+		merged.remoteUser = findLastProperty(imageMetadata, 'remoteUser');
+	}
+	if (findLastProperty(imageMetadata, 'containerUser') !== undefined) {
+		merged.containerUser = findLastProperty(imageMetadata, 'containerUser');
+	}
+	if (findLastProperty(imageMetadata, 'userEnvProbe') !== undefined) {
+		merged.userEnvProbe = findLastProperty(imageMetadata, 'userEnvProbe');
+	}
+	if (findLastProperty(imageMetadata, 'overrideCommand') !== undefined) {
+		merged.overrideCommand = findLastProperty(imageMetadata, 'overrideCommand');
+	}
+	if (findLastProperty(imageMetadata, 'otherPortsAttributes') !== undefined) {
+		merged.otherPortsAttributes = findLastProperty(imageMetadata, 'otherPortsAttributes');
+	}
+	if (findLastProperty(imageMetadata, 'shutdownAction') !== undefined) {
+		merged.shutdownAction = findLastProperty(imageMetadata, 'shutdownAction');
+	}
+
+	return merged;
 }
 
 function substituteString(input, workspaceFolder, env) {
@@ -258,6 +493,9 @@ function runReferenceReadConfiguration(workspaceFolder, args = [], env = process
 		fs.realpathSync(workspaceFolder),
 		env,
 	);
+	const featuresConfiguration = hasFlag(args, '--include-features-configuration') || hasFlag(args, '--include-merged-configuration')
+		? buildFeaturesConfiguration(fs.realpathSync(workspaceFolder), fs.realpathSync(configPath), configuration)
+		: undefined;
 	const payload = {
 		configuration,
 		metadata: {
@@ -268,12 +506,10 @@ function runReferenceReadConfiguration(workspaceFolder, args = [], env = process
 		},
 	};
 	if (hasFlag(args, '--include-merged-configuration')) {
-		payload.mergedConfiguration = configuration;
+		payload.mergedConfiguration = mergeConfiguration(configuration, featuresConfiguration);
 	}
-	if (hasFlag(args, '--include-features-configuration')) {
-		payload.featuresConfiguration = {
-			features: configuration.features || {},
-		};
+	if (hasFlag(args, '--include-features-configuration') && featuresConfiguration) {
+		payload.featuresConfiguration = featuresConfiguration;
 	}
 	return payload;
 }

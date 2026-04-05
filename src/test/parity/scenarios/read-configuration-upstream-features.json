@@ -1,5 +1,5 @@
 {
-	"name": "read-configuration-upstream-features",
-	"workspaceFolderPath": "upstream/src/test/configs/image-with-features",
+	"name": "read-configuration-upstream-local-features",
+	"workspaceFolderPath": "upstream/src/test/container-features/configs/dockerfile-with-v2-local-features-config-outside-dev-container-folder",
 	"args": ["--include-features-configuration"]
 }
