@@ -1,4 +1,5 @@
 {
 	"name": "read-configuration-basic",
-	"fixtureConfigPath": "src/test/parity/fixtures/schema/valid-image/devcontainer.json"
+	"fixtureConfigPath": "src/test/parity/fixtures/schema/valid-image/devcontainer.json",
+	"outputGoldenPath": "src/test/parity/golden/read-configuration-basic.json"
 }
