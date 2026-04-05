@@ -39,7 +39,7 @@ pub fn print_command_help(command: &str) {
             println!("\nNative support:");
             println!("  - list / ls");
             println!("  - resolve-dependencies");
-            println!("  - info <mode> <feature>");
+            println!("  - info manifest <feature>");
             println!("  - test [target]");
             println!("  - package <target>");
             println!("  - publish <target>");

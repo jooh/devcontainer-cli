@@ -16,9 +16,9 @@ pub(crate) fn run_features(args: &[String]) -> ExitCode {
         "resolve-dependencies" => build_features_resolve_dependencies_payload(&args[1..]),
         "info" => {
             if args.len() < 3 {
-                Err("features info requires <mode> <feature>".to_string())
+                Err("features info requires manifest <feature>".to_string())
             } else {
-                build_feature_info_payload(&args[2])
+                build_feature_info_payload(&args[1], &args[2])
             }
         }
         "test" => Ok(json!({
@@ -214,7 +214,11 @@ pub(crate) fn build_features_resolve_dependencies_payload(
     }))
 }
 
-pub(crate) fn build_feature_info_payload(feature_path: &str) -> Result<Value, String> {
+pub(crate) fn build_feature_info_payload(mode: &str, feature_path: &str) -> Result<Value, String> {
+    if mode != "manifest" {
+        return Err(format!("Unsupported features info mode: {mode}"));
+    }
+
     let manifest = common::parse_manifest(Path::new(feature_path), "devcontainer-feature.json")?;
     Ok(json!({
         "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
@@ -298,12 +302,31 @@ mod tests {
         )
         .expect("failed to write feature manifest");
 
-        let payload =
-            build_feature_info_payload(root.to_string_lossy().as_ref()).expect("feature info");
+        let payload = build_feature_info_payload("manifest", root.to_string_lossy().as_ref())
+            .expect("feature info");
 
         assert_eq!(payload["id"], "demo-feature");
         assert_eq!(payload["name"], "Demo Feature");
         assert_eq!(payload["version"], "1.0.0");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn feature_info_rejects_unsupported_modes() {
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("failed to create feature root");
+        fs::write(
+            root.join("devcontainer-feature.json"),
+            "{\n  \"id\": \"demo-feature\"\n}\n",
+        )
+        .expect("failed to write feature manifest");
+
+        let result = build_feature_info_payload("tags", root.to_string_lossy().as_ref());
+
+        assert_eq!(
+            result.expect_err("expected unsupported mode"),
+            "Unsupported features info mode: tags"
+        );
         let _ = fs::remove_dir_all(root);
     }
 
