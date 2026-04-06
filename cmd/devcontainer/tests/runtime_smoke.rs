@@ -32,18 +32,25 @@ case "$COMMAND" in
     exit 0
     ;;
   ps)
-    expected_label="${FAKE_PODMAN_PS_REQUIRE_LABEL:-}"
-    if [ -n "$expected_label" ]; then
-      found=0
-      while [ "$#" -gt 0 ]; do
-        if [ "${1:-}" = "--filter" ] && [ "${2:-}" = "label=$expected_label" ]; then
-          found=1
-        fi
-        shift
+    required_labels="${FAKE_PODMAN_PS_REQUIRE_LABELS:-}"
+    if [ -z "$required_labels" ] && [ -n "${FAKE_PODMAN_PS_REQUIRE_LABEL:-}" ]; then
+      required_labels="${FAKE_PODMAN_PS_REQUIRE_LABEL}"
+    fi
+    if [ -n "$required_labels" ]; then
+      original_args="$*"
+      old_ifs="${IFS- }"
+      IFS='
+'
+      for expected_label in $required_labels; do
+        case " $original_args " in
+          *" --filter label=$expected_label "*) ;;
+          *)
+            IFS="$old_ifs"
+            exit 0
+            ;;
+        esac
       done
-      if [ "$found" -ne 1 ]; then
-        exit 0
-      fi
+      IFS="$old_ifs"
     fi
     if [ "${FAKE_PODMAN_PS_WITH_HEADER:-0}" = "1" ]; then
       echo "CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES"
@@ -432,6 +439,69 @@ fn exec_with_config_uses_the_config_workspace_for_lookup_and_workdir() {
     )));
     assert!(invocations.contains(
         "exec --workdir /workspaces/workspace fake-container-id /bin/echo hello-from-config"
+    ));
+}
+
+#[test]
+fn nested_config_exec_uses_workspace_root_and_config_label() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    let caller_dir = root.join("caller");
+    let nested_config_dir = workspace.join(".devcontainer").join("python");
+    fs::create_dir_all(&nested_config_dir).expect("nested config dir");
+    fs::create_dir_all(&caller_dir).expect("caller dir");
+    let config_path = nested_config_dir.join("devcontainer.json");
+    fs::write(&config_path, "{\n  \"image\": \"alpine:3.20\"\n}\n").expect("config write");
+    let expected_workspace = workspace
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.clone());
+    let expected_config = config_path
+        .canonicalize()
+        .unwrap_or_else(|_| config_path.clone());
+
+    let required_labels = format!(
+        "devcontainer.local_folder={}\ndevcontainer.config_file={}",
+        expected_workspace.display(),
+        expected_config.display()
+    );
+
+    let output = run_command_in_dir(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--config",
+            config_path.to_string_lossy().as_ref(),
+            "/bin/echo",
+            "hello-from-nested-config",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_REQUIRE_LABELS", required_labels.as_str()),
+        ],
+        Some(&caller_dir),
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-nested-config\n"
+    );
+
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains(&format!(
+        "ps -q --filter label=devcontainer.local_folder={}",
+        expected_workspace.display()
+    )));
+    assert!(invocations.contains(&format!(
+        "--filter label=devcontainer.config_file={}",
+        expected_config.display()
+    )));
+    assert!(invocations.contains(
+        "exec --workdir /workspaces/workspace fake-container-id /bin/echo hello-from-nested-config"
     ));
 }
 

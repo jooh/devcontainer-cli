@@ -58,7 +58,11 @@ pub fn run_set_up(args: &[String]) -> Result<Value, String> {
     let workspace_folder = resolved
         .as_ref()
         .map(|value| value.workspace_folder.as_path());
-    let container_id = resolve_target_container(args, workspace_folder)?;
+    let container_id = resolve_target_container(
+        args,
+        workspace_folder,
+        resolved.as_ref().map(|value| value.config_file.as_path()),
+    )?;
     let fallback_workspace = workspace_folder_from_args(args)?;
     let remote_workspace_folder = resolved
         .as_ref()
@@ -96,7 +100,11 @@ pub fn run_user_commands(args: &[String]) -> Result<Value, String> {
     let workspace_folder = resolved
         .as_ref()
         .map(|value| value.workspace_folder.as_path());
-    let container_id = resolve_target_container(args, workspace_folder)?;
+    let container_id = resolve_target_container(
+        args,
+        workspace_folder,
+        resolved.as_ref().map(|value| value.config_file.as_path()),
+    )?;
     let fallback_workspace = workspace_folder_from_args(args)?;
     let remote_workspace_folder = resolved
         .as_ref()
@@ -140,6 +148,7 @@ pub fn run_exec(args: &[String]) -> Result<ExecResult, String> {
             .as_ref()
             .map(|value| value.workspace_folder.as_path())
             .or(workspace_folder.as_deref()),
+        resolved.as_ref().map(|value| value.config_file.as_path()),
     )?;
     let interactive = common::has_flag(args, "--interactive");
 
@@ -507,6 +516,7 @@ fn lifecycle_command_values(configuration: &Value, keys: &[&str]) -> Vec<String>
 fn resolve_target_container(
     args: &[String],
     workspace_folder: Option<&Path>,
+    config_file: Option<&Path>,
 ) -> Result<String, String> {
     if let Some(container_id) = common::parse_option_value(args, "--container-id") {
         return Ok(container_id);
@@ -518,6 +528,12 @@ fn resolve_target_container(
             labels.push(format!(
                 "devcontainer.local_folder={}",
                 workspace_folder.display()
+            ));
+        }
+        if let Some(config_file) = config_file {
+            labels.push(format!(
+                "devcontainer.config_file={}",
+                config_file.display()
             ));
         }
     }

@@ -99,12 +99,11 @@ pub(crate) fn resolve_read_configuration_path(
 
 fn infer_workspace_folder_from_config(config_path: &Path) -> PathBuf {
     let config_parent = config_path.parent().unwrap_or(config_path);
-    let workspace =
-        if config_parent.file_name().and_then(|name| name.to_str()) == Some(".devcontainer") {
-            config_parent.parent().unwrap_or(config_parent)
-        } else {
-            config_parent
-        };
+    let workspace = config_path
+        .ancestors()
+        .find(|path| path.file_name().and_then(|name| name.to_str()) == Some(".devcontainer"))
+        .and_then(Path::parent)
+        .unwrap_or(config_parent);
     fs::canonicalize(workspace).unwrap_or_else(|_| workspace.to_path_buf())
 }
 
