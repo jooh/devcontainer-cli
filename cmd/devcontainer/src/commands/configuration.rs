@@ -244,14 +244,21 @@ mod tests {
     use crate::commands::common::resolve_read_configuration_path;
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
 
     fn unique_temp_dir() -> PathBuf {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time went backwards")
             .as_nanos();
-        std::env::temp_dir().join(format!("devcontainer-config-command-test-{suffix}"))
+        let unique_id = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!(
+            "devcontainer-config-command-test-{}-{suffix}-{unique_id}",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -327,6 +334,7 @@ mod tests {
         let root = unique_temp_dir();
         let nested_config_dir = root.join(".devcontainer").join("python");
         let config = nested_config_dir.join("devcontainer.json");
+        fs::create_dir_all(&root).expect("failed to create root");
         fs::create_dir_all(&nested_config_dir).expect("failed to create nested config directory");
         fs::write(&config, "{}").expect("failed to write config");
 

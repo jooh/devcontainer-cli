@@ -2,14 +2,21 @@ use serde_json::Value;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
 
 fn unique_temp_dir() -> std::path::PathBuf {
     let suffix = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("time went backwards")
         .as_nanos();
-    std::env::temp_dir().join(format!("devcontainer-cli-smoke-{suffix}"))
+    let unique_id = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!(
+        "devcontainer-cli-smoke-{}-{suffix}-{unique_id}",
+        std::process::id()
+    ))
 }
 
 fn repo_root() -> PathBuf {
