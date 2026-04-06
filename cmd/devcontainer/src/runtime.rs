@@ -1,11 +1,17 @@
 use std::env;
 use std::fs;
+use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
 
 use serde_json::{json, Map, Value};
 
 use crate::commands::common;
 use crate::process_runner::{self, ProcessRequest, ProcessResult};
+
+pub enum ExecResult {
+    Captured(ProcessResult),
+    Streaming(i32),
+}
 
 pub fn run_build(args: &[String]) -> Result<Value, String> {
     let resolved = load_required_config(args)?;
@@ -116,21 +122,43 @@ pub fn run_user_commands(args: &[String]) -> Result<Value, String> {
     }))
 }
 
-pub fn run_exec(args: &[String]) -> Result<ProcessResult, String> {
+pub fn run_exec(args: &[String]) -> Result<ExecResult, String> {
     let command_args = exec_command_and_args(args)?;
-    let workspace_folder = workspace_folder_from_args(args)?;
     let resolved = load_optional_config(args)?;
+    let workspace_folder = if let Some(resolved) = &resolved {
+        Some(resolved.workspace_folder.clone())
+    } else {
+        workspace_folder_from_args(args)?
+    };
     let remote_workspace_folder = resolved
         .as_ref()
         .map(remote_workspace_folder)
         .unwrap_or_else(|| default_remote_workspace_folder(workspace_folder.as_deref()));
-    let container_id = resolve_target_container(args, workspace_folder.as_deref())?;
+    let container_id = resolve_target_container(
+        args,
+        resolved
+            .as_ref()
+            .map(|value| value.workspace_folder.as_path())
+            .or(workspace_folder.as_deref()),
+    )?;
+    let interactive = common::has_flag(args, "--interactive");
 
-    let mut engine_args = vec![
-        "exec".to_string(),
-        "--workdir".to_string(),
-        remote_workspace_folder,
-    ];
+    let mut engine_args = vec!["exec".to_string()];
+    if interactive {
+        engine_args.push("-i".to_string());
+        if std::io::stdin().is_terminal() && std::io::stdout().is_terminal() {
+            engine_args.push("-t".to_string());
+        }
+    }
+    engine_args.push("--workdir".to_string());
+    engine_args.push(remote_workspace_folder);
+    if let Some(user) = resolved
+        .as_ref()
+        .and_then(|value| configured_user(&value.configuration))
+    {
+        engine_args.push("--user".to_string());
+        engine_args.push(user.to_string());
+    }
     for (key, value) in
         combined_remote_env(args, resolved.as_ref().map(|value| &value.configuration))
     {
@@ -140,12 +168,19 @@ pub fn run_exec(args: &[String]) -> Result<ProcessResult, String> {
     engine_args.push(container_id);
     engine_args.extend(command_args);
 
-    process_runner::run_process(&ProcessRequest {
+    let request = ProcessRequest {
         program: engine_program(args),
         args: engine_args,
         cwd: None,
         env: std::collections::HashMap::new(),
-    })
+    };
+
+    if interactive {
+        let status_code = process_runner::run_process_streaming(&request)?;
+        Ok(ExecResult::Streaming(status_code))
+    } else {
+        process_runner::run_process(&request).map(ExecResult::Captured)
+    }
 }
 
 struct ResolvedConfig {
@@ -374,6 +409,10 @@ fn run_lifecycle_commands(
             "--workdir".to_string(),
             remote_workspace_folder.to_string(),
         ];
+        if let Some(user) = configured_user(configuration) {
+            engine_args.push("--user".to_string());
+            engine_args.push(user.to_string());
+        }
         for (key, value) in combined_remote_env(args, Some(configuration)) {
             engine_args.push("-e".to_string());
             engine_args.push(format!("{key}={value}"));
@@ -490,7 +529,7 @@ fn resolve_target_container(
         );
     }
 
-    let mut engine_args = vec!["ps".to_string()];
+    let mut engine_args = vec!["ps".to_string(), "-q".to_string()];
     for label in labels {
         engine_args.push("--filter".to_string());
         engine_args.push(format!("label={label}"));
@@ -581,12 +620,14 @@ fn default_image_name(workspace_folder: &Path) -> String {
 }
 
 fn remote_user(configuration: &Value) -> String {
+    configured_user(configuration).unwrap_or("root").to_string()
+}
+
+fn configured_user(configuration: &Value) -> Option<&str> {
     configuration
         .get("remoteUser")
         .or_else(|| configuration.get("containerUser"))
         .and_then(Value::as_str)
-        .unwrap_or("root")
-        .to_string()
 }
 
 fn has_build_definition(configuration: &Value) -> bool {

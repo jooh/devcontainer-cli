@@ -395,6 +395,9 @@ fn exec_with_config_uses_the_config_workspace_for_lookup_and_workdir() {
     fs::create_dir_all(&workspace).expect("workspace dir");
     fs::create_dir_all(&caller_dir).expect("caller dir");
     let config_path = write_devcontainer_config(&workspace, "{\n  \"image\": \"alpine:3.20\"\n}\n");
+    let expected_workspace = workspace
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.clone());
 
     let output = run_command_in_dir(
         &[
@@ -410,7 +413,7 @@ fn exec_with_config_uses_the_config_workspace_for_lookup_and_workdir() {
             ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
             (
                 "FAKE_PODMAN_PS_REQUIRE_LABEL",
-                format!("devcontainer.local_folder={}", workspace.display()).as_str(),
+                format!("devcontainer.local_folder={}", expected_workspace.display()).as_str(),
             ),
         ],
         Some(&caller_dir),
@@ -425,7 +428,7 @@ fn exec_with_config_uses_the_config_workspace_for_lookup_and_workdir() {
     let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
     assert!(invocations.contains(&format!(
         "ps -q --filter label=devcontainer.local_folder={}",
-        workspace.display()
+        expected_workspace.display()
     )));
     assert!(invocations.contains(
         "exec --workdir /workspaces/workspace fake-container-id /bin/echo hello-from-config"

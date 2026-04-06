@@ -78,16 +78,34 @@ pub(crate) fn resolve_read_configuration_path(
 ) -> Result<(PathBuf, PathBuf), String> {
     validate_option_values(args, &["--workspace-folder", "--config"])?;
 
-    let workspace_folder = parse_option_value(args, "--workspace-folder")
-        .map(PathBuf::from)
+    let explicit_workspace = parse_option_value(args, "--workspace-folder").map(PathBuf::from);
+    let explicit_config = parse_option_value(args, "--config").map(PathBuf::from);
+
+    let workspace_folder = explicit_workspace
+        .clone()
         .or_else(|| env::current_dir().ok())
         .ok_or_else(|| "Unable to determine workspace folder".to_string())?;
-
-    let explicit_config = parse_option_value(args, "--config").map(PathBuf::from);
     let config_path = config::resolve_config_path(&workspace_folder, explicit_config.as_deref())?;
 
-    let resolved_workspace = fs::canonicalize(&workspace_folder).unwrap_or(workspace_folder);
+    let resolved_workspace = if explicit_workspace.is_some() {
+        fs::canonicalize(&workspace_folder).unwrap_or(workspace_folder)
+    } else if explicit_config.is_some() {
+        infer_workspace_folder_from_config(&config_path)
+    } else {
+        fs::canonicalize(&workspace_folder).unwrap_or(workspace_folder)
+    };
     Ok((resolved_workspace, config_path))
+}
+
+fn infer_workspace_folder_from_config(config_path: &Path) -> PathBuf {
+    let config_parent = config_path.parent().unwrap_or(config_path);
+    let workspace =
+        if config_parent.file_name().and_then(|name| name.to_str()) == Some(".devcontainer") {
+            config_parent.parent().unwrap_or(config_parent)
+        } else {
+            config_parent
+        };
+    fs::canonicalize(workspace).unwrap_or_else(|_| workspace.to_path_buf())
 }
 
 pub(crate) fn load_resolved_config(args: &[String]) -> Result<(PathBuf, PathBuf, Value), String> {
