@@ -310,6 +310,14 @@ fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<String, Str
         engine_args.push("--label".to_string());
         engine_args.push(value);
     }
+    if let Some(build_args) = build.get("args").and_then(Value::as_object) {
+        for (key, value) in build_args {
+            if let Some(value) = value.as_str() {
+                engine_args.push("--build-arg".to_string());
+                engine_args.push(format!("{key}={value}"));
+            }
+        }
+    }
     if let Some(platform) = common::parse_option_value(args, "--platform") {
         engine_args.push("--platform".to_string());
         engine_args.push(platform);
@@ -425,7 +433,10 @@ fn run_lifecycle_commands(
                 args,
                 configuration,
                 remote_workspace_folder,
-                command_group.into_iter().next().expect("single lifecycle command"),
+                command_group
+                    .into_iter()
+                    .next()
+                    .expect("single lifecycle command"),
             )?;
             continue;
         }
@@ -694,8 +705,8 @@ fn resolve_target_container(
     let container_id = result
         .stdout
         .lines()
-        .find(|line| !line.trim().is_empty())
         .map(str::trim)
+        .find(|line| !line.is_empty() && !line.chars().any(char::is_whitespace))
         .unwrap_or_default()
         .to_string();
     if container_id.is_empty() {

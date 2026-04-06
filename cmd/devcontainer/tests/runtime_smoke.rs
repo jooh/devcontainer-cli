@@ -223,6 +223,43 @@ fn build_invokes_podman_for_dockerfile_configs() {
 }
 
 #[test]
+fn build_passes_configured_build_args_to_the_engine() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("Dockerfile"),
+        "FROM scratch\nARG VARIANT\nARG TOOLCHAIN\n",
+    )
+    .expect("dockerfile");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"build\": {\n    \"dockerfile\": \"Dockerfile\",\n    \"context\": \".devcontainer\",\n    \"args\": {\n      \"VARIANT\": \"bookworm\",\n      \"TOOLCHAIN\": \"stable\"\n    }\n  }\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--image-name",
+            "example/native-build:args",
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("--build-arg VARIANT=bookworm"));
+    assert!(invocations.contains("--build-arg TOOLCHAIN=stable"));
+}
+
+#[test]
 fn up_starts_a_container_and_exec_runs_inside_it() {
     let root = unique_temp_dir();
     let log_dir = root.join("logs");
@@ -570,12 +607,10 @@ fn object_lifecycle_commands_are_executed() {
 
     assert!(output.status.success(), "{output:?}");
     let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
-    assert!(invocations.contains(
-        "exec --workdir /workspaces/workspace fake-container-id sh -lc echo first"
-    ));
-    assert!(invocations.contains(
-        "exec --workdir /workspaces/workspace fake-container-id printf %s second value"
-    ));
+    assert!(invocations
+        .contains("exec --workdir /workspaces/workspace fake-container-id sh -lc echo first"));
+    assert!(invocations
+        .contains("exec --workdir /workspaces/workspace fake-container-id printf %s second value"));
 }
 
 #[test]
