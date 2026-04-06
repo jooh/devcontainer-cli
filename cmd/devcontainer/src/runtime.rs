@@ -7,6 +7,7 @@ use std::thread;
 use serde_json::{json, Map, Value};
 
 use crate::commands::common;
+use crate::config::{self, ConfigContext};
 use crate::process_runner::{self, ProcessRequest, ProcessResult};
 
 pub enum ExecResult {
@@ -30,9 +31,10 @@ pub fn run_build(args: &[String]) -> Result<Value, String> {
 
 pub fn run_up(args: &[String]) -> Result<Value, String> {
     let resolved = load_required_config(args)?;
+    run_initialize_command(&resolved.configuration, &resolved.workspace_folder)?;
     let image_name = runtime_image_name(&resolved, args)?;
     let remote_workspace_folder = remote_workspace_folder(&resolved);
-    let container_id = start_container(&resolved, args, &image_name, &remote_workspace_folder)?;
+    let container_id = ensure_up_container(&resolved, args, &image_name, &remote_workspace_folder)?;
     run_lifecycle_commands(
         &container_id,
         args,
@@ -65,26 +67,40 @@ pub fn run_set_up(args: &[String]) -> Result<Value, String> {
         resolved.as_ref().map(|value| value.config_file.as_path()),
     )?;
     let fallback_workspace = workspace_folder_from_args(args)?;
+    let inspected = if resolved.is_none() {
+        Some(inspect_container_context(args, &container_id)?)
+    } else {
+        None
+    };
+    let configuration = resolved
+        .as_ref()
+        .map(|value| value.configuration.clone())
+        .or_else(|| inspected.as_ref().map(|value| value.configuration.clone()))
+        .unwrap_or_else(|| Value::Object(Map::new()));
     let remote_workspace_folder = resolved
         .as_ref()
         .map(remote_workspace_folder)
-        .unwrap_or_else(|| default_remote_workspace_folder(fallback_workspace.as_deref()));
+        .or_else(|| {
+            inspected
+                .as_ref()
+                .and_then(|value| value.remote_workspace_folder.clone())
+        })
+        .unwrap_or_else(|| {
+            default_remote_workspace_folder(
+                inspected
+                    .as_ref()
+                    .and_then(|value| value.local_workspace_folder.as_deref())
+                    .or(fallback_workspace.as_deref()),
+            )
+        });
 
     run_lifecycle_commands(
         &container_id,
         args,
-        resolved
-            .as_ref()
-            .map(|value| &value.configuration)
-            .unwrap_or(&Value::Object(Map::new())),
+        &configuration,
         &remote_workspace_folder,
         LifecycleMode::SetUp,
     )?;
-
-    let configuration = resolved
-        .as_ref()
-        .map(|value| value.configuration.clone())
-        .unwrap_or_else(|| json!({}));
 
     Ok(json!({
         "outcome": "success",
@@ -107,18 +123,37 @@ pub fn run_user_commands(args: &[String]) -> Result<Value, String> {
         resolved.as_ref().map(|value| value.config_file.as_path()),
     )?;
     let fallback_workspace = workspace_folder_from_args(args)?;
+    let inspected = if resolved.is_none() {
+        Some(inspect_container_context(args, &container_id)?)
+    } else {
+        None
+    };
+    let configuration = resolved
+        .as_ref()
+        .map(|value| value.configuration.clone())
+        .or_else(|| inspected.as_ref().map(|value| value.configuration.clone()))
+        .unwrap_or_else(|| Value::Object(Map::new()));
     let remote_workspace_folder = resolved
         .as_ref()
         .map(remote_workspace_folder)
-        .unwrap_or_else(|| default_remote_workspace_folder(fallback_workspace.as_deref()));
+        .or_else(|| {
+            inspected
+                .as_ref()
+                .and_then(|value| value.remote_workspace_folder.clone())
+        })
+        .unwrap_or_else(|| {
+            default_remote_workspace_folder(
+                inspected
+                    .as_ref()
+                    .and_then(|value| value.local_workspace_folder.as_deref())
+                    .or(fallback_workspace.as_deref()),
+            )
+        });
 
     run_lifecycle_commands(
         &container_id,
         args,
-        resolved
-            .as_ref()
-            .map(|value| &value.configuration)
-            .unwrap_or(&Value::Object(Map::new())),
+        &configuration,
         &remote_workspace_folder,
         LifecycleMode::RunUserCommands,
     )?;
@@ -139,10 +174,6 @@ pub fn run_exec(args: &[String]) -> Result<ExecResult, String> {
     } else {
         workspace_folder_from_args(args)?
     };
-    let remote_workspace_folder = resolved
-        .as_ref()
-        .map(remote_workspace_folder)
-        .unwrap_or_else(|| default_remote_workspace_folder(workspace_folder.as_deref()));
     let container_id = resolve_target_container(
         args,
         resolved
@@ -151,7 +182,32 @@ pub fn run_exec(args: &[String]) -> Result<ExecResult, String> {
             .or(workspace_folder.as_deref()),
         resolved.as_ref().map(|value| value.config_file.as_path()),
     )?;
+    let inspected = if resolved.is_none() {
+        Some(inspect_container_context(args, &container_id)?)
+    } else {
+        None
+    };
+    let configuration = resolved
+        .as_ref()
+        .map(|value| &value.configuration)
+        .or_else(|| inspected.as_ref().map(|value| &value.configuration));
     let interactive = common::has_flag(args, "--interactive");
+    let remote_workspace_folder = resolved
+        .as_ref()
+        .map(remote_workspace_folder)
+        .or_else(|| {
+            inspected
+                .as_ref()
+                .and_then(|value| value.remote_workspace_folder.clone())
+        })
+        .unwrap_or_else(|| {
+            default_remote_workspace_folder(
+                inspected
+                    .as_ref()
+                    .and_then(|value| value.local_workspace_folder.as_deref())
+                    .or(workspace_folder.as_deref()),
+            )
+        });
 
     let mut engine_args = vec!["exec".to_string()];
     if interactive {
@@ -162,16 +218,11 @@ pub fn run_exec(args: &[String]) -> Result<ExecResult, String> {
     }
     engine_args.push("--workdir".to_string());
     engine_args.push(remote_workspace_folder);
-    if let Some(user) = resolved
-        .as_ref()
-        .and_then(|value| configured_user(&value.configuration))
-    {
+    if let Some(user) = configuration.and_then(configured_user) {
         engine_args.push("--user".to_string());
         engine_args.push(user.to_string());
     }
-    for (key, value) in
-        combined_remote_env(args, resolved.as_ref().map(|value| &value.configuration))
-    {
+    for (key, value) in combined_remote_env(args, configuration) {
         engine_args.push("-e".to_string());
         engine_args.push(format!("{key}={value}"));
     }
@@ -197,6 +248,12 @@ struct ResolvedConfig {
     workspace_folder: PathBuf,
     config_file: PathBuf,
     configuration: Value,
+}
+
+struct InspectedContainerContext {
+    configuration: Value,
+    local_workspace_folder: Option<PathBuf>,
+    remote_workspace_folder: Option<String>,
 }
 
 enum LifecycleMode {
@@ -418,6 +475,43 @@ fn start_container(
     Ok(container_id)
 }
 
+fn ensure_up_container(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    image_name: &str,
+    remote_workspace_folder: &str,
+) -> Result<String, String> {
+    let existing = find_target_container(
+        args,
+        Some(resolved.workspace_folder.as_path()),
+        Some(resolved.config_file.as_path()),
+    )?;
+    match existing {
+        Some(container_id) if common::has_flag(args, "--remove-existing-container") => {
+            remove_container(args, &container_id)?;
+            start_container(resolved, args, image_name, remote_workspace_folder)
+        }
+        Some(container_id) => Ok(container_id),
+        None if common::has_flag(args, "--expect-existing-container") => {
+            Err("Dev container not found.".to_string())
+        }
+        None => start_container(resolved, args, image_name, remote_workspace_folder),
+    }
+}
+
+fn remove_container(args: &[String], container_id: &str) -> Result<(), String> {
+    let result = process_runner::run_process(&ProcessRequest {
+        program: engine_program(args),
+        args: vec!["rm".to_string(), "-f".to_string(), container_id.to_string()],
+        cwd: None,
+        env: std::collections::HashMap::new(),
+    })?;
+    if result.status_code != 0 {
+        return Err(stderr_or_stdout(&result));
+    }
+    Ok(())
+}
+
 fn run_lifecycle_commands(
     container_id: &str,
     args: &[String],
@@ -480,6 +574,59 @@ fn run_lifecycle_commands(
         if let Some(error) = first_error {
             return Err(error);
         }
+    }
+
+    Ok(())
+}
+
+fn run_initialize_command(configuration: &Value, workspace_folder: &Path) -> Result<(), String> {
+    let Some(command_group) = lifecycle_command_value(configuration, "initializeCommand") else {
+        return Ok(());
+    };
+
+    if command_group.len() == 1 {
+        return run_host_lifecycle_command(
+            workspace_folder,
+            command_group
+                .into_iter()
+                .next()
+                .expect("single initialize command"),
+        );
+    }
+
+    let handles = command_group
+        .into_iter()
+        .map(|command| {
+            let request = host_lifecycle_request(workspace_folder, command);
+            thread::spawn(move || process_runner::run_process(&request))
+        })
+        .collect::<Vec<_>>();
+
+    let mut first_error = None;
+    for handle in handles {
+        match handle.join() {
+            Ok(Ok(result)) if result.status_code == 0 => {}
+            Ok(Ok(result)) => {
+                if first_error.is_none() {
+                    first_error = Some(stderr_or_stdout(&result));
+                }
+            }
+            Ok(Err(error)) => {
+                if first_error.is_none() {
+                    first_error = Some(error);
+                }
+            }
+            Err(_) => {
+                if first_error.is_none() {
+                    first_error =
+                        Some("Initialize command thread panicked unexpectedly".to_string());
+                }
+            }
+        }
+    }
+
+    if let Some(error) = first_error {
+        return Err(error);
     }
 
     Ok(())
@@ -626,6 +773,17 @@ fn run_lifecycle_command(
     Ok(())
 }
 
+fn run_host_lifecycle_command(
+    workspace_folder: &Path,
+    command: LifecycleCommand,
+) -> Result<(), String> {
+    let result = process_runner::run_process(&host_lifecycle_request(workspace_folder, command))?;
+    if result.status_code != 0 {
+        return Err(stderr_or_stdout(&result));
+    }
+    Ok(())
+}
+
 fn lifecycle_exec_request(
     container_id: &str,
     args: &[String],
@@ -664,6 +822,26 @@ fn lifecycle_exec_request(
     }
 }
 
+fn host_lifecycle_request(workspace_folder: &Path, command: LifecycleCommand) -> ProcessRequest {
+    match command {
+        LifecycleCommand::Shell(command) => ProcessRequest {
+            program: "/bin/sh".to_string(),
+            args: vec!["-lc".to_string(), command],
+            cwd: Some(workspace_folder.to_path_buf()),
+            env: std::collections::HashMap::new(),
+        },
+        LifecycleCommand::Exec(parts) => {
+            let mut parts = parts.into_iter();
+            ProcessRequest {
+                program: parts.next().unwrap_or_default(),
+                args: parts.collect(),
+                cwd: Some(workspace_folder.to_path_buf()),
+                env: std::collections::HashMap::new(),
+            }
+        }
+    }
+}
+
 fn resolve_target_container(
     args: &[String],
     workspace_folder: Option<&Path>,
@@ -673,22 +851,18 @@ fn resolve_target_container(
         return Ok(container_id);
     }
 
-    let mut labels = common::parse_option_values(args, "--id-label");
-    if labels.is_empty() {
-        if let Some(workspace_folder) = workspace_folder {
-            labels.push(format!(
-                "devcontainer.local_folder={}",
-                workspace_folder.display()
-            ));
-        }
-        if let Some(config_file) = config_file {
-            labels.push(format!(
-                "devcontainer.config_file={}",
-                config_file.display()
-            ));
-        }
+    match find_target_container(args, workspace_folder, config_file)? {
+        Some(container_id) => Ok(container_id),
+        None => Err("Dev container not found.".to_string()),
     }
+}
 
+fn find_target_container(
+    args: &[String],
+    workspace_folder: Option<&Path>,
+    config_file: Option<&Path>,
+) -> Result<Option<String>, String> {
+    let labels = target_container_labels(args, workspace_folder, config_file);
     if labels.is_empty() {
         return Err(
             "Unable to determine target container. Provide --container-id or --workspace-folder."
@@ -712,18 +886,214 @@ fn resolve_target_container(
         return Err(stderr_or_stdout(&result));
     }
 
-    let container_id = result
+    Ok(result
         .stdout
         .lines()
         .map(str::trim)
         .find(|line| !line.is_empty() && !line.chars().any(char::is_whitespace))
-        .unwrap_or_default()
-        .to_string();
-    if container_id.is_empty() {
-        return Err("Dev container not found.".to_string());
+        .map(str::to_string))
+}
+
+fn target_container_labels(
+    args: &[String],
+    workspace_folder: Option<&Path>,
+    config_file: Option<&Path>,
+) -> Vec<String> {
+    let mut labels = common::parse_option_values(args, "--id-label");
+    if labels.is_empty() {
+        if let Some(workspace_folder) = workspace_folder {
+            labels.push(format!(
+                "devcontainer.local_folder={}",
+                workspace_folder.display()
+            ));
+        }
+        if let Some(config_file) = config_file {
+            labels.push(format!(
+                "devcontainer.config_file={}",
+                config_file.display()
+            ));
+        }
+    }
+    labels
+}
+
+fn inspect_container_context(
+    args: &[String],
+    container_id: &str,
+) -> Result<InspectedContainerContext, String> {
+    let result = process_runner::run_process(&ProcessRequest {
+        program: engine_program(args),
+        args: vec!["inspect".to_string(), container_id.to_string()],
+        cwd: None,
+        env: std::collections::HashMap::new(),
+    })?;
+    if result.status_code != 0 {
+        return Err(stderr_or_stdout(&result));
     }
 
-    Ok(container_id)
+    let inspected: Value = serde_json::from_str(&result.stdout)
+        .map_err(|error| format!("Invalid inspect JSON: {error}"))?;
+    let details = inspected
+        .as_array()
+        .and_then(|entries| entries.first())
+        .ok_or_else(|| "Container engine did not return inspect details".to_string())?;
+    let labels = details
+        .get("Config")
+        .and_then(|value| value.get("Labels"))
+        .and_then(Value::as_object);
+    let local_workspace_folder = labels
+        .and_then(|entries| entries.get("devcontainer.local_folder"))
+        .and_then(Value::as_str)
+        .map(PathBuf::from);
+    let mut configuration = merged_container_metadata(
+        labels
+            .and_then(|entries| entries.get("devcontainer.metadata"))
+            .and_then(Value::as_str),
+    );
+    if let Some(workspace_folder) = &local_workspace_folder {
+        configuration = config::substitute_local_context(
+            &configuration,
+            &ConfigContext {
+                workspace_folder: workspace_folder.clone(),
+                env: env::vars().collect(),
+            },
+        );
+    }
+    if configured_user(&configuration).is_none() {
+        if let Some(user) = details
+            .get("Config")
+            .and_then(|value| value.get("User"))
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+        {
+            if let Value::Object(entries) = &mut configuration {
+                entries.insert("containerUser".to_string(), Value::String(user.to_string()));
+            }
+        }
+    }
+
+    Ok(InspectedContainerContext {
+        remote_workspace_folder: configuration
+            .get("workspaceFolder")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .or_else(|| inspect_workspace_mount(details, local_workspace_folder.as_deref())),
+        configuration,
+        local_workspace_folder,
+    })
+}
+
+fn merged_container_metadata(metadata_label: Option<&str>) -> Value {
+    let Some(metadata_label) = metadata_label else {
+        return Value::Object(Map::new());
+    };
+    let parsed = serde_json::from_str::<Value>(metadata_label).ok();
+    let entries = match parsed {
+        Some(Value::Array(values)) => values,
+        Some(Value::Object(entries)) => vec![Value::Object(entries)],
+        _ => Vec::new(),
+    };
+
+    let mut merged = Map::new();
+    merge_last_metadata_value(&entries, &mut merged, "waitFor");
+    merge_last_metadata_value(&entries, &mut merged, "workspaceFolder");
+    merge_last_metadata_value(&entries, &mut merged, "remoteUser");
+    merge_last_metadata_value(&entries, &mut merged, "containerUser");
+    merge_object_metadata_value(&entries, &mut merged, "remoteEnv");
+    merge_object_metadata_value(&entries, &mut merged, "containerEnv");
+
+    for key in [
+        "initializeCommand",
+        "onCreateCommand",
+        "updateContentCommand",
+        "postCreateCommand",
+        "postStartCommand",
+        "postAttachCommand",
+    ] {
+        if let Some(command_group) = merged_metadata_lifecycle_values(&entries, key) {
+            merged.insert(key.to_string(), command_group);
+        }
+    }
+
+    Value::Object(merged)
+}
+
+fn merge_last_metadata_value(entries: &[Value], merged: &mut Map<String, Value>, key: &str) {
+    if let Some(value) = entries
+        .iter()
+        .filter_map(|entry| entry.get(key))
+        .next_back()
+    {
+        merged.insert(key.to_string(), value.clone());
+    }
+}
+
+fn merge_object_metadata_value(entries: &[Value], merged: &mut Map<String, Value>, key: &str) {
+    let combined = entries
+        .iter()
+        .filter_map(|entry| entry.get(key).and_then(Value::as_object))
+        .fold(Map::new(), |mut combined, value| {
+            combined.extend(
+                value
+                    .iter()
+                    .map(|(name, value)| (name.clone(), value.clone())),
+            );
+            combined
+        });
+    if !combined.is_empty() {
+        merged.insert(key.to_string(), Value::Object(combined));
+    }
+}
+
+fn merged_metadata_lifecycle_values(entries: &[Value], key: &str) -> Option<Value> {
+    let commands = entries
+        .iter()
+        .filter_map(|entry| entry.get(key))
+        .flat_map(flatten_lifecycle_values)
+        .collect::<Vec<_>>();
+    match commands.len() {
+        0 => None,
+        1 => commands.into_iter().next(),
+        _ => Some(Value::Object(
+            commands
+                .into_iter()
+                .enumerate()
+                .map(|(index, value)| (index.to_string(), value))
+                .collect(),
+        )),
+    }
+}
+
+fn flatten_lifecycle_values(value: &Value) -> Vec<Value> {
+    match value {
+        Value::String(_) | Value::Array(_) => vec![value.clone()],
+        Value::Object(entries) => entries
+            .values()
+            .flat_map(flatten_lifecycle_values)
+            .collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn inspect_workspace_mount(
+    details: &Value,
+    local_workspace_folder: Option<&Path>,
+) -> Option<String> {
+    let mounts = details.get("Mounts").and_then(Value::as_array)?;
+    if let Some(local_workspace_folder) = local_workspace_folder {
+        let local_workspace_folder = local_workspace_folder.display().to_string();
+        if let Some(destination) = mounts.iter().find_map(|mount| {
+            (mount.get("Source").and_then(Value::as_str) == Some(local_workspace_folder.as_str()))
+                .then(|| mount.get("Destination").and_then(Value::as_str))
+                .flatten()
+        }) {
+            return Some(destination.to_string());
+        }
+    }
+    mounts
+        .iter()
+        .find_map(|mount| mount.get("Destination").and_then(Value::as_str))
+        .map(str::to_string)
 }
 
 fn workspace_folder_from_args(args: &[String]) -> Result<Option<PathBuf>, String> {

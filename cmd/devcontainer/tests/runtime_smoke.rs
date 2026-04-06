@@ -28,6 +28,14 @@ case "$COMMAND" in
     exit 0
     ;;
   run)
+    if [ -n "${FAKE_PODMAN_REQUIRE_FILE_BEFORE_RUN:-}" ] && [ ! -f "${FAKE_PODMAN_REQUIRE_FILE_BEFORE_RUN}" ]; then
+      echo "missing required file before run" >&2
+      exit 91
+    fi
+    if [ -n "${FAKE_PODMAN_RUN_CONTAINER_ID:-}" ]; then
+      echo "${FAKE_PODMAN_RUN_CONTAINER_ID}"
+      exit 0
+    fi
     echo "fake-container-id"
     exit 0
     ;;
@@ -55,7 +63,25 @@ case "$COMMAND" in
     if [ "${FAKE_PODMAN_PS_WITH_HEADER:-0}" = "1" ]; then
       echo "CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES"
     fi
+    if [ -n "${FAKE_PODMAN_PS_OUTPUT:-}" ]; then
+      printf '%s\n' "${FAKE_PODMAN_PS_OUTPUT}"
+      exit 0
+    fi
+    if [ "${FAKE_PODMAN_PS_DISABLE_DEFAULT:-0}" = "1" ]; then
+      exit 0
+    fi
     echo "fake-container-id"
+    exit 0
+    ;;
+  inspect)
+    if [ -n "${FAKE_PODMAN_INSPECT_FILE:-}" ]; then
+      cat "${FAKE_PODMAN_INSPECT_FILE}"
+      exit 0
+    fi
+    echo '[{"Config":{"Labels":{}},"Mounts":[]}]'
+    exit 0
+    ;;
+  rm)
     exit 0
     ;;
   exec)
@@ -317,7 +343,10 @@ fn up_starts_a_container_and_exec_runs_inside_it() {
             workspace.to_string_lossy().as_ref(),
             "--include-configuration",
         ],
-        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
     );
 
     assert!(up_output.status.success(), "{up_output:?}");
@@ -375,7 +404,10 @@ fn up_preserves_custom_id_labels_for_followup_exec() {
             "--id-label",
             "example.label=from-user",
         ],
-        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
     );
 
     assert!(up_output.status.success(), "{up_output:?}");
@@ -432,6 +464,7 @@ fn run_user_commands_resolves_container_ids_from_headered_ps_output() {
         ],
         &[
             ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_OUTPUT", "fake-container-id"),
             ("FAKE_PODMAN_PS_WITH_HEADER", "1"),
         ],
     );
@@ -441,6 +474,60 @@ fn run_user_commands_resolves_container_ids_from_headered_ps_output() {
     assert!(invocations.contains("ps -q "));
     let exec_log = fs::read_to_string(log_dir.join("exec.log")).expect("exec log");
     assert!(exec_log.contains("sh -lc echo post-create"));
+}
+
+#[test]
+fn run_user_commands_with_container_id_loads_metadata_lifecycle_hooks() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let inspect_path = root.join("inspect.json");
+    let metadata = serde_json::to_string(&serde_json::json!({
+        "postCreateCommand": "echo post-create-from-metadata",
+        "postAttachCommand": "echo post-attach-from-metadata",
+        "workspaceFolder": "/metadata-workspace"
+    }))
+    .expect("metadata");
+    fs::write(
+        &inspect_path,
+        serde_json::json!([{
+            "Config": {
+                "Labels": {
+                    "devcontainer.metadata": metadata
+                }
+            },
+            "Mounts": []
+        }])
+        .to_string(),
+    )
+    .expect("inspect json");
+
+    let output = run_command(
+        &[
+            "run-user-commands",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--container-id",
+            "fake-container-id",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            (
+                "FAKE_PODMAN_INSPECT_FILE",
+                inspect_path.to_string_lossy().as_ref(),
+            ),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("json payload");
+    assert_eq!(payload["remoteWorkspaceFolder"], "/metadata-workspace");
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("inspect fake-container-id"));
+    let exec_log = fs::read_to_string(log_dir.join("exec.log")).expect("exec log");
+    assert!(exec_log.contains("sh -lc echo post-create-from-metadata"));
+    assert!(exec_log.contains("sh -lc echo post-attach-from-metadata"));
 }
 
 #[test]
@@ -464,7 +551,10 @@ fn lifecycle_commands_run_as_the_configured_remote_user() {
             "--workspace-folder",
             workspace.to_string_lossy().as_ref(),
         ],
-        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
     );
 
     assert!(output.status.success(), "{output:?}");
@@ -513,7 +603,10 @@ fn set_up_and_run_user_commands_target_existing_containers() {
             "--workspace-folder",
             workspace.to_string_lossy().as_ref(),
         ],
-        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_OUTPUT", "fake-container-id"),
+        ],
     );
 
     assert!(
@@ -660,7 +753,10 @@ fn lifecycle_array_commands_preserve_argument_boundaries() {
             "--workspace-folder",
             workspace.to_string_lossy().as_ref(),
         ],
-        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
     );
 
     assert!(output.status.success(), "{output:?}");
@@ -738,6 +834,211 @@ fn interactive_exec_attaches_stdin() {
 }
 
 #[test]
+fn up_runs_initialize_command_before_starting_container() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    let initialize_marker = root.join("initialize.marker");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        &format!(
+            "{{\n  \"image\": \"alpine:3.20\",\n  \"initializeCommand\": \"printf initialized > {}\"\n}}\n",
+            initialize_marker.display()
+        ),
+    );
+
+    let output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            (
+                "FAKE_PODMAN_REQUIRE_FILE_BEFORE_RUN",
+                initialize_marker.to_string_lossy().as_ref(),
+            ),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(&initialize_marker).expect("initialize marker"),
+        "initialized"
+    );
+}
+
+#[test]
+fn up_reuses_existing_container_when_labels_match() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(&workspace, "{\n  \"image\": \"alpine:3.20\"\n}\n");
+
+    let output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_OUTPUT", "existing-container-id"),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("json payload");
+    assert_eq!(payload["containerId"], "existing-container-id");
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("ps -q "));
+    assert!(!invocations.contains("run "));
+}
+
+#[test]
+fn up_remove_existing_container_recreates_the_container() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(&workspace, "{\n  \"image\": \"alpine:3.20\"\n}\n");
+
+    let output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--remove-existing-container",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_OUTPUT", "existing-container-id"),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("json payload");
+    assert_eq!(payload["containerId"], "fake-container-id");
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("rm -f existing-container-id"));
+    assert!(invocations.contains("run "));
+}
+
+#[test]
+fn up_expect_existing_container_fails_when_missing() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(&workspace, "{\n  \"image\": \"alpine:3.20\"\n}\n");
+
+    let output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--expect-existing-container",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
+    );
+
+    assert!(!output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stderr)
+            .expect("utf8 stderr")
+            .trim(),
+        "Dev container not found."
+    );
+}
+
+#[test]
+fn exec_with_container_id_uses_metadata_for_context() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let inspect_path = root.join("inspect.json");
+    let metadata = serde_json::to_string(&serde_json::json!({
+        "remoteUser": "vscode",
+        "remoteEnv": {
+            "TEST_REMOTE_ENV": "from-metadata"
+        }
+    }))
+    .expect("metadata");
+    fs::write(
+        &inspect_path,
+        serde_json::json!([{
+            "Config": {
+                "User": "container-user",
+                "Labels": {
+                    "devcontainer.metadata": metadata,
+                    "devcontainer.local_folder": "/host/project"
+                }
+            },
+            "Mounts": [{
+                "Source": "/host/project",
+                "Destination": "/container/project"
+            }]
+        }])
+        .to_string(),
+    )
+    .expect("inspect json");
+
+    let output = run_command(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--container-id",
+            "fake-container-id",
+            "/bin/echo",
+            "hello-from-metadata",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            (
+                "FAKE_PODMAN_INSPECT_FILE",
+                inspect_path.to_string_lossy().as_ref(),
+            ),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-metadata\n"
+    );
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("inspect fake-container-id"));
+    assert!(invocations.contains(
+        "exec --workdir /container/project --user vscode -e TEST_REMOTE_ENV=from-metadata fake-container-id /bin/echo hello-from-metadata"
+    ));
+}
+
+#[test]
 fn skip_post_create_skips_post_start_and_post_attach() {
     let root = unique_temp_dir();
     let log_dir = root.join("logs");
@@ -759,7 +1060,10 @@ fn skip_post_create_skips_post_start_and_post_attach() {
             workspace.to_string_lossy().as_ref(),
             "--skip-post-create",
         ],
-        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
     );
 
     assert!(output.status.success(), "{output:?}");
@@ -788,7 +1092,10 @@ fn skip_non_blocking_stops_after_default_wait_for() {
             workspace.to_string_lossy().as_ref(),
             "--skip-non-blocking-commands",
         ],
-        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_OUTPUT", "fake-container-id"),
+        ],
     );
 
     assert!(output.status.success(), "{output:?}");
@@ -822,7 +1129,10 @@ fn skip_non_blocking_respects_wait_for_post_start() {
             workspace.to_string_lossy().as_ref(),
             "--skip-non-blocking-commands",
         ],
-        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_OUTPUT", "fake-container-id"),
+        ],
     );
 
     assert!(output.status.success(), "{output:?}");
