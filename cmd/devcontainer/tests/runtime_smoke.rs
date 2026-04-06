@@ -260,6 +260,42 @@ fn build_passes_configured_build_args_to_the_engine() {
 }
 
 #[test]
+fn up_honors_build_no_cache() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("Dockerfile"),
+        "FROM scratch\n",
+    )
+    .expect("dockerfile");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"build\": {\n    \"dockerfile\": \"Dockerfile\",\n    \"context\": \".devcontainer\"\n  }\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--build-no-cache",
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("build "));
+    assert!(invocations.contains("--no-cache"));
+}
+
+#[test]
 fn up_starts_a_container_and_exec_runs_inside_it() {
     let root = unique_temp_dir();
     let log_dir = root.join("logs");
@@ -645,4 +681,64 @@ fn interactive_exec_attaches_stdin() {
 
     let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
     assert!(invocations.contains("exec -i "));
+}
+
+#[test]
+fn exec_from_workspace_directory_loads_local_config() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    let config_path = write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/configured-workspace\",\n  \"remoteUser\": \"vscode\",\n  \"remoteEnv\": {\n    \"TEST_REMOTE_ENV\": \"from-config\"\n  }\n}\n",
+    );
+    let expected_workspace = workspace
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.clone());
+    let expected_config = config_path
+        .canonicalize()
+        .unwrap_or_else(|_| config_path.clone());
+
+    let required_labels = format!(
+        "devcontainer.local_folder={}\ndevcontainer.config_file={}",
+        expected_workspace.display(),
+        expected_config.display()
+    );
+
+    let output = run_command_in_dir(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "/bin/echo",
+            "hello-from-workspace",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_REQUIRE_LABELS", required_labels.as_str()),
+        ],
+        Some(&workspace),
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-workspace\n"
+    );
+
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains(&format!(
+        "ps -q --filter label=devcontainer.local_folder={}",
+        expected_workspace.display()
+    )));
+    assert!(invocations.contains(&format!(
+        "--filter label=devcontainer.config_file={}",
+        expected_config.display()
+    )));
+    assert!(invocations.contains(
+        "exec --workdir /configured-workspace --user vscode -e TEST_REMOTE_ENV=from-config fake-container-id /bin/echo hello-from-workspace"
+    ));
 }

@@ -221,11 +221,6 @@ fn load_required_config(args: &[String]) -> Result<ResolvedConfig, String> {
 
 fn load_optional_config(args: &[String]) -> Result<Option<ResolvedConfig>, String> {
     let explicit_config = common::parse_option_value(args, "--config");
-    let explicit_workspace = common::parse_option_value(args, "--workspace-folder");
-    if explicit_config.is_none() && explicit_workspace.is_none() {
-        return Ok(None);
-    }
-
     match load_required_config(args) {
         Ok(config) => Ok(Some(config)),
         Err(error)
@@ -295,7 +290,7 @@ fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<String, Str
         "--file".to_string(),
         dockerfile_path.display().to_string(),
     ];
-    if common::has_flag(args, "--no-cache") {
+    if common::has_flag(args, "--no-cache") || common::has_flag(args, "--build-no-cache") {
         engine_args.push("--no-cache".to_string());
     }
     for value in common::parse_option_values(args, "--cache-from") {
