@@ -738,6 +738,103 @@ fn interactive_exec_attaches_stdin() {
 }
 
 #[test]
+fn skip_post_create_skips_post_start_and_post_attach() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"onCreateCommand\": \"echo on-create\",\n  \"updateContentCommand\": \"echo update-content\",\n  \"postCreateCommand\": \"echo post-create\",\n  \"postStartCommand\": \"echo post-start\",\n  \"postAttachCommand\": \"echo post-attach\"\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--skip-post-create",
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert!(!log_dir.join("exec.log").exists());
+}
+
+#[test]
+fn skip_non_blocking_stops_after_default_wait_for() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"onCreateCommand\": \"echo on-create\",\n  \"updateContentCommand\": \"echo update-content\",\n  \"postCreateCommand\": \"echo post-create\",\n  \"postStartCommand\": \"echo post-start\",\n  \"postAttachCommand\": \"echo post-attach\"\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "run-user-commands",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--skip-non-blocking-commands",
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let exec_log = fs::read_to_string(log_dir.join("exec.log")).expect("exec log");
+    assert!(exec_log.contains("sh -lc echo on-create"));
+    assert!(exec_log.contains("sh -lc echo update-content"));
+    assert!(!exec_log.contains("sh -lc echo post-create"));
+    assert!(!exec_log.contains("sh -lc echo post-start"));
+    assert!(!exec_log.contains("sh -lc echo post-attach"));
+}
+
+#[test]
+fn skip_non_blocking_respects_wait_for_post_start() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"waitFor\": \"postStartCommand\",\n  \"onCreateCommand\": \"echo on-create\",\n  \"updateContentCommand\": \"echo update-content\",\n  \"postCreateCommand\": \"echo post-create\",\n  \"postStartCommand\": \"echo post-start\",\n  \"postAttachCommand\": \"echo post-attach\"\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "run-user-commands",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--skip-non-blocking-commands",
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let exec_log = fs::read_to_string(log_dir.join("exec.log")).expect("exec log");
+    assert!(exec_log.contains("sh -lc echo on-create"));
+    assert!(exec_log.contains("sh -lc echo update-content"));
+    assert!(exec_log.contains("sh -lc echo post-create"));
+    assert!(exec_log.contains("sh -lc echo post-start"));
+    assert!(!exec_log.contains("sh -lc echo post-attach"));
+}
+
+#[test]
 fn exec_from_workspace_directory_loads_local_config() {
     let root = unique_temp_dir();
     let log_dir = root.join("logs");

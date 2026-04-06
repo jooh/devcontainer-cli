@@ -494,34 +494,53 @@ fn selected_lifecycle_commands(
     let skip_post_attach = common::has_flag(args, "--skip-post-attach");
     let skip_non_blocking = common::has_flag(args, "--skip-non-blocking-commands");
 
+    if skip_post_create {
+        return Vec::new();
+    }
+
+    let wait_for = configuration
+        .get("waitFor")
+        .and_then(Value::as_str)
+        .unwrap_or("updateContentCommand");
+    if skip_non_blocking && wait_for == "initializeCommand" {
+        return Vec::new();
+    }
+
     let mut commands = Vec::new();
-    let include_create = !skip_post_create;
+    let lifecycle_stages = [
+        (
+            "onCreateCommand",
+            lifecycle_command_value(configuration, "onCreateCommand"),
+        ),
+        (
+            "updateContentCommand",
+            lifecycle_command_value(configuration, "updateContentCommand"),
+        ),
+        (
+            "postCreateCommand",
+            lifecycle_command_value(configuration, "postCreateCommand"),
+        ),
+        (
+            "postStartCommand",
+            lifecycle_command_value(configuration, "postStartCommand"),
+        ),
+        (
+            "postAttachCommand",
+            (!skip_post_attach)
+                .then(|| lifecycle_command_value(configuration, "postAttachCommand"))
+                .flatten(),
+        ),
+    ];
 
-    if include_create {
-        commands.extend(lifecycle_command_values(
-            configuration,
-            &[
-                "onCreateCommand",
-                "updateContentCommand",
-                "postCreateCommand",
-            ],
-        ));
-    }
-    commands.extend(lifecycle_command_values(
-        configuration,
-        &["postStartCommand"],
-    ));
-    if !skip_post_attach {
-        commands.extend(lifecycle_command_values(
-            configuration,
-            &["postAttachCommand"],
-        ));
-    }
-
-    if skip_non_blocking {
-        match mode {
-            LifecycleMode::Up | LifecycleMode::SetUp | LifecycleMode::RunUserCommands => {
-                commands.truncate(commands.len().min(3));
+    match mode {
+        LifecycleMode::Up | LifecycleMode::SetUp | LifecycleMode::RunUserCommands => {
+            for (stage, command_group) in lifecycle_stages {
+                if let Some(command_group) = command_group {
+                    commands.push(command_group);
+                }
+                if skip_non_blocking && stage == wait_for {
+                    break;
+                }
             }
         }
     }
@@ -529,17 +548,9 @@ fn selected_lifecycle_commands(
     commands
 }
 
-fn lifecycle_command_values(configuration: &Value, keys: &[&str]) -> Vec<Vec<LifecycleCommand>> {
-    let mut commands = Vec::new();
-    for key in keys {
-        let Some(value) = configuration.get(*key) else {
-            continue;
-        };
-        if let Some(command_group) = lifecycle_command_group(value) {
-            commands.push(command_group);
-        }
-    }
-    commands
+fn lifecycle_command_value(configuration: &Value, key: &str) -> Option<Vec<LifecycleCommand>> {
+    let value = configuration.get(key)?;
+    lifecycle_command_group(value)
 }
 
 fn lifecycle_command_group(value: &Value) -> Option<Vec<LifecycleCommand>> {
