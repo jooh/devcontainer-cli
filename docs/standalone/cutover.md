@@ -12,14 +12,18 @@
 - `node build/check-native-only.js`
 - `node build/check-no-node-runtime.js`
 - `node build/check-parity-harness.js`
+- `node build/generate-cli-reference.js --check`
 
 ## Current parity scope
 
 The automated repo-owned parity checks currently verify:
 
 - command-matrix drift against pinned upstream CLI sources
+- generated command-reference drift against the pinned upstream CLI sources
 - schema drift against the pinned spec submodule
 - native startup/help behavior without Node on `PATH`
 - a repo-owned `read-configuration` parity scenario using pinned fixtures and golden expectations
+
+The native runtime now also has repo-owned Rust integration coverage for `build`, `up`, `set-up`, `run-user-commands`, and `exec` using a podman-compatible fake engine harness.
 
 The parity harness is intentionally narrow today. Expanding command coverage should happen by adding new scenarios and golden data under `src/test/parity/`.

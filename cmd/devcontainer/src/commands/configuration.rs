@@ -62,6 +62,7 @@ pub(crate) fn should_use_native_read_configuration(args: &[String]) -> bool {
     true
 }
 
+#[cfg(test)]
 pub(crate) fn build_build_payload(args: &[String]) -> Result<Value, String> {
     let (workspace_folder, config_file, configuration) = common::load_resolved_config(args)?;
     let build_section = configuration
@@ -121,6 +122,7 @@ pub(crate) fn build_build_payload(args: &[String]) -> Result<Value, String> {
     }))
 }
 
+#[cfg(test)]
 pub(crate) fn build_lifecycle_payload(command: &str, args: &[String]) -> Result<Value, String> {
     let (workspace_folder, config_file, configuration) = common::load_resolved_config(args)?;
     Ok(json!({
@@ -316,6 +318,29 @@ mod tests {
         assert_eq!(
             result.1,
             fs::canonicalize(config).expect("failed to canonicalize")
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn infers_workspace_root_for_nested_devcontainer_configs() {
+        let root = unique_temp_dir();
+        let nested_config_dir = root.join(".devcontainer").join("python");
+        let config = nested_config_dir.join("devcontainer.json");
+        fs::create_dir_all(&nested_config_dir).expect("failed to create nested config directory");
+        fs::write(&config, "{}").expect("failed to write config");
+
+        let args = vec!["--config".to_string(), config.display().to_string()];
+        let (workspace_folder, config_file) =
+            resolve_read_configuration_path(&args).expect("expected config resolution");
+
+        assert_eq!(
+            workspace_folder,
+            fs::canonicalize(&root).expect("failed to canonicalize workspace")
+        );
+        assert_eq!(
+            config_file,
+            fs::canonicalize(config).expect("failed to canonicalize config")
         );
         let _ = fs::remove_dir_all(root);
     }

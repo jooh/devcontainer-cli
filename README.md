@@ -45,6 +45,12 @@ npm test
 
 The Node-based checks do not require installing project dependencies; they use built-in Node modules only. Node 20+ is still required to run them.
 
+Generated command reference:
+
+```bash
+npm run generate-cli-reference
+```
+
 Enable the repository-managed pre-commit hook:
 
 ```bash
@@ -79,5 +85,6 @@ If a pinned submodule revision changes, update the matching baseline files in `d
 ## Contributor notes
 
 - Architecture and crate layout: `docs/architecture.md`
+- Generated command reference: `docs/cli/command-reference.md`
 - Native distribution and release notes: `docs/standalone/distribution.md`
 - Runtime and compatibility guardrails: `docs/standalone/cutover.md`
