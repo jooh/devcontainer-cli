@@ -1,7 +1,8 @@
 use serde_json::Value;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn unique_temp_dir() -> PathBuf {
@@ -31,17 +32,41 @@ case "$COMMAND" in
     exit 0
     ;;
   ps)
+    expected_label="${FAKE_PODMAN_PS_REQUIRE_LABEL:-}"
+    if [ -n "$expected_label" ]; then
+      found=0
+      while [ "$#" -gt 0 ]; do
+        if [ "${1:-}" = "--filter" ] && [ "${2:-}" = "label=$expected_label" ]; then
+          found=1
+        fi
+        shift
+      done
+      if [ "$found" -ne 1 ]; then
+        exit 0
+      fi
+    fi
+    if [ "${FAKE_PODMAN_PS_WITH_HEADER:-0}" = "1" ]; then
+      echo "CONTAINER ID   IMAGE   COMMAND   CREATED   STATUS   PORTS   NAMES"
+    fi
     echo "fake-container-id"
     exit 0
     ;;
   exec)
+    saw_interactive=0
     while [ "$#" -gt 0 ]; do
       case "${1:-}" in
-        --workdir)
+        --workdir|-w)
           shift 2
           ;;
-        -e)
+        -e|--user|-u)
           shift 2
+          ;;
+        -i)
+          saw_interactive=1
+          shift
+          ;;
+        -t)
+          shift
           ;;
         fake-container-id)
           shift
@@ -55,10 +80,17 @@ case "$COMMAND" in
     if [ "${1:-}" = "fake-container-id" ]; then
       shift
     fi
+    if [ "${FAKE_PODMAN_REQUIRE_INTERACTIVE:-0}" = "1" ] && [ "$saw_interactive" -ne 1 ]; then
+      echo "missing interactive exec flag" >&2
+      exit 90
+    fi
     printf '%s\n' "$*" >> "$LOG_DIR/exec.log"
     if [ "${1:-}" = "/bin/echo" ]; then
       shift
       printf '%s\n' "$*"
+    elif [ "${1:-}" = "/bin/cat" ]; then
+      shift
+      cat
     fi
     exit 0
     ;;
@@ -90,12 +122,47 @@ fn write_devcontainer_config(root: &Path, body: &str) -> PathBuf {
 }
 
 fn run_command(args: &[&str], envs: &[(&str, &str)]) -> std::process::Output {
+    run_command_in_dir(args, envs, None)
+}
+
+fn run_command_in_dir(
+    args: &[&str],
+    envs: &[(&str, &str)],
+    cwd: Option<&Path>,
+) -> std::process::Output {
     let mut command = Command::new(env!("CARGO_BIN_EXE_devcontainer"));
     command.args(args);
     for (key, value) in envs {
         command.env(key, value);
     }
+    if let Some(cwd) = cwd {
+        command.current_dir(cwd);
+    }
     command.output().expect("command should run")
+}
+
+fn run_command_with_input(
+    args: &[&str],
+    envs: &[(&str, &str)],
+    input: &str,
+) -> std::process::Output {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_devcontainer"));
+    command.args(args);
+    command.stdin(Stdio::piped());
+    command.stdout(Stdio::piped());
+    command.stderr(Stdio::piped());
+    for (key, value) in envs {
+        command.env(key, value);
+    }
+
+    let mut child = command.spawn().expect("command should spawn");
+    child
+        .stdin
+        .take()
+        .expect("stdin")
+        .write_all(input.as_bytes())
+        .expect("write stdin");
+    child.wait_with_output().expect("command should complete")
 }
 
 #[test]
@@ -202,6 +269,69 @@ fn up_starts_a_container_and_exec_runs_inside_it() {
 }
 
 #[test]
+fn run_user_commands_resolves_container_ids_from_headered_ps_output() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"echo post-create\"\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "run-user-commands",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_WITH_HEADER", "1"),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("ps -q "));
+    let exec_log = fs::read_to_string(log_dir.join("exec.log")).expect("exec log");
+    assert!(exec_log.contains("sh -lc echo post-create"));
+}
+
+#[test]
+fn lifecycle_commands_run_as_the_configured_remote_user() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"remoteUser\": \"vscode\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("exec --workdir /workspaces/workspace --user vscode"));
+}
+
+#[test]
 fn set_up_and_run_user_commands_target_existing_containers() {
     let root = unique_temp_dir();
     let log_dir = root.join("logs");
@@ -252,4 +382,86 @@ fn set_up_and_run_user_commands_target_existing_containers() {
     let exec_log = fs::read_to_string(log_dir.join("exec.log")).expect("exec log");
     assert!(exec_log.contains("sh -lc echo post-create"));
     assert!(exec_log.contains("sh -lc echo post-attach"));
+}
+
+#[test]
+fn exec_with_config_uses_the_config_workspace_for_lookup_and_workdir() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    let caller_dir = root.join("caller");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    fs::create_dir_all(&caller_dir).expect("caller dir");
+    let config_path = write_devcontainer_config(&workspace, "{\n  \"image\": \"alpine:3.20\"\n}\n");
+
+    let output = run_command_in_dir(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--config",
+            config_path.to_string_lossy().as_ref(),
+            "/bin/echo",
+            "hello-from-config",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            (
+                "FAKE_PODMAN_PS_REQUIRE_LABEL",
+                format!("devcontainer.local_folder={}", workspace.display()).as_str(),
+            ),
+        ],
+        Some(&caller_dir),
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-config\n"
+    );
+
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains(&format!(
+        "ps -q --filter label=devcontainer.local_folder={}",
+        workspace.display()
+    )));
+    assert!(invocations.contains(
+        "exec --workdir /workspaces/workspace fake-container-id /bin/echo hello-from-config"
+    ));
+}
+
+#[test]
+fn interactive_exec_attaches_stdin() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+
+    let output = run_command_with_input(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--container-id",
+            "fake-container-id",
+            "--interactive",
+            "/bin/cat",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_REQUIRE_INTERACTIVE", "1"),
+        ],
+        "hello-from-stdin\n",
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-stdin\n"
+    );
+
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("exec -i "));
 }
