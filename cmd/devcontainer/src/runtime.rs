@@ -34,19 +34,19 @@ pub fn run_up(args: &[String]) -> Result<Value, String> {
     run_initialize_command(&resolved.configuration, &resolved.workspace_folder)?;
     let image_name = runtime_image_name(&resolved, args)?;
     let remote_workspace_folder = remote_workspace_folder(&resolved);
-    let container_id = ensure_up_container(&resolved, args, &image_name, &remote_workspace_folder)?;
+    let up_container = ensure_up_container(&resolved, args, &image_name, &remote_workspace_folder)?;
     run_lifecycle_commands(
-        &container_id,
+        &up_container.container_id,
         args,
         &resolved.configuration,
         &remote_workspace_folder,
-        LifecycleMode::Up,
+        up_container.lifecycle_mode,
     )?;
 
     Ok(json!({
         "outcome": "success",
         "command": "up",
-        "containerId": container_id,
+        "containerId": up_container.container_id,
         "remoteUser": remote_user(&resolved.configuration),
         "remoteWorkspaceFolder": remote_workspace_folder,
         "configuration": if common::has_flag(args, "--include-configuration") { resolved.configuration.clone() } else { Value::Null },
@@ -256,8 +256,16 @@ struct InspectedContainerContext {
     remote_workspace_folder: Option<String>,
 }
 
+struct UpContainer {
+    container_id: String,
+    lifecycle_mode: LifecycleMode,
+}
+
+#[derive(Clone, Copy)]
 enum LifecycleMode {
-    Up,
+    UpCreated,
+    UpStarted,
+    UpReused,
     SetUp,
     RunUserCommands,
 }
@@ -420,6 +428,11 @@ fn start_container(
             "devcontainer.config_file={}",
             resolved.config_file.display()
         ),
+        "--label".to_string(),
+        format!(
+            "devcontainer.metadata={}",
+            serialized_container_metadata(&resolved.configuration, remote_workspace_folder)?
+        ),
         "--mount".to_string(),
         workspace_mount(resolved, remote_workspace_folder),
     ];
@@ -475,27 +488,80 @@ fn start_container(
     Ok(container_id)
 }
 
+fn start_existing_container(args: &[String], container_id: &str) -> Result<(), String> {
+    let result = process_runner::run_process(&ProcessRequest {
+        program: engine_program(args),
+        args: vec!["start".to_string(), container_id.to_string()],
+        cwd: None,
+        env: std::collections::HashMap::new(),
+    })?;
+    if result.status_code != 0 {
+        return Err(stderr_or_stdout(&result));
+    }
+    Ok(())
+}
+
 fn ensure_up_container(
     resolved: &ResolvedConfig,
     args: &[String],
     image_name: &str,
     remote_workspace_folder: &str,
-) -> Result<String, String> {
-    let existing = find_target_container(
+) -> Result<UpContainer, String> {
+    let running = find_target_container(
         args,
         Some(resolved.workspace_folder.as_path()),
         Some(resolved.config_file.as_path()),
+        false,
     )?;
-    match existing {
+    match running {
         Some(container_id) if common::has_flag(args, "--remove-existing-container") => {
             remove_container(args, &container_id)?;
-            start_container(resolved, args, image_name, remote_workspace_folder)
+            start_container(resolved, args, image_name, remote_workspace_folder).map(
+                |container_id| UpContainer {
+                    container_id,
+                    lifecycle_mode: LifecycleMode::UpCreated,
+                },
+            )
         }
-        Some(container_id) => Ok(container_id),
-        None if common::has_flag(args, "--expect-existing-container") => {
-            Err("Dev container not found.".to_string())
+        Some(container_id) => Ok(UpContainer {
+            container_id,
+            lifecycle_mode: LifecycleMode::UpReused,
+        }),
+        None => {
+            let existing = find_target_container(
+                args,
+                Some(resolved.workspace_folder.as_path()),
+                Some(resolved.config_file.as_path()),
+                true,
+            )?;
+            match existing {
+                Some(container_id) if common::has_flag(args, "--remove-existing-container") => {
+                    remove_container(args, &container_id)?;
+                    start_container(resolved, args, image_name, remote_workspace_folder).map(
+                        |container_id| UpContainer {
+                            container_id,
+                            lifecycle_mode: LifecycleMode::UpCreated,
+                        },
+                    )
+                }
+                Some(container_id) => {
+                    start_existing_container(args, &container_id)?;
+                    Ok(UpContainer {
+                        container_id,
+                        lifecycle_mode: LifecycleMode::UpStarted,
+                    })
+                }
+                None if common::has_flag(args, "--expect-existing-container") => {
+                    Err("Dev container not found.".to_string())
+                }
+                None => start_container(resolved, args, image_name, remote_workspace_folder).map(
+                    |container_id| UpContainer {
+                        container_id,
+                        lifecycle_mode: LifecycleMode::UpCreated,
+                    },
+                ),
+            }
         }
-        None => start_container(resolved, args, image_name, remote_workspace_folder),
     }
 }
 
@@ -680,10 +746,16 @@ fn selected_lifecycle_commands(
     ];
 
     match mode {
-        LifecycleMode::Up | LifecycleMode::SetUp | LifecycleMode::RunUserCommands => {
+        LifecycleMode::UpCreated
+        | LifecycleMode::UpStarted
+        | LifecycleMode::UpReused
+        | LifecycleMode::SetUp
+        | LifecycleMode::RunUserCommands => {
             for (stage, command_group) in lifecycle_stages {
-                if let Some(command_group) = command_group {
-                    commands.push(command_group);
+                if lifecycle_stage_runs_in_mode(stage, mode) {
+                    if let Some(command_group) = command_group {
+                        commands.push(command_group);
+                    }
                 }
                 if skip_non_blocking && stage == wait_for {
                     break;
@@ -693,6 +765,14 @@ fn selected_lifecycle_commands(
     }
 
     commands
+}
+
+fn lifecycle_stage_runs_in_mode(stage: &str, mode: LifecycleMode) -> bool {
+    match mode {
+        LifecycleMode::UpCreated | LifecycleMode::SetUp | LifecycleMode::RunUserCommands => true,
+        LifecycleMode::UpStarted => matches!(stage, "postStartCommand" | "postAttachCommand"),
+        LifecycleMode::UpReused => stage == "postAttachCommand",
+    }
 }
 
 fn lifecycle_command_value(configuration: &Value, key: &str) -> Option<Vec<LifecycleCommand>> {
@@ -851,7 +931,7 @@ fn resolve_target_container(
         return Ok(container_id);
     }
 
-    match find_target_container(args, workspace_folder, config_file)? {
+    match find_target_container(args, workspace_folder, config_file, false)? {
         Some(container_id) => Ok(container_id),
         None => Err("Dev container not found.".to_string()),
     }
@@ -861,6 +941,7 @@ fn find_target_container(
     args: &[String],
     workspace_folder: Option<&Path>,
     config_file: Option<&Path>,
+    include_stopped: bool,
 ) -> Result<Option<String>, String> {
     let labels = target_container_labels(args, workspace_folder, config_file);
     if labels.is_empty() {
@@ -871,6 +952,9 @@ fn find_target_container(
     }
 
     let mut engine_args = vec!["ps".to_string(), "-q".to_string()];
+    if include_stopped {
+        engine_args.push("-a".to_string());
+    }
     for label in labels {
         engine_args.push("--filter".to_string());
         engine_args.push(format!("label={label}"));
@@ -1122,6 +1206,13 @@ fn remote_workspace_folder(resolved: &ResolvedConfig) -> String {
         .get("workspaceFolder")
         .and_then(Value::as_str)
         .map(str::to_string)
+        .or_else(|| {
+            resolved
+                .configuration
+                .get("workspaceMount")
+                .and_then(Value::as_str)
+                .and_then(mount_option_target)
+        })
         .unwrap_or_else(|| default_remote_workspace_folder(Some(&resolved.workspace_folder)))
 }
 
@@ -1137,6 +1228,70 @@ fn workspace_mount(resolved: &ResolvedConfig, remote_workspace_folder: &str) -> 
                 resolved.workspace_folder.display()
             )
         })
+}
+
+fn serialized_container_metadata(
+    configuration: &Value,
+    remote_workspace_folder: &str,
+) -> Result<String, String> {
+    let mut metadata = Map::new();
+    for key in [
+        "waitFor",
+        "workspaceFolder",
+        "remoteUser",
+        "containerUser",
+        "remoteEnv",
+        "containerEnv",
+        "initializeCommand",
+        "onCreateCommand",
+        "updateContentCommand",
+        "postCreateCommand",
+        "postStartCommand",
+        "postAttachCommand",
+    ] {
+        if let Some(value) = configuration.get(key) {
+            metadata.insert(key.to_string(), value.clone());
+        }
+    }
+    metadata
+        .entry("workspaceFolder".to_string())
+        .or_insert_with(|| Value::String(remote_workspace_folder.to_string()));
+    serde_json::to_string(&Value::Object(metadata))
+        .map_err(|error| format!("Failed to serialize container metadata: {error}"))
+}
+
+fn mount_option_target(mount: &str) -> Option<String> {
+    split_mount_options(mount).into_iter().find_map(|option| {
+        for key in ["target", "destination", "dst"] {
+            if let Some(value) = option.strip_prefix(&format!("{key}=")) {
+                return Some(value.trim_matches('"').to_string());
+            }
+        }
+        None
+    })
+}
+
+fn split_mount_options(mount: &str) -> Vec<String> {
+    let mut options = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    for character in mount.chars() {
+        match character {
+            '"' => {
+                in_quotes = !in_quotes;
+                current.push(character);
+            }
+            ',' if !in_quotes => {
+                options.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => current.push(character),
+        }
+    }
+    if !current.is_empty() {
+        options.push(current.trim().to_string());
+    }
+    options
 }
 
 fn default_image_name(workspace_folder: &Path) -> String {
