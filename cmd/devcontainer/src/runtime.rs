@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use std::io::IsTerminal;
 use std::path::{Path, PathBuf};
+use std::thread;
 
 use serde_json::{json, Map, Value};
 
@@ -202,6 +203,11 @@ enum LifecycleMode {
     Up,
     SetUp,
     RunUserCommands,
+}
+
+enum LifecycleCommand {
+    Shell(String),
+    Exec(Vec<String>),
 }
 
 fn load_required_config(args: &[String]) -> Result<ResolvedConfig, String> {
@@ -412,33 +418,57 @@ fn run_lifecycle_commands(
     remote_workspace_folder: &str,
     mode: LifecycleMode,
 ) -> Result<(), String> {
-    for command in selected_lifecycle_commands(configuration, args, mode) {
-        let mut engine_args = vec![
-            "exec".to_string(),
-            "--workdir".to_string(),
-            remote_workspace_folder.to_string(),
-        ];
-        if let Some(user) = configured_user(configuration) {
-            engine_args.push("--user".to_string());
-            engine_args.push(user.to_string());
+    for command_group in selected_lifecycle_commands(configuration, args, mode) {
+        if command_group.len() == 1 {
+            run_lifecycle_command(
+                container_id,
+                args,
+                configuration,
+                remote_workspace_folder,
+                command_group.into_iter().next().expect("single lifecycle command"),
+            )?;
+            continue;
         }
-        for (key, value) in combined_remote_env(args, Some(configuration)) {
-            engine_args.push("-e".to_string());
-            engine_args.push(format!("{key}={value}"));
-        }
-        engine_args.push(container_id.to_string());
-        engine_args.push("sh".to_string());
-        engine_args.push("-lc".to_string());
-        engine_args.push(command);
 
-        let result = process_runner::run_process(&ProcessRequest {
-            program: engine_program(args),
-            args: engine_args,
-            cwd: None,
-            env: std::collections::HashMap::new(),
-        })?;
-        if result.status_code != 0 {
-            return Err(stderr_or_stdout(&result));
+        let handles = command_group
+            .into_iter()
+            .map(|command| {
+                let request = lifecycle_exec_request(
+                    container_id,
+                    args,
+                    configuration,
+                    remote_workspace_folder,
+                    command,
+                );
+                thread::spawn(move || process_runner::run_process(&request))
+            })
+            .collect::<Vec<_>>();
+
+        let mut first_error = None;
+        for handle in handles {
+            match handle.join() {
+                Ok(Ok(result)) if result.status_code == 0 => {}
+                Ok(Ok(result)) => {
+                    if first_error.is_none() {
+                        first_error = Some(stderr_or_stdout(&result));
+                    }
+                }
+                Ok(Err(error)) => {
+                    if first_error.is_none() {
+                        first_error = Some(error);
+                    }
+                }
+                Err(_) => {
+                    if first_error.is_none() {
+                        first_error =
+                            Some("Lifecycle command thread panicked unexpectedly".to_string());
+                    }
+                }
+            }
+        }
+
+        if let Some(error) = first_error {
+            return Err(error);
         }
     }
 
@@ -449,7 +479,7 @@ fn selected_lifecycle_commands(
     configuration: &Value,
     args: &[String],
     mode: LifecycleMode,
-) -> Vec<String> {
+) -> Vec<Vec<LifecycleCommand>> {
     let skip_post_create = common::has_flag(args, "--skip-post-create");
     let skip_post_attach = common::has_flag(args, "--skip-post-attach");
     let skip_non_blocking = common::has_flag(args, "--skip-non-blocking-commands");
@@ -489,28 +519,128 @@ fn selected_lifecycle_commands(
     commands
 }
 
-fn lifecycle_command_values(configuration: &Value, keys: &[&str]) -> Vec<String> {
+fn lifecycle_command_values(configuration: &Value, keys: &[&str]) -> Vec<Vec<LifecycleCommand>> {
     let mut commands = Vec::new();
     for key in keys {
         let Some(value) = configuration.get(*key) else {
             continue;
         };
-        match value {
-            Value::String(command) => commands.push(command.clone()),
-            Value::Array(parts) => {
-                let joined = parts
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .collect::<Vec<_>>()
-                    .join(" ");
-                if !joined.is_empty() {
-                    commands.push(joined);
-                }
-            }
-            _ => {}
+        if let Some(command_group) = lifecycle_command_group(value) {
+            commands.push(command_group);
         }
     }
     commands
+}
+
+fn lifecycle_command_group(value: &Value) -> Option<Vec<LifecycleCommand>> {
+    match value {
+        Value::String(command) => Some(vec![LifecycleCommand::Shell(command.clone())]),
+        Value::Array(parts) => {
+            let parts = parts
+                .iter()
+                .map(Value::as_str)
+                .collect::<Option<Vec<_>>>()?
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            if parts.is_empty() {
+                None
+            } else {
+                Some(vec![LifecycleCommand::Exec(parts)])
+            }
+        }
+        Value::Object(entries) => {
+            let commands = entries
+                .values()
+                .filter_map(lifecycle_command)
+                .collect::<Vec<_>>();
+            if commands.is_empty() {
+                None
+            } else {
+                Some(commands)
+            }
+        }
+        _ => None,
+    }
+}
+
+fn lifecycle_command(value: &Value) -> Option<LifecycleCommand> {
+    match value {
+        Value::String(command) => Some(LifecycleCommand::Shell(command.clone())),
+        Value::Array(parts) => {
+            let parts = parts
+                .iter()
+                .map(Value::as_str)
+                .collect::<Option<Vec<_>>>()?
+                .into_iter()
+                .map(str::to_string)
+                .collect::<Vec<_>>();
+            if parts.is_empty() {
+                None
+            } else {
+                Some(LifecycleCommand::Exec(parts))
+            }
+        }
+        _ => None,
+    }
+}
+
+fn run_lifecycle_command(
+    container_id: &str,
+    args: &[String],
+    configuration: &Value,
+    remote_workspace_folder: &str,
+    command: LifecycleCommand,
+) -> Result<(), String> {
+    let result = process_runner::run_process(&lifecycle_exec_request(
+        container_id,
+        args,
+        configuration,
+        remote_workspace_folder,
+        command,
+    ))?;
+    if result.status_code != 0 {
+        return Err(stderr_or_stdout(&result));
+    }
+    Ok(())
+}
+
+fn lifecycle_exec_request(
+    container_id: &str,
+    args: &[String],
+    configuration: &Value,
+    remote_workspace_folder: &str,
+    command: LifecycleCommand,
+) -> ProcessRequest {
+    let mut engine_args = vec![
+        "exec".to_string(),
+        "--workdir".to_string(),
+        remote_workspace_folder.to_string(),
+    ];
+    if let Some(user) = configured_user(configuration) {
+        engine_args.push("--user".to_string());
+        engine_args.push(user.to_string());
+    }
+    for (key, value) in combined_remote_env(args, Some(configuration)) {
+        engine_args.push("-e".to_string());
+        engine_args.push(format!("{key}={value}"));
+    }
+    engine_args.push(container_id.to_string());
+    match command {
+        LifecycleCommand::Shell(command) => {
+            engine_args.push("sh".to_string());
+            engine_args.push("-lc".to_string());
+            engine_args.push(command);
+        }
+        LifecycleCommand::Exec(parts) => engine_args.extend(parts),
+    }
+
+    ProcessRequest {
+        program: engine_program(args),
+        args: engine_args,
+        cwd: None,
+        env: std::collections::HashMap::new(),
+    }
 }
 
 fn resolve_target_container(

@@ -92,6 +92,13 @@ case "$COMMAND" in
       exit 90
     fi
     printf '%s\n' "$*" >> "$LOG_DIR/exec.log"
+    {
+      printf '%s\n' "BEGIN"
+      for arg in "$@"; do
+        printf '[%s]\n' "$arg"
+      done
+      printf '%s\n' "END"
+    } >> "$LOG_DIR/exec-argv.log"
     if [ "${1:-}" = "/bin/echo" ]; then
       shift
       printf '%s\n' "$*"
@@ -502,6 +509,72 @@ fn nested_config_exec_uses_workspace_root_and_config_label() {
     )));
     assert!(invocations.contains(
         "exec --workdir /workspaces/workspace fake-container-id /bin/echo hello-from-nested-config"
+    ));
+}
+
+#[test]
+fn lifecycle_array_commands_preserve_argument_boundaries() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": [\"printf\", \"%s\", \"foo='bar baz'\"]\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let exec_argv = fs::read_to_string(log_dir.join("exec-argv.log")).expect("exec argv log");
+    assert!(exec_argv.contains("[printf]\n[%s]\n[foo='bar baz']"));
+    assert!(!exec_argv.contains("[sh]\n[-lc]\n[printf %s foo='bar baz']"));
+}
+
+#[test]
+fn object_lifecycle_commands_are_executed() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    let config_path = write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": {\n    \"alpha\": \"echo first\",\n    \"beta\": [\"printf\", \"%s\", \"second value\"]\n  }\n}\n",
+    );
+
+    let output = run_command(
+        &[
+            "set-up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--container-id",
+            "fake-container-id",
+            "--config",
+            config_path.to_string_lossy().as_ref(),
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains(
+        "exec --workdir /workspaces/workspace fake-container-id sh -lc echo first"
+    ));
+    assert!(invocations.contains(
+        "exec --workdir /workspaces/workspace fake-container-id printf %s second value"
     ));
 }
 
