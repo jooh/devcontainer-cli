@@ -356,6 +356,60 @@ fn up_starts_a_container_and_exec_runs_inside_it() {
 }
 
 #[test]
+fn up_preserves_custom_id_labels_for_followup_exec() {
+    let root = unique_temp_dir();
+    let log_dir = root.join("logs");
+    fs::create_dir_all(&log_dir).expect("log dir");
+    let fake_podman = write_fake_podman(&root);
+    let workspace = root.join("workspace");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(&workspace, "{\n  \"image\": \"alpine:3.20\"\n}\n");
+
+    let up_output = run_command(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--id-label",
+            "example.label=from-user",
+        ],
+        &[("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref())],
+    );
+
+    assert!(up_output.status.success(), "{up_output:?}");
+
+    let exec_output = run_command(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--id-label",
+            "example.label=from-user",
+            "/bin/echo",
+            "hello-via-label",
+        ],
+        &[
+            ("FAKE_PODMAN_LOG_DIR", log_dir.to_string_lossy().as_ref()),
+            ("FAKE_PODMAN_PS_REQUIRE_LABEL", "example.label=from-user"),
+        ],
+    );
+
+    assert!(exec_output.status.success(), "{exec_output:?}");
+    assert_eq!(
+        String::from_utf8(exec_output.stdout).expect("utf8 stdout"),
+        "hello-via-label\n"
+    );
+
+    let invocations = fs::read_to_string(log_dir.join("invocations.log")).expect("invocations");
+    assert!(invocations.contains("--label example.label=from-user"));
+    assert!(invocations.contains("ps -q --filter label=example.label=from-user"));
+}
+
+#[test]
 fn run_user_commands_resolves_container_ids_from_headered_ps_output() {
     let root = unique_temp_dir();
     let log_dir = root.join("logs");

@@ -366,6 +366,10 @@ fn start_container(
         "--mount".to_string(),
         workspace_mount(resolved, remote_workspace_folder),
     ];
+    for label in common::parse_option_values(args, "--id-label") {
+        engine_args.push("--label".to_string());
+        engine_args.push(label);
+    }
     for mount in common::parse_option_values(args, "--mount") {
         engine_args.push("--mount".to_string());
         engine_args.push(mount);
