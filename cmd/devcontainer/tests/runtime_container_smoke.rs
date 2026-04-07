@@ -58,7 +58,7 @@ fn up_starts_a_container_and_exec_runs_inside_it() {
         .contains("exec --workdir /workspace fake-container-id /bin/echo hello-from-container"));
 
     let exec_log = harness.read_exec_log();
-    assert!(exec_log.contains("sh -lc echo ready"));
+    assert!(exec_log.contains("/bin/sh -lc echo ready"));
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn up_uses_workspace_mount_target_for_remote_workdir_when_workspace_folder_is_om
     assert_eq!(payload["remoteWorkspaceFolder"], "/custom-target");
     let invocations = harness.read_invocations();
     assert!(
-        invocations.contains("exec --workdir /custom-target fake-container-id sh -lc echo ready")
+        invocations.contains("exec --workdir /custom-target fake-container-id /bin/sh -lc echo ready")
     );
 }
 
@@ -192,11 +192,11 @@ fn up_reusing_running_container_skips_create_only_lifecycle_hooks() {
 
     assert!(output.status.success(), "{output:?}");
     let exec_log = harness.read_exec_log();
-    assert!(!exec_log.contains("sh -lc echo on-create"));
-    assert!(!exec_log.contains("sh -lc echo update-content"));
-    assert!(!exec_log.contains("sh -lc echo post-create"));
-    assert!(!exec_log.contains("sh -lc echo post-start"));
-    assert!(exec_log.contains("sh -lc echo post-attach"));
+    assert!(!exec_log.contains("/bin/sh -lc echo on-create"));
+    assert!(!exec_log.contains("/bin/sh -lc echo update-content"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-create"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-start"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-attach"));
 }
 
 #[test]
@@ -232,11 +232,11 @@ fn up_resumes_stopped_containers_instead_of_creating_new_ones() {
     assert!(invocations.contains("start stopped-container-id"));
     assert!(!invocations.contains("run "));
     let exec_log = harness.read_exec_log();
-    assert!(!exec_log.contains("sh -lc echo on-create"));
-    assert!(!exec_log.contains("sh -lc echo update-content"));
-    assert!(!exec_log.contains("sh -lc echo post-create"));
-    assert!(exec_log.contains("sh -lc echo post-start"));
-    assert!(exec_log.contains("sh -lc echo post-attach"));
+    assert!(!exec_log.contains("/bin/sh -lc echo on-create"));
+    assert!(!exec_log.contains("/bin/sh -lc echo update-content"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-start"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-attach"));
 }
 
 #[test]

@@ -257,7 +257,7 @@ fn lifecycle_exec_args(
     engine_args.push(container_id.to_string());
     match command {
         LifecycleCommand::Shell(command) => {
-            engine_args.push("sh".to_string());
+            engine_args.push("/bin/sh".to_string());
             engine_args.push("-lc".to_string());
             engine_args.push(command);
         }
@@ -270,7 +270,7 @@ fn host_lifecycle_request(workspace_folder: &Path, command: LifecycleCommand) ->
     match command {
         LifecycleCommand::Shell(command) => ProcessRequest {
             program: "/bin/sh".to_string(),
-            args: vec!["-lc".to_string(), command],
+            args: vec!["-c".to_string(), command],
             cwd: Some(workspace_folder.to_path_buf()),
             env: std::collections::HashMap::new(),
         },
@@ -290,7 +290,10 @@ fn host_lifecycle_request(workspace_folder: &Path, command: LifecycleCommand) ->
 mod tests {
     use serde_json::json;
 
-    use super::{lifecycle_command_group, selected_lifecycle_commands, LifecycleMode};
+    use super::{
+        lifecycle_command_group, lifecycle_exec_args, selected_lifecycle_commands, LifecycleCommand,
+        LifecycleMode,
+    };
 
     #[test]
     fn lifecycle_command_group_supports_strings_arrays_and_objects() {
@@ -330,5 +333,21 @@ mod tests {
         );
 
         assert_eq!(reused.len(), 1);
+    }
+
+    #[test]
+    fn lifecycle_exec_args_use_absolute_shell_path() {
+        let args = lifecycle_exec_args(
+            &[],
+            &json!({}),
+            "/workspaces/sample",
+            "container-id",
+            LifecycleCommand::Shell("echo hello".to_string()),
+        );
+
+        assert!(
+            args.contains(&"/bin/sh".to_string()),
+            "expected lifecycle shell command to use /bin/sh: {args:?}"
+        );
     }
 }
