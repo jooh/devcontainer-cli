@@ -291,8 +291,8 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        lifecycle_command_group, lifecycle_exec_args, selected_lifecycle_commands, LifecycleCommand,
-        LifecycleMode,
+        lifecycle_command_group, lifecycle_exec_args, selected_lifecycle_commands,
+        LifecycleCommand, LifecycleMode,
     };
 
     #[test]

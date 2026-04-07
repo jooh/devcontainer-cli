@@ -87,9 +87,8 @@ fn up_uses_workspace_mount_target_for_remote_workdir_when_workspace_folder_is_om
     let payload = harness.parse_stdout_json(&output);
     assert_eq!(payload["remoteWorkspaceFolder"], "/custom-target");
     let invocations = harness.read_invocations();
-    assert!(
-        invocations.contains("exec --workdir /custom-target fake-container-id /bin/sh -lc echo ready")
-    );
+    assert!(invocations
+        .contains("exec --workdir /custom-target fake-container-id /bin/sh -lc echo ready"));
 }
 
 #[test]
