@@ -55,14 +55,22 @@ jobs:
         include:
           - target: linux-x64
             runner: ubuntu-latest
+            rust_target: x86_64-unknown-linux-gnu
             archive_name: devcontainer-${{ needs.prepare.outputs.version }}-linux-x64.tar.gz
+            checksum_cmd: sha256sum
+          - target: linux-x64-musl
+            runner: ubuntu-latest
+            rust_target: x86_64-unknown-linux-musl
+            archive_name: devcontainer-${{ needs.prepare.outputs.version }}-linux-x64-musl.tar.gz
             checksum_cmd: sha256sum
           - target: darwin-x64
             runner: macos-15-intel
+            rust_target: x86_64-apple-darwin
             archive_name: devcontainer-${{ needs.prepare.outputs.version }}-darwin-x64.tar.gz
             checksum_cmd: shasum -a 256
           - target: darwin-arm64
             runner: macos-15
+            rust_target: aarch64-apple-darwin
             archive_name: devcontainer-${{ needs.prepare.outputs.version }}-darwin-arm64.tar.gz
             checksum_cmd: shasum -a 256
     runs-on: ${{ matrix.runner }}
@@ -75,6 +83,16 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust_target }}
+
+      - name: Install musl linker
+        if: matrix.rust_target == 'x86_64-unknown-linux-musl'
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes musl-tools
 
       - name: Set Cargo version
         shell: bash
@@ -87,14 +105,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cargo build --release --manifest-path "$CARGO_TOML_PATH"
+          cargo build --release --target '${{ matrix.rust_target }}' --manifest-path "$CARGO_TOML_PATH"
 
       - name: Package release artifact
         shell: bash
         run: |
           set -euo pipefail
           artifact_name='${{ matrix.archive_name }}'
-          tar -C "$CRATE_DIR/target/release" -czf "$artifact_name" devcontainer
+          tar -C "$CRATE_DIR/target/${{ matrix.rust_target }}/release" -czf "$artifact_name" devcontainer
           ${{ matrix.checksum_cmd }} "$artifact_name" > "${artifact_name}.sha256"
 
       - name: Upload release artifact
