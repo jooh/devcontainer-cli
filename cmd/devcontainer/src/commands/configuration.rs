@@ -35,9 +35,10 @@ pub(crate) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
 }
 
 pub(crate) fn should_use_native_read_configuration(args: &[String]) -> bool {
-    const SUPPORTED_OPTIONS: [&str; 4] = [
+    const SUPPORTED_OPTIONS: [&str; 5] = [
         "--workspace-folder",
         "--config",
+        "--docker-compose-path",
         "--include-merged-configuration",
         "--include-features-configuration",
     ];
@@ -279,6 +280,16 @@ mod tests {
             "--workspace-folder".to_string(),
             "/workspace".to_string(),
             "--include-merged-configuration".to_string(),
+        ]));
+    }
+
+    #[test]
+    fn read_configuration_accepts_docker_compose_path_flag() {
+        assert!(should_use_native_read_configuration(&[
+            "--workspace-folder".to_string(),
+            "/workspace".to_string(),
+            "--docker-compose-path".to_string(),
+            "trigger-compose-v2".to_string(),
         ]));
     }
 

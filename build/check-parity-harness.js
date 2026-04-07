@@ -28,6 +28,20 @@ function run(command, args, options = {}) {
 	});
 }
 
+function copyRecursive(source, destination) {
+	const stat = fs.statSync(source);
+	if (stat.isDirectory()) {
+		fs.mkdirSync(destination, { recursive: true });
+		for (const entry of fs.readdirSync(source)) {
+			copyRecursive(path.join(source, entry), path.join(destination, entry));
+		}
+		return;
+	}
+
+	fs.mkdirSync(path.dirname(destination), { recursive: true });
+	fs.copyFileSync(source, destination);
+}
+
 function stripJsonComments(text) {
 	let result = '';
 	let inString = false;
@@ -142,6 +156,9 @@ function runNativeReadConfiguration(workspaceFolder, scenario) {
 	if (scenario.explicitConfigPath) {
 		args.push('--config', path.join(workspaceFolder, scenario.explicitConfigPath));
 	}
+	if (Array.isArray(scenario.additionalArgs)) {
+		args.push(...scenario.additionalArgs);
+	}
 	const result = run('cargo', args);
 	if (result.status !== 0) {
 		throw new Error(`native read-configuration failed:\n${result.stderr}`);
@@ -232,12 +249,16 @@ function main() {
 	for (const scenario of loadScenarios()) {
 		const tempRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'devcontainer-parity-'));
 		const workspaceFolder = path.join(tempRoot, 'workspace');
-		const configPath = path.join(
-			workspaceFolder,
-			scenario.workspaceConfigPath || path.join('.devcontainer', 'devcontainer.json'),
-		);
-		fs.mkdirSync(path.dirname(configPath), { recursive: true });
-		fs.writeFileSync(configPath, fs.readFileSync(path.join(repositoryRoot, scenario.fixtureConfigPath), 'utf8'));
+		if (scenario.fixtureWorkspacePath) {
+			copyRecursive(path.join(repositoryRoot, scenario.fixtureWorkspacePath), workspaceFolder);
+		} else {
+			const configPath = path.join(
+				workspaceFolder,
+				scenario.workspaceConfigPath || path.join('.devcontainer', 'devcontainer.json'),
+			);
+			fs.mkdirSync(path.dirname(configPath), { recursive: true });
+			fs.writeFileSync(configPath, fs.readFileSync(path.join(repositoryRoot, scenario.fixtureConfigPath), 'utf8'));
+		}
 
 		const reference = runReferenceReadConfiguration(workspaceFolder, scenario);
 		const native = runNativeReadConfiguration(workspaceFolder, scenario);
