@@ -16,10 +16,11 @@ pub(crate) struct ComposeSpec {
 }
 
 pub(crate) fn uses_compose_config(configuration: &Value) -> bool {
-    configuration
-        .get("dockerComposeFile")
-        .is_some()
-        && configuration.get("service").and_then(Value::as_str).is_some()
+    configuration.get("dockerComposeFile").is_some()
+        && configuration
+            .get("service")
+            .and_then(Value::as_str)
+            .is_some()
 }
 
 pub(crate) fn load_compose_spec(resolved: &ResolvedConfig) -> Result<Option<ComposeSpec>, String> {
@@ -53,7 +54,10 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
 
     if spec.has_build {
-        let result = engine::run_compose(args, compose_args(&spec.files, "build", &["--pull", &spec.service]))?;
+        let result = engine::run_compose(
+            args,
+            compose_args(&spec.files, "build", &["--pull", &spec.service]),
+        )?;
         if result.status_code != 0 {
             return Err(engine::stderr_or_stdout(&result));
         }
@@ -78,7 +82,10 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
 pub(crate) fn up_service(resolved: &ResolvedConfig, args: &[String]) -> Result<(), String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
-    let result = engine::run_compose(args, compose_args(&spec.files, "up", &["-d", &spec.service]))?;
+    let result = engine::run_compose(
+        args,
+        compose_args(&spec.files, "up", &["-d", &spec.service]),
+    )?;
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
     }
@@ -88,7 +95,10 @@ pub(crate) fn up_service(resolved: &ResolvedConfig, args: &[String]) -> Result<(
 pub(crate) fn remove_service(resolved: &ResolvedConfig, args: &[String]) -> Result<(), String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
-    let result = engine::run_compose(args, compose_args(&spec.files, "rm", &["-s", "-f", &spec.service]))?;
+    let result = engine::run_compose(
+        args,
+        compose_args(&spec.files, "rm", &["-s", "-f", &spec.service]),
+    )?;
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
     }
@@ -101,7 +111,10 @@ pub(crate) fn resolve_container_id(
 ) -> Result<Option<String>, String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
-    let result = engine::run_compose(args, compose_args(&spec.files, "ps", &["-q", &spec.service]))?;
+    let result = engine::run_compose(
+        args,
+        compose_args(&spec.files, "ps", &["-q", &spec.service]),
+    )?;
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
     }
@@ -131,7 +144,8 @@ fn compose_files(configuration: &Value, config_root: &Path) -> Result<Vec<PathBu
         Some(Value::Array(values)) => values
             .iter()
             .map(|value| {
-                value.as_str()
+                value
+                    .as_str()
                     .map(|path| resolve_relative(config_root, path))
                     .ok_or_else(|| "dockerComposeFile entries must be strings".to_string())
             })
@@ -167,7 +181,8 @@ fn inspect_service_definition(
         if service_definition.contains_key(YamlValue::String("build".to_string())) {
             has_build = true;
         }
-        if let Some(value) = service_field(service_definition, "image").and_then(YamlValue::as_str) {
+        if let Some(value) = service_field(service_definition, "image").and_then(YamlValue::as_str)
+        {
             image = Some(value.to_string());
         }
     }
