@@ -1,11 +1,11 @@
 mod build;
-mod compose;
+pub(crate) mod compose;
 mod container;
-mod context;
-mod engine;
+pub(crate) mod context;
+pub(crate) mod engine;
 mod exec;
 mod lifecycle;
-mod metadata;
+pub(crate) mod metadata;
 
 use serde_json::{json, Value};
 

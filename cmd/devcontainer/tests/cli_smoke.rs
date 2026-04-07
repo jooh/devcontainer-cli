@@ -97,7 +97,7 @@ fn read_configuration_command_returns_configuration_payload() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(stdout.contains("\"configuration\""));
-    assert!(stdout.contains("\"metadata\""));
+    assert!(stdout.contains("\"workspace\""));
 
     let _ = fs::remove_dir_all(root);
 }
@@ -132,12 +132,16 @@ fn read_configuration_supports_upstream_subfolder_config() {
         "true"
     );
     assert_eq!(
-        payload["metadata"]["configFile"],
+        payload["configuration"]["configFilePath"],
         config
             .canonicalize()
             .expect("canonical config")
             .to_string_lossy()
             .as_ref()
+    );
+    assert_eq!(
+        payload["workspace"]["workspaceFolder"],
+        "/workspaces/dockerfile-without-features"
     );
 }
 
@@ -205,6 +209,45 @@ fn read_configuration_applies_upstream_style_local_substitution_defaults() {
         payload["configuration"]["containerEnv"]["MISSING_WITHOUT_DEFAULT"],
         "before--after"
     );
+}
+
+#[test]
+fn read_configuration_merged_output_uses_upstream_pluralized_fields() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    fs::create_dir_all(&config_dir).expect("config dir");
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"postAttachCommand\": \"echo attached\",\n  \"remoteUser\": \"vscode\"\n}\n",
+    )
+    .expect("config write");
+
+    let (_, payload) = run_read_configuration(
+        &[
+            "--workspace-folder",
+            root.to_string_lossy().as_ref(),
+            "--include-merged-configuration",
+        ],
+        None,
+    );
+
+    assert_eq!(
+        payload["configuration"]["postAttachCommand"],
+        "echo attached"
+    );
+    assert_eq!(
+        payload["mergedConfiguration"]["postAttachCommands"]
+            .as_array()
+            .expect("post attach commands")
+            .len(),
+        1
+    );
+    assert!(payload["mergedConfiguration"]
+        .get("postAttachCommand")
+        .is_none());
+    assert_eq!(payload["mergedConfiguration"]["remoteUser"], "vscode");
+
+    let _ = fs::remove_dir_all(root);
 }
 
 #[test]

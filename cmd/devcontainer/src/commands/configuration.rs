@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
@@ -8,6 +8,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 
 use super::common;
+use crate::config::{self, ConfigContext};
+use crate::runtime;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 struct Lockfile {
@@ -50,33 +52,46 @@ struct FeatureReference {
     digest: Option<String>,
 }
 
-pub(crate) fn build_read_configuration_payload(args: &[String]) -> Result<Value, String> {
-    let loaded = load_config(args)?;
-    let mut payload = Map::new();
-    payload.insert("configuration".to_string(), loaded.configuration.clone());
-    payload.insert(
-        "metadata".to_string(),
-        json!({
-            "format": "jsonc",
-            "pathResolution": "native-rust",
-            "workspaceFolder": loaded.workspace_folder,
-            "configFile": loaded.config_file,
-        }),
-    );
+struct InspectedContainer {
+    metadata_entries: Vec<Value>,
+    container_env: HashMap<String, String>,
+}
 
-    if common::has_flag(args, "--include-merged-configuration") {
+pub(crate) fn build_read_configuration_payload(args: &[String]) -> Result<Value, String> {
+    let include_merged = common::has_flag(args, "--include-merged-configuration");
+    let include_features = common::has_flag(args, "--include-features-configuration");
+    let loaded = load_optional_config(args)?;
+    let inspected = if let Some(container_id) = common::parse_option_value(args, "--container-id") {
+        Some(inspect_container(args, &container_id, loaded.as_ref())?)
+    } else {
+        None
+    };
+    let configuration = read_configuration_value(loaded.as_ref(), inspected.as_ref());
+    let mut payload = Map::new();
+    payload.insert("configuration".to_string(), configuration.clone());
+
+    if let Some(loaded) = loaded.as_ref() {
         payload.insert(
-            "mergedConfiguration".to_string(),
-            loaded.configuration.clone(),
+            "workspace".to_string(),
+            workspace_payload(loaded, &configuration),
         );
     }
 
-    if common::has_flag(args, "--include-features-configuration") {
+    if include_features || (include_merged && inspected.is_none()) {
+        if let Some(loaded) = loaded.as_ref() {
+            payload.insert(
+                "featuresConfiguration".to_string(),
+                json!({
+                    "features": loaded.configuration.get("features").cloned().unwrap_or_else(|| json!({})),
+                }),
+            );
+        }
+    }
+
+    if include_merged {
         payload.insert(
-            "featuresConfiguration".to_string(),
-            json!({
-                "features": loaded.configuration.get("features").cloned().unwrap_or_else(|| json!({})),
-            }),
+            "mergedConfiguration".to_string(),
+            merged_configuration_payload(&configuration, inspected.as_ref()),
         );
     }
 
@@ -84,9 +99,12 @@ pub(crate) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
 }
 
 pub(crate) fn should_use_native_read_configuration(args: &[String]) -> bool {
-    const SUPPORTED_OPTIONS: [&str; 5] = [
+    const SUPPORTED_OPTIONS: [&str; 8] = [
         "--workspace-folder",
         "--config",
+        "--container-id",
+        "--id-label",
+        "--docker-path",
         "--docker-compose-path",
         "--include-merged-configuration",
         "--include-features-configuration",
@@ -226,6 +244,433 @@ fn load_config(args: &[String]) -> Result<LoadedConfig, String> {
         raw_text,
         configuration,
     })
+}
+
+fn load_optional_config(args: &[String]) -> Result<Option<LoadedConfig>, String> {
+    match load_config(args) {
+        Ok(loaded) => Ok(Some(loaded)),
+        Err(error)
+            if common::parse_option_value(args, "--container-id").is_some()
+                && common::parse_option_value(args, "--config").is_none()
+                && common::parse_option_value(args, "--workspace-folder").is_none()
+                && error.starts_with("Unable to locate a dev container config at ") =>
+        {
+            Ok(None)
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn read_configuration_value(
+    loaded: Option<&LoadedConfig>,
+    inspected: Option<&InspectedContainer>,
+) -> Value {
+    let mut configuration = loaded
+        .map(|value| {
+            let mut configuration = value.configuration.clone();
+            if let Value::Object(entries) = &mut configuration {
+                entries.insert(
+                    "configFilePath".to_string(),
+                    Value::String(value.config_file.display().to_string()),
+                );
+            }
+            configuration
+        })
+        .unwrap_or_else(|| Value::Object(Map::new()));
+
+    if let Some(inspected) = inspected {
+        configuration = config::substitute_container_env(&configuration, &inspected.container_env);
+    }
+
+    configuration
+}
+
+fn workspace_payload(loaded: &LoadedConfig, configuration: &Value) -> Value {
+    let resolved = runtime::context::ResolvedConfig {
+        workspace_folder: loaded.workspace_folder.clone(),
+        config_file: loaded.config_file.clone(),
+        configuration: configuration.clone(),
+    };
+    let workspace_folder = runtime::context::remote_workspace_folder(&resolved);
+    let mut payload = Map::new();
+    payload.insert(
+        "workspaceFolder".to_string(),
+        Value::String(workspace_folder.clone()),
+    );
+    if !runtime::compose::uses_compose_config(configuration) {
+        payload.insert(
+            "workspaceMount".to_string(),
+            Value::String(runtime::context::workspace_mount(
+                &resolved,
+                &workspace_folder,
+            )),
+        );
+    }
+    Value::Object(payload)
+}
+
+fn inspect_container(
+    args: &[String],
+    container_id: &str,
+    loaded: Option<&LoadedConfig>,
+) -> Result<InspectedContainer, String> {
+    let result =
+        runtime::engine::run_engine(args, vec!["inspect".to_string(), container_id.to_string()])?;
+    if result.status_code != 0 {
+        return Err(runtime::engine::stderr_or_stdout(&result));
+    }
+
+    let inspected: Value = serde_json::from_str(&result.stdout)
+        .map_err(|error| format!("Invalid inspect JSON: {error}"))?;
+    let details = inspected
+        .as_array()
+        .and_then(|entries| entries.first())
+        .ok_or_else(|| "Container engine did not return inspect details".to_string())?;
+    let labels = details
+        .get("Config")
+        .and_then(|value| value.get("Labels"))
+        .and_then(Value::as_object);
+    let container_env = details
+        .get("Config")
+        .and_then(|value| value.get("Env"))
+        .and_then(Value::as_array)
+        .map(|values| {
+            values
+                .iter()
+                .filter_map(Value::as_str)
+                .filter_map(|entry| {
+                    entry
+                        .split_once('=')
+                        .map(|(name, value)| (name.to_string(), value.to_string()))
+                })
+                .collect::<HashMap<_, _>>()
+        })
+        .unwrap_or_default();
+    let local_workspace_folder = loaded
+        .map(|value| value.workspace_folder.clone())
+        .or_else(|| {
+            labels
+                .and_then(|entries| entries.get("devcontainer.local_folder"))
+                .and_then(Value::as_str)
+                .map(PathBuf::from)
+        });
+    let mut metadata_entries = runtime::metadata::metadata_entries(
+        labels
+            .and_then(|entries| entries.get("devcontainer.metadata"))
+            .and_then(Value::as_str),
+    );
+    if let Some(workspace_folder) = local_workspace_folder {
+        let context = ConfigContext {
+            workspace_folder,
+            env: std::env::vars().collect(),
+        };
+        metadata_entries = metadata_entries
+            .into_iter()
+            .map(|entry| config::substitute_local_context(&entry, &context))
+            .collect();
+    }
+    metadata_entries = metadata_entries
+        .into_iter()
+        .map(|entry| config::substitute_container_env(&entry, &container_env))
+        .collect();
+
+    Ok(InspectedContainer {
+        metadata_entries,
+        container_env,
+    })
+}
+
+fn merged_configuration_payload(
+    configuration: &Value,
+    inspected: Option<&InspectedContainer>,
+) -> Value {
+    let mut metadata_entries = inspected
+        .map(|value| value.metadata_entries.clone())
+        .unwrap_or_default();
+    let config_metadata = pick_config_metadata(configuration);
+    if config_metadata
+        .as_object()
+        .is_some_and(|entries| !entries.is_empty())
+    {
+        metadata_entries.push(config_metadata);
+    }
+    merge_configuration(configuration, &metadata_entries)
+}
+
+fn pick_config_metadata(configuration: &Value) -> Value {
+    let Some(entries) = configuration.as_object() else {
+        return Value::Object(Map::new());
+    };
+    let mut picked = Map::new();
+    for key in [
+        "onCreateCommand",
+        "updateContentCommand",
+        "postCreateCommand",
+        "postStartCommand",
+        "postAttachCommand",
+        "waitFor",
+        "customizations",
+        "mounts",
+        "containerEnv",
+        "containerUser",
+        "init",
+        "privileged",
+        "capAdd",
+        "securityOpt",
+        "remoteUser",
+        "userEnvProbe",
+        "remoteEnv",
+        "overrideCommand",
+        "portsAttributes",
+        "otherPortsAttributes",
+        "forwardPorts",
+        "shutdownAction",
+        "updateRemoteUserUID",
+        "hostRequirements",
+        "entrypoint",
+    ] {
+        if let Some(value) = entries.get(key) {
+            picked.insert(key.to_string(), value.clone());
+        }
+    }
+    Value::Object(picked)
+}
+
+fn merge_configuration(configuration: &Value, metadata_entries: &[Value]) -> Value {
+    let mut merged = configuration.as_object().cloned().unwrap_or_default();
+    for key in [
+        "customizations",
+        "entrypoint",
+        "onCreateCommand",
+        "updateContentCommand",
+        "postCreateCommand",
+        "postStartCommand",
+        "postAttachCommand",
+        "shutdownAction",
+    ] {
+        merged.remove(key);
+    }
+
+    if metadata_entries
+        .iter()
+        .any(|entry| entry.get("init").and_then(Value::as_bool) == Some(true))
+    {
+        merged.insert("init".to_string(), Value::Bool(true));
+    }
+    if metadata_entries
+        .iter()
+        .any(|entry| entry.get("privileged").and_then(Value::as_bool) == Some(true))
+    {
+        merged.insert("privileged".to_string(), Value::Bool(true));
+    }
+    insert_merged_array(
+        &mut merged,
+        "capAdd",
+        union_string_arrays(metadata_entries, "capAdd"),
+    );
+    insert_merged_array(
+        &mut merged,
+        "securityOpt",
+        union_string_arrays(metadata_entries, "securityOpt"),
+    );
+    insert_merged_array(
+        &mut merged,
+        "entrypoints",
+        collect_scalar_values(metadata_entries, "entrypoint"),
+    );
+    insert_merged_array(&mut merged, "mounts", merge_mounts(metadata_entries));
+    insert_if_non_empty_object(
+        &mut merged,
+        "customizations",
+        merge_customizations(metadata_entries),
+    );
+    insert_merged_array(
+        &mut merged,
+        "onCreateCommands",
+        collect_command_values(metadata_entries, "onCreateCommand"),
+    );
+    insert_merged_array(
+        &mut merged,
+        "updateContentCommands",
+        collect_command_values(metadata_entries, "updateContentCommand"),
+    );
+    insert_merged_array(
+        &mut merged,
+        "postCreateCommands",
+        collect_command_values(metadata_entries, "postCreateCommand"),
+    );
+    insert_merged_array(
+        &mut merged,
+        "postStartCommands",
+        collect_command_values(metadata_entries, "postStartCommand"),
+    );
+    insert_merged_array(
+        &mut merged,
+        "postAttachCommands",
+        collect_command_values(metadata_entries, "postAttachCommand"),
+    );
+    insert_last_value(&mut merged, "workspaceFolder", metadata_entries);
+    insert_last_value(&mut merged, "waitFor", metadata_entries);
+    insert_last_value(&mut merged, "remoteUser", metadata_entries);
+    insert_last_value(&mut merged, "containerUser", metadata_entries);
+    insert_last_value(&mut merged, "userEnvProbe", metadata_entries);
+    insert_if_non_empty_object(
+        &mut merged,
+        "remoteEnv",
+        merge_object_entries(metadata_entries, "remoteEnv"),
+    );
+    insert_if_non_empty_object(
+        &mut merged,
+        "containerEnv",
+        merge_object_entries(metadata_entries, "containerEnv"),
+    );
+    insert_last_value(&mut merged, "overrideCommand", metadata_entries);
+    insert_if_non_empty_object(
+        &mut merged,
+        "portsAttributes",
+        merge_object_entries(metadata_entries, "portsAttributes"),
+    );
+    insert_last_value(&mut merged, "otherPortsAttributes", metadata_entries);
+    insert_merged_array(
+        &mut merged,
+        "forwardPorts",
+        union_values(metadata_entries, "forwardPorts"),
+    );
+    insert_last_value(&mut merged, "shutdownAction", metadata_entries);
+    insert_last_value(&mut merged, "updateRemoteUserUID", metadata_entries);
+    insert_last_value(&mut merged, "hostRequirements", metadata_entries);
+
+    Value::Object(merged)
+}
+
+fn insert_merged_array(merged: &mut Map<String, Value>, key: &str, values: Vec<Value>) {
+    if !values.is_empty() {
+        merged.insert(key.to_string(), Value::Array(values));
+    }
+}
+
+fn insert_if_non_empty_object(merged: &mut Map<String, Value>, key: &str, value: Value) {
+    if value.as_object().is_some_and(|entries| !entries.is_empty()) {
+        merged.insert(key.to_string(), value);
+    }
+}
+
+fn insert_last_value(merged: &mut Map<String, Value>, key: &str, entries: &[Value]) {
+    if let Some(value) = entries
+        .iter()
+        .filter_map(|entry| entry.get(key))
+        .next_back()
+    {
+        merged.insert(key.to_string(), value.clone());
+    }
+}
+
+fn union_string_arrays(entries: &[Value], key: &str) -> Vec<Value> {
+    let mut seen = HashSet::new();
+    entries
+        .iter()
+        .filter_map(|entry| entry.get(key).and_then(Value::as_array))
+        .flat_map(|values| values.iter())
+        .filter_map(Value::as_str)
+        .filter(|value| seen.insert((*value).to_string()))
+        .map(|value| Value::String(value.to_string()))
+        .collect()
+}
+
+fn collect_scalar_values(entries: &[Value], key: &str) -> Vec<Value> {
+    entries
+        .iter()
+        .filter_map(|entry| entry.get(key))
+        .filter(|value| value.is_string())
+        .cloned()
+        .collect()
+}
+
+fn collect_command_values(entries: &[Value], key: &str) -> Vec<Value> {
+    entries
+        .iter()
+        .filter_map(|entry| entry.get(key))
+        .cloned()
+        .collect()
+}
+
+fn merge_customizations(entries: &[Value]) -> Value {
+    let mut merged = Map::new();
+    for entry in entries {
+        let Some(customizations) = entry.get("customizations").and_then(Value::as_object) else {
+            continue;
+        };
+        for (key, value) in customizations {
+            merged
+                .entry(key.clone())
+                .or_insert_with(|| Value::Array(Vec::new()))
+                .as_array_mut()
+                .expect("customizations arrays")
+                .push(value.clone());
+        }
+    }
+    Value::Object(merged)
+}
+
+fn merge_object_entries(entries: &[Value], key: &str) -> Value {
+    let mut merged = Map::new();
+    for entry in entries {
+        let Some(values) = entry.get(key).and_then(Value::as_object) else {
+            continue;
+        };
+        merged.extend(
+            values
+                .iter()
+                .map(|(name, value)| (name.clone(), value.clone())),
+        );
+    }
+    Value::Object(merged)
+}
+
+fn union_values(entries: &[Value], key: &str) -> Vec<Value> {
+    let mut seen = HashSet::new();
+    let mut merged = Vec::new();
+    for entry in entries {
+        let Some(values) = entry.get(key).and_then(Value::as_array) else {
+            continue;
+        };
+        for value in values {
+            let fingerprint = serde_json::to_string(value).unwrap_or_else(|_| String::new());
+            if seen.insert(fingerprint) {
+                merged.push(value.clone());
+            }
+        }
+    }
+    merged
+}
+
+fn merge_mounts(entries: &[Value]) -> Vec<Value> {
+    let mut seen = HashSet::new();
+    let mut collected = Vec::new();
+    let flattened = entries
+        .iter()
+        .filter_map(|entry| entry.get("mounts").and_then(Value::as_array))
+        .flat_map(|values| values.iter().cloned())
+        .collect::<Vec<_>>();
+    for value in flattened.into_iter().rev() {
+        let target = match &value {
+            Value::String(text) => runtime::metadata::mount_option_target(text),
+            Value::Object(entries) => entries
+                .get("target")
+                .and_then(Value::as_str)
+                .map(str::to_string),
+            _ => None,
+        };
+        if let Some(target) = target {
+            if seen.insert(target) {
+                collected.push(value);
+            }
+        } else {
+            collected.push(value);
+        }
+    }
+    collected.reverse();
+    collected
 }
 
 fn validate_upgrade_options(args: &[String]) -> Result<(), String> {

@@ -145,10 +145,15 @@ function validateConfigAgainstSpecSchema(relativePath) {
 
 function normalizeReadConfigurationOutput(stdout) {
 	const parsed = JSON.parse(stdout);
-	return {
+	const normalized = {
 		configuration: parsed.configuration,
-		metadata: parsed.metadata,
 	};
+	for (const key of ['workspace', 'featuresConfiguration', 'mergedConfiguration']) {
+		if (Object.prototype.hasOwnProperty.call(parsed, key)) {
+			normalized[key] = parsed[key];
+		}
+	}
+	return normalized;
 }
 
 function runNativeReadConfiguration(workspaceFolder, scenario) {
@@ -172,15 +177,23 @@ function runReferenceReadConfiguration(workspaceFolder, scenario) {
 		scenario.explicitConfigPath || scenario.workspaceConfigPath || path.join('.devcontainer', 'devcontainer.json'),
 	);
 	const configuration = parseJsonc(fs.readFileSync(configPath, 'utf8'));
-	return {
-		configuration,
-		metadata: {
-			workspaceFolder: fs.realpathSync(workspaceFolder),
-			configFile: fs.realpathSync(configPath),
-			format: 'jsonc',
-			pathResolution: 'native-rust',
-		},
+	configuration.configFilePath = fs.realpathSync(configPath);
+	return { configuration, workspace: referenceWorkspaceConfig(fs.realpathSync(workspaceFolder), configuration) };
+}
+
+function referenceWorkspaceConfig(workspaceFolder, configuration) {
+	const remoteWorkspaceFolder = typeof configuration.workspaceFolder === 'string'
+		? configuration.workspaceFolder
+		: `/workspaces/${path.basename(workspaceFolder)}`;
+	const payload = {
+		workspaceFolder: remoteWorkspaceFolder,
 	};
+	if (!Object.prototype.hasOwnProperty.call(configuration, 'dockerComposeFile')) {
+		payload.workspaceMount = typeof configuration.workspaceMount === 'string'
+			? configuration.workspaceMount
+			: `type=bind,source=${workspaceFolder},target=${remoteWorkspaceFolder}`;
+	}
+	return payload;
 }
 
 function ensureRequiredCommands(matrix) {
@@ -268,8 +281,8 @@ function main() {
 		for (const key of golden.requiredTopLevelKeys) {
 			assert(Object.prototype.hasOwnProperty.call(native, key), `native output missing top-level key ${key} for scenario ${scenario.name}`);
 		}
-		for (const key of golden.requiredMetadataKeys) {
-			assert(Object.prototype.hasOwnProperty.call(native.metadata, key), `native output missing metadata key ${key} for scenario ${scenario.name}`);
+		for (const key of golden.requiredWorkspaceKeys) {
+			assert(Object.prototype.hasOwnProperty.call(native.workspace, key), `native output missing workspace key ${key} for scenario ${scenario.name}`);
 		}
 	}
 

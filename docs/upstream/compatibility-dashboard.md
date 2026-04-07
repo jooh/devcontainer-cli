@@ -6,13 +6,13 @@
 
 ## Native command status
 
-- `read-configuration`: parity-tested for the current repo-owned scenarios; broader upstream merge parity is still pending
+- `read-configuration`: native upstream-style output with workspace, merged lifecycle arrays, and container-aware substitution/inspection coverage
 - `build`: native runtime foundation for image/dockerfile flows plus basic Docker Compose service support; deeper parity is still pending
 - `up`: native runtime foundation for image/dockerfile flows plus basic Docker Compose service support; deeper parity is still pending
 - `set-up`: native lifecycle foundation for existing containers
 - `run-user-commands`: native lifecycle foundation for existing containers
-- `outdated`: partial native implementation
-- `upgrade`: partial native implementation
+- `outdated`: native pinned-fixture lockfile parity
+- `upgrade`: native pinned-fixture lockfile parity
 - `exec`: native in-container execution foundation
 - `features`: native local flows, `test` and OCI parity still pending
 - `templates`: native local flows, OCI parity still pending

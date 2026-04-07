@@ -169,31 +169,52 @@ fn parse_variable(input: &str) -> (&str, Vec<&str>) {
     }
 }
 
-fn replace_variable(variable: &str, context: &ConfigContext) -> Option<String> {
+fn replace_variable(
+    variable: &str,
+    context: Option<&ConfigContext>,
+    container_env: Option<&HashMap<String, String>>,
+) -> Option<String> {
     let (name, args) = parse_variable(variable);
     match name {
-        "localWorkspaceFolder" => Some(context.workspace_folder.to_string_lossy().into_owned()),
-        "localWorkspaceFolderBasename" => Some(
-            context
+        "localWorkspaceFolder" => {
+            context.map(|value| value.workspace_folder.to_string_lossy().into_owned())
+        }
+        "localWorkspaceFolderBasename" => context.map(|value| {
+            value
                 .workspace_folder
                 .file_name()
                 .and_then(|name| name.to_str())
                 .map(str::to_string)
-                .unwrap_or_else(|| context.workspace_folder.to_string_lossy().into_owned()),
-        ),
-        "env" | "localEnv" => args.first().map(|variable_name| {
-            context
-                .env
-                .get(*variable_name)
-                .cloned()
-                .or_else(|| args.get(1).map(|value| (*value).to_string()))
-                .unwrap_or_default()
+                .unwrap_or_else(|| value.workspace_folder.to_string_lossy().into_owned())
+        }),
+        "env" | "localEnv" => context.and_then(|value| {
+            args.first().map(|variable_name| {
+                value
+                    .env
+                    .get(*variable_name)
+                    .cloned()
+                    .or_else(|| args.get(1).map(|default| (*default).to_string()))
+                    .unwrap_or_default()
+            })
+        }),
+        "containerEnv" => container_env.and_then(|value| {
+            args.first().map(|variable_name| {
+                value
+                    .get(*variable_name)
+                    .cloned()
+                    .or_else(|| args.get(1).map(|default| (*default).to_string()))
+                    .unwrap_or_default()
+            })
         }),
         _ => None,
     }
 }
 
-fn substitute_string(input: &str, context: &ConfigContext) -> String {
+fn substitute_string(
+    input: &str,
+    context: Option<&ConfigContext>,
+    container_env: Option<&HashMap<String, String>>,
+) -> String {
     let mut output = String::with_capacity(input.len());
     let mut remaining = input;
 
@@ -208,7 +229,7 @@ fn substitute_string(input: &str, context: &ConfigContext) -> String {
         };
 
         let variable = &after_start[..end_offset];
-        if let Some(replacement) = replace_variable(variable, context) {
+        if let Some(replacement) = replace_variable(variable, context, container_env) {
             output.push_str(&replacement);
         } else {
             output.push_str("${");
@@ -225,7 +246,7 @@ fn substitute_string(input: &str, context: &ConfigContext) -> String {
 
 pub fn substitute_local_context(value: &Value, context: &ConfigContext) -> Value {
     match value {
-        Value::String(text) => Value::String(substitute_string(text, context)),
+        Value::String(text) => Value::String(substitute_string(text, Some(context), None)),
         Value::Array(items) => Value::Array(
             items
                 .iter()
@@ -242,9 +263,31 @@ pub fn substitute_local_context(value: &Value, context: &ConfigContext) -> Value
     }
 }
 
+pub fn substitute_container_env(value: &Value, env: &HashMap<String, String>) -> Value {
+    match value {
+        Value::String(text) => Value::String(substitute_string(text, None, Some(env))),
+        Value::Array(items) => Value::Array(
+            items
+                .iter()
+                .map(|item| substitute_container_env(item, env))
+                .collect(),
+        ),
+        Value::Object(entries) => Value::Object(
+            entries
+                .iter()
+                .map(|(key, value)| (key.clone(), substitute_container_env(value, env)))
+                .collect(),
+        ),
+        _ => value.clone(),
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{parse_jsonc_value, resolve_config_path, substitute_local_context, ConfigContext};
+    use super::{
+        parse_jsonc_value, resolve_config_path, substitute_container_env, substitute_local_context,
+        ConfigContext,
+    };
     use serde_json::json;
     use std::collections::HashMap;
     use std::fs;
@@ -335,5 +378,27 @@ mod tests {
             "fallback"
         );
         assert_eq!(substituted["containerEnv"]["MISSING"], "before--after");
+    }
+
+    #[test]
+    fn substitutes_container_env_tokens_without_replacing_local_env_tokens() {
+        let value = json!({
+            "remoteEnv": {
+                "PATH_FROM_CONTAINER": "${containerEnv:PATH}",
+                "FALLBACK": "${containerEnv:MISSING:fallback}",
+                "LOCAL_PATH": "${localEnv:PATH}"
+            }
+        });
+        let substituted = substitute_container_env(
+            &value,
+            &HashMap::from([("PATH".to_string(), "/usr/local/bin:/usr/bin".to_string())]),
+        );
+
+        assert_eq!(
+            substituted["remoteEnv"]["PATH_FROM_CONTAINER"],
+            "/usr/local/bin:/usr/bin"
+        );
+        assert_eq!(substituted["remoteEnv"]["FALLBACK"], "fallback");
+        assert_eq!(substituted["remoteEnv"]["LOCAL_PATH"], "${localEnv:PATH}");
     }
 }
