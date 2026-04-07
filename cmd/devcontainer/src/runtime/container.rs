@@ -39,6 +39,9 @@ pub(crate) fn ensure_up_container(
                     lifecycle_mode: LifecycleMode::UpReused,
                 });
             }
+            None if common::has_flag(args, "--expect-existing-container") => {
+                return Err("Dev container not found.".to_string());
+            }
             None => {
                 compose::up_service(resolved, args)?;
                 let container_id = compose::resolve_container_id(resolved, args)?

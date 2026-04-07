@@ -133,6 +133,9 @@ case "$COMMAND" in
   compose)
     while [ "$#" -gt 0 ]; do
       case "${1:-}" in
+        --project-name)
+          shift 2
+          ;;
         -f)
           shift 2
           ;;

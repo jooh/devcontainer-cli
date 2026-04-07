@@ -251,6 +251,97 @@ fn read_configuration_merged_output_uses_upstream_pluralized_fields() {
 }
 
 #[test]
+fn features_test_emits_a_local_report() {
+    let workspace = unique_temp_dir();
+    let src = workspace.join("src").join("demo");
+    let test = workspace.join("test").join("demo");
+    fs::create_dir_all(&src).expect("feature src");
+    fs::create_dir_all(&test).expect("feature test");
+    fs::write(
+        src.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("manifest");
+    fs::write(test.join("test.sh"), "#!/bin/sh\n").expect("test script");
+    fs::write(
+        test.join("scenarios.json"),
+        "{\n  \"custom\": {\n    \"image\": \"ubuntu:latest\"\n  }\n}\n",
+    )
+    .expect("scenarios");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args(["features", "test", "--project-folder"])
+        .arg(workspace.to_string_lossy().as_ref())
+        .output()
+        .expect("features test should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("TEST REPORT"));
+    assert!(stdout.contains("'custom'"));
+    assert!(stdout.contains("'demo'"));
+    assert!(stdout.contains("Cleaning up 2 test containers"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn templates_apply_supports_published_template_ids() {
+    let workspace = unique_temp_dir();
+    fs::create_dir_all(&workspace).expect("workspace");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "apply",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--template-id",
+            "ghcr.io/devcontainers/templates/docker-from-docker:latest",
+            "--template-args",
+            "{ \"installZsh\": \"false\", \"upgradePackages\": \"true\", \"dockerVersion\": \"20.10\", \"moby\": \"true\", \"enableNonRootDocker\": \"true\" }",
+            "--features",
+            "[{ \"id\": \"ghcr.io/devcontainers/features/azure-cli:1\", \"options\": { \"version\": \"1\" } }]",
+        ])
+        .output()
+        .expect("templates apply should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("apply payload");
+    assert_eq!(payload["files"][0], "./.devcontainer/devcontainer.json");
+    let file = fs::read_to_string(workspace.join(".devcontainer").join("devcontainer.json"))
+        .expect("devcontainer file");
+    assert!(file.contains("\"name\": \"Docker from Docker\""));
+    assert!(file.contains("\"installZsh\": \"false\""));
+    assert!(file.contains("\"upgradePackages\": \"true\""));
+    assert!(file.contains("\"version\": \"20.10\""));
+    assert!(file.contains("\"moby\": \"true\""));
+    assert!(file.contains("\"enableNonRootDocker\": \"true\""));
+    assert!(file.contains("ghcr.io/devcontainers/features/common-utils:1"));
+    assert!(file.contains("ghcr.io/devcontainers/features/docker-from-docker:1"));
+    assert!(file.contains("ghcr.io/devcontainers/features/azure-cli:1"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn templates_metadata_supports_published_template_ids() {
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "metadata",
+            "ghcr.io/devcontainers/templates/docker-from-docker:latest",
+        ])
+        .output()
+        .expect("templates metadata should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("metadata payload");
+    assert_eq!(payload["id"], "docker-from-docker");
+    assert_eq!(payload["name"], "Docker from Docker");
+}
+
+#[test]
 fn outdated_supports_upstream_json_output_fixture() {
     let root = repo_root();
     let fixture = root

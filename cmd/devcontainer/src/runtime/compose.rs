@@ -1,3 +1,4 @@
+use std::env;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
@@ -13,6 +14,7 @@ pub(crate) struct ComposeSpec {
     pub(crate) service: String,
     pub(crate) image: Option<String>,
     pub(crate) has_build: bool,
+    pub(crate) project_name: String,
 }
 
 pub(crate) fn uses_compose_config(configuration: &Value) -> bool {
@@ -39,6 +41,7 @@ pub(crate) fn load_compose_spec(resolved: &ResolvedConfig) -> Result<Option<Comp
         .and_then(Value::as_str)
         .ok_or_else(|| "Compose configuration must define service".to_string())?
         .to_string();
+    let project_name = compose_project_name(&files)?;
     let (image, has_build) = inspect_service_definition(&files, &service)?;
 
     Ok(Some(ComposeSpec {
@@ -46,6 +49,7 @@ pub(crate) fn load_compose_spec(resolved: &ResolvedConfig) -> Result<Option<Comp
         service,
         image,
         has_build,
+        project_name,
     }))
 }
 
@@ -56,7 +60,7 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
     if spec.has_build {
         let result = engine::run_compose(
             args,
-            compose_args(&spec.files, "build", &["--pull", &spec.service]),
+            compose_args(&spec, "build", &["--pull", &spec.service]),
         )?;
         if result.status_code != 0 {
             return Err(engine::stderr_or_stdout(&result));
@@ -82,10 +86,7 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
 pub(crate) fn up_service(resolved: &ResolvedConfig, args: &[String]) -> Result<(), String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
-    let result = engine::run_compose(
-        args,
-        compose_args(&spec.files, "up", &["-d", &spec.service]),
-    )?;
+    let result = engine::run_compose(args, compose_args(&spec, "up", &["-d", &spec.service]))?;
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
     }
@@ -97,7 +98,7 @@ pub(crate) fn remove_service(resolved: &ResolvedConfig, args: &[String]) -> Resu
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
     let result = engine::run_compose(
         args,
-        compose_args(&spec.files, "rm", &["-s", "-f", &spec.service]),
+        compose_args(&spec, "rm", &["-s", "-f", &spec.service]),
     )?;
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
@@ -111,10 +112,7 @@ pub(crate) fn resolve_container_id(
 ) -> Result<Option<String>, String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
-    let result = engine::run_compose(
-        args,
-        compose_args(&spec.files, "ps", &["-q", &spec.service]),
-    )?;
+    let result = engine::run_compose(args, compose_args(&spec, "ps", &["-q", &spec.service]))?;
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
     }
@@ -127,9 +125,11 @@ pub(crate) fn resolve_container_id(
         .map(str::to_string))
 }
 
-fn compose_args(files: &[PathBuf], subcommand: &str, tail: &[&str]) -> Vec<String> {
+fn compose_args(spec: &ComposeSpec, subcommand: &str, tail: &[&str]) -> Vec<String> {
     let mut args = Vec::new();
-    for file in files {
+    args.push("--project-name".to_string());
+    args.push(spec.project_name.clone());
+    for file in &spec.files {
         args.push("-f".to_string());
         args.push(file.display().to_string());
     }
@@ -209,9 +209,117 @@ fn resolve_relative(root: &Path, value: &str) -> PathBuf {
     }
 }
 
+fn compose_project_name(compose_files: &[PathBuf]) -> Result<String, String> {
+    if let Some(value) = env::var("COMPOSE_PROJECT_NAME")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+    {
+        return Ok(sanitize_project_name(&value));
+    }
+    if let Some(value) = compose_project_name_from_dotenv()? {
+        return Ok(sanitize_project_name(&value));
+    }
+    for compose_file in compose_files.iter().rev() {
+        if let Some(value) = compose_name_from_file(compose_file)? {
+            return Ok(sanitize_project_name(&value));
+        }
+    }
+
+    let working_dir = compose_files
+        .first()
+        .and_then(|file| file.parent())
+        .ok_or_else(|| "Compose configuration must define at least one compose file".to_string())?;
+    let base = if working_dir.file_name().and_then(|value| value.to_str()) == Some(".devcontainer")
+    {
+        format!(
+            "{}_devcontainer",
+            working_dir
+                .parent()
+                .and_then(Path::file_name)
+                .and_then(|value| value.to_str())
+                .unwrap_or("devcontainer")
+        )
+    } else {
+        working_dir
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("devcontainer")
+            .to_string()
+    };
+    Ok(sanitize_project_name(&base))
+}
+
+fn compose_project_name_from_dotenv() -> Result<Option<String>, String> {
+    let cwd = env::current_dir().map_err(|error| error.to_string())?;
+    let env_file = cwd.join(".env");
+    let raw = match std::fs::read_to_string(env_file) {
+        Ok(raw) => raw,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.to_string()),
+    };
+    Ok(raw.lines().find_map(|line| {
+        line.trim()
+            .strip_prefix("COMPOSE_PROJECT_NAME=")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(str::to_string)
+    }))
+}
+
+fn compose_name_from_file(compose_file: &Path) -> Result<Option<String>, String> {
+    let raw = std::fs::read_to_string(compose_file).map_err(|error| error.to_string())?;
+    Ok(raw.lines().find_map(|line| {
+        if line.starts_with(' ') || line.starts_with('\t') {
+            return None;
+        }
+        line.strip_prefix("name:")
+            .map(str::trim)
+            .filter(|value| !value.is_empty())
+            .map(substitute_compose_env)
+    }))
+}
+
+fn substitute_compose_env(value: &str) -> String {
+    let trimmed = value.trim_matches('"').trim_matches('\'');
+    let mut output = String::with_capacity(trimmed.len());
+    let mut remaining = trimmed;
+
+    while let Some(start) = remaining.find("${") {
+        output.push_str(&remaining[..start]);
+        let after_start = &remaining[start + 2..];
+        let Some(end) = after_start.find('}') else {
+            output.push_str(&remaining[start..]);
+            return output;
+        };
+        let variable = &after_start[..end];
+        if let Ok(replacement) = env::var(variable) {
+            output.push_str(&replacement);
+        }
+        remaining = &after_start[end + 1..];
+    }
+
+    output.push_str(remaining);
+    output
+}
+
+fn sanitize_project_name(value: &str) -> String {
+    value
+        .chars()
+        .flat_map(|character| character.to_lowercase())
+        .filter(|character| {
+            character.is_ascii_lowercase()
+                || character.is_ascii_digit()
+                || matches!(character, '-' | '_')
+        })
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
-    use super::{inspect_service_definition, uses_compose_config};
+    use super::{
+        compose_name_from_file, compose_project_name, inspect_service_definition,
+        uses_compose_config,
+    };
     use serde_json::json;
     use std::fs;
     use std::path::PathBuf;
@@ -259,6 +367,41 @@ mod tests {
 
         assert_eq!(image.as_deref(), Some("example/native-compose:test"));
         assert!(has_build);
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn compose_project_name_defaults_to_workspace_devcontainer() {
+        let root = unique_temp_dir();
+        let compose_file = root.join(".devcontainer").join("docker-compose.yml");
+        fs::create_dir_all(compose_file.parent().expect("compose dir")).expect("compose dir");
+        fs::write(&compose_file, "services:\n  app:\n    image: alpine:3.20\n").expect("compose");
+
+        let project_name = compose_project_name(&[compose_file]).expect("project name");
+
+        assert_eq!(
+            project_name,
+            root.file_name().unwrap().to_string_lossy().to_lowercase() + "_devcontainer"
+        );
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn compose_name_from_file_reads_top_level_name() {
+        let root = unique_temp_dir();
+        let compose_file = root.join("docker-compose.yml");
+        fs::create_dir_all(&root).expect("compose dir");
+        fs::write(
+            &compose_file,
+            "name: Custom-Project-Name\nservices:\n  app:\n    image: alpine:3.20\n",
+        )
+        .expect("compose");
+
+        let project_name = compose_name_from_file(&compose_file)
+            .expect("compose name")
+            .expect("top-level name");
+
+        assert_eq!(project_name, "Custom-Project-Name");
         let _ = fs::remove_dir_all(root);
     }
 }

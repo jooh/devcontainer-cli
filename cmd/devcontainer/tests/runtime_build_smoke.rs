@@ -150,6 +150,6 @@ fn build_uses_compose_for_compose_build_services() {
     assert_eq!(payload["imageName"], "example/native-compose:test");
 
     let invocations = harness.read_invocations();
-    assert!(invocations.contains("compose -f "));
+    assert!(invocations.contains("compose --project-name workspace_devcontainer -f "));
     assert!(invocations.contains(" build --pull app"));
 }

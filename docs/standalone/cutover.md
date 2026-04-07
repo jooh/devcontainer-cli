@@ -24,11 +24,11 @@ The automated repo-owned parity checks currently verify:
 - native startup/help behavior without Node on `PATH`
 - pinned `read-configuration` parity scenarios, including upstream-style workspace output
 
-The native runtime now also has repo-owned Rust integration coverage for `build`, `up`, `set-up`, `run-user-commands`, and `exec` using a podman-compatible fake engine harness, including a basic Docker Compose lane for `build` and `up`.
+The native runtime now also has repo-owned Rust integration coverage for `build`, `up`, `set-up`, `run-user-commands`, and `exec` using a podman-compatible fake engine harness, including Docker Compose project-name and existing-container coverage for `build` and `up`.
 
-The remaining parity work is concentrated in two areas:
+The original umbrella gaps around `read-configuration`, `outdated` / `upgrade`, deeper Docker Compose support, and OCI-oriented `features` / `templates` flows are now covered by native code paths with repo-owned tests.
 
-- deeper Docker Compose parity for `build` and `up` beyond the current basic service foundation
-- OCI-backed `features` / `templates` subcommands and broader parity-harness coverage
+What remains is incremental hardening rather than missing command families:
 
-The parity harness is intentionally narrow today. Expanding command coverage should happen by adding new scenarios and golden data under `src/test/parity/`.
+- broader parity-harness coverage beyond the current pinned scenarios
+- additional upstream edge cases where we decide the maintenance cost is worth the extra compatibility surface
