@@ -34,7 +34,7 @@ fn run_user_commands_resolves_container_ids_from_headered_ps_output() {
     let invocations = harness.read_invocations();
     assert!(invocations.contains("ps -q "));
     let exec_log = harness.read_exec_log();
-    assert!(exec_log.contains("sh -lc echo post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-create"));
 }
 
 #[test]
@@ -82,8 +82,8 @@ fn run_user_commands_with_container_id_loads_metadata_lifecycle_hooks() {
     let invocations = harness.read_invocations();
     assert!(invocations.contains("inspect fake-container-id"));
     let exec_log = harness.read_exec_log();
-    assert!(exec_log.contains("sh -lc echo post-create-from-metadata"));
-    assert!(exec_log.contains("sh -lc echo post-attach-from-metadata"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-create-from-metadata"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-attach-from-metadata"));
 }
 
 #[test]
@@ -159,8 +159,8 @@ fn set_up_and_run_user_commands_target_existing_containers() {
         "{run_user_commands_output:?}"
     );
     let exec_log = harness.read_exec_log();
-    assert!(exec_log.contains("sh -lc echo post-create"));
-    assert!(exec_log.contains("sh -lc echo post-attach"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-attach"));
 }
 
 #[test]
@@ -218,7 +218,7 @@ fn object_lifecycle_commands_are_executed() {
     assert!(output.status.success(), "{output:?}");
     let invocations = harness.read_invocations();
     assert!(invocations
-        .contains("exec --workdir /workspaces/workspace fake-container-id sh -lc echo first"));
+        .contains("exec --workdir /workspaces/workspace fake-container-id /bin/sh -lc echo first"));
     assert!(invocations
         .contains("exec --workdir /workspaces/workspace fake-container-id printf %s second value"));
 }
@@ -314,11 +314,11 @@ fn skip_non_blocking_stops_after_default_wait_for() {
 
     assert!(output.status.success(), "{output:?}");
     let exec_log = harness.read_exec_log();
-    assert!(exec_log.contains("sh -lc echo on-create"));
-    assert!(exec_log.contains("sh -lc echo update-content"));
-    assert!(!exec_log.contains("sh -lc echo post-create"));
-    assert!(!exec_log.contains("sh -lc echo post-start"));
-    assert!(!exec_log.contains("sh -lc echo post-attach"));
+    assert!(exec_log.contains("/bin/sh -lc echo on-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo update-content"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-create"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-start"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-attach"));
 }
 
 #[test]
@@ -346,9 +346,9 @@ fn skip_non_blocking_respects_wait_for_post_start() {
 
     assert!(output.status.success(), "{output:?}");
     let exec_log = harness.read_exec_log();
-    assert!(exec_log.contains("sh -lc echo on-create"));
-    assert!(exec_log.contains("sh -lc echo update-content"));
-    assert!(exec_log.contains("sh -lc echo post-create"));
-    assert!(exec_log.contains("sh -lc echo post-start"));
-    assert!(!exec_log.contains("sh -lc echo post-attach"));
+    assert!(exec_log.contains("/bin/sh -lc echo on-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo update-content"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-start"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-attach"));
 }
