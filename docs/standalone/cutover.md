@@ -22,8 +22,15 @@ The automated repo-owned parity checks currently verify:
 - generated command-reference drift against the pinned upstream CLI sources
 - schema drift against the pinned spec submodule
 - native startup/help behavior without Node on `PATH`
-- a repo-owned `read-configuration` parity scenario using pinned fixtures and golden expectations
+- a narrow `read-configuration` parity slice using pinned fixtures and golden expectations
 
 The native runtime now also has repo-owned Rust integration coverage for `build`, `up`, `set-up`, `run-user-commands`, and `exec` using a podman-compatible fake engine harness.
+
+The remaining parity work is concentrated in four areas:
+
+- Docker Compose parity for `build` and `up`
+- upstream-equivalent merge/output behavior for `read-configuration`
+- upstream-equivalent `outdated` and `upgrade` lockfile behavior
+- OCI-backed `features` / `templates` subcommands and broader parity-harness coverage
 
 The parity harness is intentionally narrow today. Expanding command coverage should happen by adding new scenarios and golden data under `src/test/parity/`.
