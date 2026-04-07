@@ -2,6 +2,7 @@ use serde_json::Value;
 
 use crate::commands::common;
 
+use super::compose;
 use super::context::{workspace_mount, ResolvedConfig};
 use super::engine;
 use super::lifecycle::LifecycleMode;
@@ -18,6 +19,38 @@ pub(crate) fn ensure_up_container(
     image_name: &str,
     remote_workspace_folder: &str,
 ) -> Result<UpContainer, String> {
+    if compose::uses_compose_config(&resolved.configuration) {
+        let existing = compose::resolve_container_id(resolved, args)?;
+        match existing {
+            Some(_) if common::has_flag(args, "--remove-existing-container") => {
+                compose::remove_service(resolved, args)?;
+                compose::up_service(resolved, args)?;
+                let container_id = compose::resolve_container_id(resolved, args)?
+                    .ok_or_else(|| "Dev container not found.".to_string())?;
+                return Ok(UpContainer {
+                    container_id,
+                    lifecycle_mode: LifecycleMode::UpCreated,
+                });
+            }
+            Some(container_id) => {
+                compose::up_service(resolved, args)?;
+                return Ok(UpContainer {
+                    container_id,
+                    lifecycle_mode: LifecycleMode::UpReused,
+                });
+            }
+            None => {
+                compose::up_service(resolved, args)?;
+                let container_id = compose::resolve_container_id(resolved, args)?
+                    .ok_or_else(|| "Dev container not found.".to_string())?;
+                return Ok(UpContainer {
+                    container_id,
+                    lifecycle_mode: LifecycleMode::UpCreated,
+                });
+            }
+        }
+    }
+
     let running = find_target_container(
         args,
         Some(resolved.workspace_folder.as_path()),

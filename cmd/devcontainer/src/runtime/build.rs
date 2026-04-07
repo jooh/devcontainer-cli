@@ -4,6 +4,7 @@ use serde_json::{json, Value};
 
 use crate::commands::common;
 
+use super::compose;
 use super::context::ResolvedConfig;
 use super::engine;
 
@@ -11,7 +12,9 @@ pub(crate) fn runtime_image_name(
     resolved: &ResolvedConfig,
     args: &[String],
 ) -> Result<String, String> {
-    if has_build_definition(&resolved.configuration) {
+    if compose::uses_compose_config(&resolved.configuration) {
+        compose::build_service(resolved, args)
+    } else if has_build_definition(&resolved.configuration) {
         build_image(resolved, args)
     } else if let Some(image) = resolved.configuration.get("image").and_then(Value::as_str) {
         Ok(image.to_string())
@@ -24,6 +27,10 @@ pub(crate) fn runtime_image_name(
 }
 
 pub(crate) fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<String, String> {
+    if compose::uses_compose_config(&resolved.configuration) {
+        return compose::build_service(resolved, args);
+    }
+
     if !has_build_definition(&resolved.configuration) {
         return resolved
             .configuration

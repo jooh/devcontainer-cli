@@ -130,6 +130,48 @@ shift
 printf '%s %s\n' "$COMMAND" "$*" >> "$LOG_DIR/invocations.log"
 
 case "$COMMAND" in
+  compose)
+    while [ "$#" -gt 0 ]; do
+      case "${1:-}" in
+        -f)
+          shift 2
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
+    SUBCOMMAND="${1:-}"
+    shift || true
+    case "$SUBCOMMAND" in
+      build)
+        exit 0
+        ;;
+      up)
+        : > "$LOG_DIR/compose-service-running"
+        exit 0
+        ;;
+      ps)
+        if [ -n "${FAKE_PODMAN_COMPOSE_PS_OUTPUT:-}" ]; then
+          printf '%s\n' "${FAKE_PODMAN_COMPOSE_PS_OUTPUT}"
+          exit 0
+        fi
+        if [ -f "$LOG_DIR/compose-service-running" ]; then
+          echo "fake-compose-container-id"
+          exit 0
+        fi
+        exit 0
+        ;;
+      rm)
+        rm -f "$LOG_DIR/compose-service-running"
+        exit 0
+        ;;
+      *)
+        echo "unsupported fake podman compose command: $SUBCOMMAND" >&2
+        exit 1
+        ;;
+    esac
+    ;;
   build)
     exit 0
     ;;

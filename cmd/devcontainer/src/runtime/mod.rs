@@ -1,4 +1,5 @@
 mod build;
+mod compose;
 mod container;
 mod context;
 mod engine;

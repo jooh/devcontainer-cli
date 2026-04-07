@@ -30,6 +30,7 @@ The binary entrypoint in `cmd/devcontainer/src/main.rs` stays intentionally thin
 ## Runtime subsystems
 
 - `runtime/build.rs`: image resolution, Dockerfile/context handling, build args, and push flow.
+- `runtime/compose.rs`: compose-config inspection, compose CLI invocation, and compose service/container resolution.
 - `runtime/container.rs`: container lookup, create/start/remove behavior, and label-based targeting.
 - `runtime/context.rs`: config loading, inspect fallback, workspace resolution, user selection, and remote env merging.
 - `runtime/engine.rs`: container-engine request construction plus normalized process execution/error handling.

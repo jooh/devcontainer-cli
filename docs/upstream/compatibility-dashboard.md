@@ -7,8 +7,8 @@
 ## Native command status
 
 - `read-configuration`: parity-tested for the current repo-owned scenarios; broader upstream merge parity is still pending
-- `build`: native runtime foundation for image/dockerfile flows; Docker Compose parity is still pending
-- `up`: native runtime foundation for image/dockerfile flows; Docker Compose parity is still pending
+- `build`: native runtime foundation for image/dockerfile flows plus basic Docker Compose service support; deeper parity is still pending
+- `up`: native runtime foundation for image/dockerfile flows plus basic Docker Compose service support; deeper parity is still pending
 - `set-up`: native lifecycle foundation for existing containers
 - `run-user-commands`: native lifecycle foundation for existing containers
 - `outdated`: partial native implementation

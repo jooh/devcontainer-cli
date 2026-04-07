@@ -267,6 +267,68 @@ fn up_remove_existing_container_recreates_the_container() {
 }
 
 #[test]
+fn up_starts_compose_services_and_exec_uses_compose_container_lookup() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"remoteUser\": \"vscode\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let up_output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[],
+    );
+
+    assert!(up_output.status.success(), "{up_output:?}");
+    let up_payload = harness.parse_stdout_json(&up_output);
+    assert_eq!(up_payload["containerId"], "fake-compose-container-id");
+    assert_eq!(up_payload["remoteWorkspaceFolder"], "/workspace");
+
+    let exec_output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "/bin/echo",
+            "hello-from-compose",
+        ],
+        &[],
+    );
+
+    assert!(exec_output.status.success(), "{exec_output:?}");
+    assert_eq!(
+        String::from_utf8(exec_output.stdout).expect("utf8 stdout"),
+        "hello-from-compose\n"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("compose -f "));
+    assert!(invocations.contains(" up -d app"));
+    assert!(invocations.contains(" ps -q app"));
+    assert!(invocations
+        .contains("exec --workdir /workspace --user vscode fake-compose-container-id /bin/echo hello-from-compose"));
+
+    let exec_log = harness.read_exec_log();
+    assert!(exec_log.contains("/bin/sh -lc echo ready"));
+}
+
+#[test]
 fn up_expect_existing_container_fails_when_missing() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
