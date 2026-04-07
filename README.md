@@ -7,6 +7,7 @@ The shipped runtime is the Rust binary in `cmd/devcontainer`. Node is kept only 
 ## Repository layout
 
 - `cmd/devcontainer/`: native Rust CLI crate.
+- `cmd/devcontainer/src/runtime/`: native runtime subsystems for container-backed commands.
 - `upstream/`: canonical upstream `devcontainers/cli` baseline.
 - `spec/`: canonical upstream `devcontainers/spec` schemas and docs.
 - `build/`: repo-owned compatibility guard scripts.
@@ -84,7 +85,7 @@ If a pinned submodule revision changes, update the matching baseline files in `d
 
 ## Contributor notes
 
-- Architecture and crate layout: `docs/architecture.md`
+- Architecture, command flow, and runtime module ownership: `docs/architecture.md`
 - Generated command reference: `docs/cli/command-reference.md`
 - Native distribution and release notes: `docs/standalone/distribution.md`
 - Runtime and compatibility guardrails: `docs/standalone/cutover.md`

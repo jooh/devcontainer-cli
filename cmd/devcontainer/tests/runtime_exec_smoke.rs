@@ -1,0 +1,143 @@
+mod support;
+
+use serde_json::json;
+use std::fs;
+
+use support::runtime_harness::{write_devcontainer_config, RuntimeHarness};
+
+#[test]
+fn interactive_exec_attaches_stdin() {
+    let harness = RuntimeHarness::new();
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+
+    let output = harness.run_with_input(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--container-id",
+            "fake-container-id",
+            "--interactive",
+            "/bin/cat",
+        ],
+        &[("FAKE_PODMAN_REQUIRE_INTERACTIVE", "1")],
+        "hello-from-stdin\n",
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-stdin\n"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("exec -i "));
+}
+
+#[test]
+fn exec_with_container_id_uses_metadata_for_context() {
+    let harness = RuntimeHarness::new();
+    let inspect_path = harness.root.join("inspect.json");
+    let metadata = serde_json::to_string(&json!({
+        "remoteUser": "vscode",
+        "remoteEnv": {
+            "TEST_REMOTE_ENV": "from-metadata"
+        }
+    }))
+    .expect("metadata");
+    fs::write(
+        &inspect_path,
+        json!([{
+            "Config": {
+                "User": "container-user",
+                "Labels": {
+                    "devcontainer.metadata": metadata,
+                    "devcontainer.local_folder": "/host/project"
+                }
+            },
+            "Mounts": [{
+                "Source": "/host/project",
+                "Destination": "/container/project"
+            }]
+        }])
+        .to_string(),
+    )
+    .expect("inspect json");
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--container-id",
+            "fake-container-id",
+            "/bin/echo",
+            "hello-from-metadata",
+        ],
+        &[(
+            "FAKE_PODMAN_INSPECT_FILE",
+            inspect_path.to_string_lossy().as_ref(),
+        )],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-metadata\n"
+    );
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("inspect fake-container-id"));
+    assert!(invocations.contains(
+        "exec --workdir /container/project --user vscode -e TEST_REMOTE_ENV=from-metadata fake-container-id /bin/echo hello-from-metadata"
+    ));
+}
+
+#[test]
+fn up_persists_metadata_for_followup_exec_with_container_id() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceMount\": \"type=bind,source=/host/project,target=/persisted-workspace\",\n  \"remoteUser\": \"vscode\",\n  \"remoteEnv\": {\n    \"TEST_REMOTE_ENV\": \"from-config\"\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let up_output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(up_output.status.success(), "{up_output:?}");
+    let exec_output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--container-id",
+            "fake-container-id",
+            "/bin/echo",
+            "hello-from-persisted-metadata",
+        ],
+        &[],
+    );
+
+    assert!(exec_output.status.success(), "{exec_output:?}");
+    assert_eq!(
+        String::from_utf8(exec_output.stdout).expect("utf8 stdout"),
+        "hello-from-persisted-metadata\n"
+    );
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("--label devcontainer.metadata="));
+    assert!(invocations.contains("inspect fake-container-id"));
+    assert!(invocations.contains(
+        "exec --workdir /persisted-workspace --user vscode -e TEST_REMOTE_ENV=from-config fake-container-id /bin/echo hello-from-persisted-metadata"
+    ));
+}

@@ -6,7 +6,8 @@ The native CLI lives in `cmd/devcontainer` and is organized as a library crate w
 
 - `src/lib.rs`: top-level argument flow and unsupported-path handling.
 - `src/cli.rs`: help and log-format handling.
-- `src/commands/`: command-family implementations.
+- `src/commands/`: thin command-family adapters.
+- `src/runtime/`: runtime subsystems for build/container/context/exec/lifecycle behavior.
 - `src/config.rs`: JSONC and config resolution helpers.
 - `src/process_runner.rs`: subprocess execution.
 

@@ -62,85 +62,6 @@ pub(crate) fn should_use_native_read_configuration(args: &[String]) -> bool {
     true
 }
 
-#[cfg(test)]
-pub(crate) fn build_build_payload(args: &[String]) -> Result<Value, String> {
-    let (workspace_folder, config_file, configuration) = common::load_resolved_config(args)?;
-    let build_section = configuration
-        .get("build")
-        .cloned()
-        .unwrap_or_else(|| json!({}));
-    let dockerfile = build_section
-        .get("dockerfile")
-        .or_else(|| build_section.get("dockerFile"))
-        .and_then(Value::as_str)
-        .unwrap_or("Dockerfile");
-    let context = build_section
-        .get("context")
-        .and_then(Value::as_str)
-        .unwrap_or(".");
-
-    let mut docker_args = vec!["build".to_string()];
-    if common::has_flag(args, "--no-cache") {
-        docker_args.push("--no-cache".to_string());
-    }
-    for value in common::parse_option_values(args, "--cache-from") {
-        docker_args.push("--cache-from".to_string());
-        docker_args.push(value);
-    }
-    for value in common::parse_option_values(args, "--cache-to") {
-        docker_args.push("--cache-to".to_string());
-        docker_args.push(value);
-    }
-    for value in common::parse_option_values(args, "--label") {
-        docker_args.push("--label".to_string());
-        docker_args.push(value);
-    }
-    if let Some(image_name) = common::parse_option_value(args, "--image-name") {
-        docker_args.push("--tag".to_string());
-        docker_args.push(image_name);
-    }
-    if let Some(platform) = common::parse_option_value(args, "--platform") {
-        docker_args.push("--platform".to_string());
-        docker_args.push(platform);
-    }
-    docker_args.push("--file".to_string());
-    docker_args.push(dockerfile.to_string());
-    docker_args.push(context.to_string());
-
-    Ok(json!({
-        "outcome": "success",
-        "command": "build",
-        "workspaceFolder": workspace_folder,
-        "configFile": config_file,
-        "buildKit": common::parse_option_value(args, "--buildkit").unwrap_or_else(|| "auto".to_string()),
-        "push": common::has_flag(args, "--push"),
-        "docker": {
-            "program": "docker",
-            "args": docker_args,
-        },
-        "configuration": configuration,
-    }))
-}
-
-#[cfg(test)]
-pub(crate) fn build_lifecycle_payload(command: &str, args: &[String]) -> Result<Value, String> {
-    let (workspace_folder, config_file, configuration) = common::load_resolved_config(args)?;
-    Ok(json!({
-        "outcome": "success",
-        "command": command,
-        "workspaceFolder": workspace_folder,
-        "configFile": config_file,
-        "mounts": common::parse_mounts(args),
-        "remoteEnv": common::parse_remote_env(args),
-        "skipPostCreate": common::has_flag(args, "--skip-post-create"),
-        "skipPostAttach": common::has_flag(args, "--skip-post-attach"),
-        "skipNonBlockingCommands": common::has_flag(args, "--skip-non-blocking-commands"),
-        "lifecycleCommands": common::lifecycle_commands(&configuration),
-        "configuration": if common::has_flag(args, "--include-configuration") { configuration.clone() } else { Value::Null },
-        "mergedConfiguration": if common::has_flag(args, "--include-merged-configuration") { configuration.clone() } else { Value::Null },
-    }))
-}
-
 pub(crate) fn build_outdated_payload(args: &[String]) -> Result<Value, String> {
     let (workspace_folder, config_file, configuration) = common::load_resolved_config(args)?;
     let features = configuration
@@ -237,21 +158,27 @@ pub(crate) fn run_upgrade_lockfile(args: &[String]) -> Result<Value, String> {
 #[cfg(test)]
 mod tests {
     use super::{
-        build_build_payload, build_lifecycle_payload, build_outdated_payload,
-        build_read_configuration_payload, run_upgrade_lockfile,
+        build_outdated_payload, build_read_configuration_payload, run_upgrade_lockfile,
         should_use_native_read_configuration,
     };
     use crate::commands::common::resolve_read_configuration_path;
     use std::fs;
     use std::path::PathBuf;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
 
     fn unique_temp_dir() -> PathBuf {
         let suffix = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .expect("time went backwards")
             .as_nanos();
-        std::env::temp_dir().join(format!("devcontainer-config-command-test-{suffix}"))
+        let unique_id = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!(
+            "devcontainer-config-command-test-{}-{suffix}-{unique_id}",
+            std::process::id()
+        ))
     }
 
     #[test]
@@ -327,6 +254,7 @@ mod tests {
         let root = unique_temp_dir();
         let nested_config_dir = root.join(".devcontainer").join("python");
         let config = nested_config_dir.join("devcontainer.json");
+        fs::create_dir_all(&root).expect("failed to create root");
         fs::create_dir_all(&nested_config_dir).expect("failed to create nested config directory");
         fs::write(&config, "{}").expect("failed to write config");
 
@@ -379,76 +307,6 @@ mod tests {
             .as_object()
             .expect("features object")
             .contains_key("ghcr.io/devcontainers/features/git:1"));
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn build_payload_contains_docker_plan_and_flags() {
-        let root = unique_temp_dir();
-        let config_dir = root.join(".devcontainer");
-        fs::create_dir_all(&config_dir).expect("failed to create config directory");
-        fs::write(
-            config_dir.join("devcontainer.json"),
-            "{\n  \"build\": {\n    \"dockerfile\": \"Dockerfile\",\n    \"context\": \"..\"\n  }\n}\n",
-        )
-        .expect("failed to write config");
-
-        let args = vec![
-            "--workspace-folder".to_string(),
-            root.display().to_string(),
-            "--buildkit".to_string(),
-            "never".to_string(),
-            "--no-cache".to_string(),
-            "--cache-from".to_string(),
-            "ghcr.io/example/cache".to_string(),
-            "--label".to_string(),
-            "devcontainer.test=true".to_string(),
-        ];
-        let payload = build_build_payload(&args).expect("payload");
-        let docker_args = payload["docker"]["args"].as_array().expect("docker args");
-
-        assert!(docker_args.iter().any(|value| value == "--no-cache"));
-        assert!(docker_args
-            .iter()
-            .any(|value| value == "ghcr.io/example/cache"));
-        assert!(docker_args
-            .iter()
-            .any(|value| value == "devcontainer.test=true"));
-        assert_eq!(payload["buildKit"], "never");
-        let _ = fs::remove_dir_all(root);
-    }
-
-    #[test]
-    fn lifecycle_payload_collects_commands_mounts_and_remote_env() {
-        let root = unique_temp_dir();
-        let config_dir = root.join(".devcontainer");
-        fs::create_dir_all(&config_dir).expect("failed to create config directory");
-        fs::write(
-            config_dir.join("devcontainer.json"),
-            "{\n  \"image\": \"debian:bookworm\",\n  \"onCreateCommand\": \"echo create\",\n  \"postCreateCommand\": \"echo post\"\n}\n",
-        )
-        .expect("failed to write config");
-
-        let args = vec![
-            "--workspace-folder".to_string(),
-            root.display().to_string(),
-            "--mount".to_string(),
-            "type=bind,source=/tmp,target=/workspace".to_string(),
-            "--remote-env".to_string(),
-            "HELLO=world".to_string(),
-        ];
-        let payload = build_lifecycle_payload("up", &args).expect("payload");
-
-        assert_eq!(payload["command"], "up");
-        assert_eq!(payload["mounts"].as_array().expect("mounts").len(), 1);
-        assert_eq!(payload["remoteEnv"]["HELLO"], "world");
-        assert_eq!(
-            payload["lifecycleCommands"]
-                .as_array()
-                .expect("lifecycle commands")
-                .len(),
-            2
-        );
         let _ = fs::remove_dir_all(root);
     }
 

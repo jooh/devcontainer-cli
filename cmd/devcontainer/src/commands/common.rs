@@ -3,8 +3,6 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[cfg(test)]
-use serde_json::json;
 use serde_json::{Map, Value};
 
 use crate::config::{self, ConfigContext};
@@ -46,14 +44,6 @@ pub(crate) fn parse_option_values(args: &[String], option: &str) -> Vec<String> 
 
 pub(crate) fn has_flag(args: &[String], flag: &str) -> bool {
     args.iter().any(|arg| arg == flag)
-}
-
-#[cfg(test)]
-pub(crate) fn parse_mounts(args: &[String]) -> Vec<Value> {
-    parse_option_values(args, "--mount")
-        .into_iter()
-        .map(Value::String)
-        .collect()
 }
 
 pub(crate) fn parse_remote_env(args: &[String]) -> Map<String, Value> {
@@ -119,24 +109,6 @@ pub(crate) fn load_resolved_config(args: &[String]) -> Result<(PathBuf, PathBuf,
         },
     );
     Ok((workspace_folder, config_file, substituted))
-}
-
-#[cfg(test)]
-pub(crate) fn lifecycle_commands(configuration: &Value) -> Vec<Value> {
-    [
-        "onCreateCommand",
-        "updateContentCommand",
-        "postCreateCommand",
-        "postStartCommand",
-        "postAttachCommand",
-    ]
-    .iter()
-    .filter_map(|key| {
-        configuration
-            .get(*key)
-            .map(|value| json!({ "name": key, "value": value }))
-    })
-    .collect()
 }
 
 pub(crate) fn parse_manifest(root: &Path, manifest_name: &str) -> Result<Value, String> {
