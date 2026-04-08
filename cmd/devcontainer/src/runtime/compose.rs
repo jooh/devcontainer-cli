@@ -8,9 +8,9 @@ use serde_yaml::{Mapping, Value as YamlValue};
 
 use crate::commands::common;
 
-use super::context::ResolvedConfig;
+use super::context::{workspace_mount, ResolvedConfig};
 use super::engine;
-use super::metadata::serialized_container_metadata;
+use super::metadata::{serialized_container_metadata, split_mount_options};
 
 static NEXT_OVERRIDE_FILE_ID: AtomicU64 = AtomicU64::new(0);
 
@@ -495,6 +495,12 @@ fn compose_metadata_override_file(
             .map(|label| format!("\n      - '{}'", escape_compose_label(label)))
             .collect::<String>()
     ));
+    if let Some(volume) = compose_workspace_volume(resolved, remote_workspace_folder) {
+        content.push_str(&format!(
+            "\n    volumes:\n      - '{}'\n",
+            escape_compose_scalar(&volume)
+        ));
+    }
 
     let override_file = unique_override_file_path();
     std::fs::write(&override_file, content).map_err(|error| error.to_string())?;
@@ -503,6 +509,51 @@ fn compose_metadata_override_file(
 
 fn escape_compose_label(label: &str) -> String {
     label.replace('\'', "''").replace('$', "$$")
+}
+
+fn escape_compose_scalar(value: &str) -> String {
+    value.replace('\'', "''")
+}
+
+fn compose_workspace_volume(
+    resolved: &ResolvedConfig,
+    remote_workspace_folder: &str,
+) -> Option<String> {
+    let mount = workspace_mount(resolved, remote_workspace_folder);
+    let mut mount_type = None;
+    let mut source = None;
+    let mut target = None;
+    let mut read_only = false;
+    for option in split_mount_options(&mount) {
+        if option == "readonly" || option == "ro" {
+            read_only = true;
+            continue;
+        }
+        if let Some(value) = option.strip_prefix("type=") {
+            mount_type = Some(value.trim_matches('"').to_string());
+        } else if let Some(value) = option
+            .strip_prefix("source=")
+            .or_else(|| option.strip_prefix("src="))
+        {
+            source = Some(value.trim_matches('"').to_string());
+        } else if let Some(value) = option
+            .strip_prefix("target=")
+            .or_else(|| option.strip_prefix("destination="))
+            .or_else(|| option.strip_prefix("dst="))
+        {
+            target = Some(value.trim_matches('"').to_string());
+        }
+    }
+
+    if mount_type.as_deref().unwrap_or("bind") != "bind" {
+        return None;
+    }
+
+    let mut volume = format!("{}:{}", source?, target?);
+    if read_only {
+        volume.push_str(":ro");
+    }
+    Some(volume)
 }
 
 fn unique_override_file_path() -> PathBuf {
@@ -561,9 +612,9 @@ fn parse_semver_prefix(value: &str) -> Option<(u64, u64, u64)> {
 #[cfg(test)]
 mod tests {
     use super::{
-        compose_image_name_separator, compose_name_from_file, compose_project_name,
-        inspect_service_definition, parse_semver_prefix, sanitize_project_name,
-        substitute_compose_env, uses_compose_config,
+        compose_image_name_separator, compose_metadata_override_file, compose_name_from_file,
+        compose_project_name, inspect_service_definition, parse_semver_prefix,
+        sanitize_project_name, substitute_compose_env, uses_compose_config,
     };
     use serde_json::json;
     use std::fs;
@@ -718,5 +769,30 @@ mod tests {
     #[test]
     fn compose_image_name_separator_defaults_to_hyphen_without_runtime_args() {
         assert_eq!(compose_image_name_separator(&[]), '-');
+    }
+
+    #[test]
+    fn metadata_override_file_mounts_workspace_by_default() {
+        let root = unique_temp_dir();
+        fs::create_dir_all(&root).expect("workspace root");
+        let resolved = crate::runtime::context::ResolvedConfig {
+            workspace_folder: root.clone(),
+            config_file: root.join(".devcontainer.json"),
+            configuration: json!({
+                "dockerComposeFile": "docker-compose.yml",
+                "service": "app",
+            }),
+        };
+
+        let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project")
+            .expect("override result")
+            .expect("override path");
+        let override_content = fs::read_to_string(&override_file).expect("override content");
+
+        assert!(override_content.contains("volumes:"));
+        assert!(override_content.contains(&format!("- '{}:/workspaces/project'", root.display())));
+
+        let _ = fs::remove_file(override_file);
+        let _ = fs::remove_dir_all(root);
     }
 }

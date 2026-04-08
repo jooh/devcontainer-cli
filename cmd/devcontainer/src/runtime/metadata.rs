@@ -136,7 +136,7 @@ fn flatten_lifecycle_values(value: &Value) -> Vec<Value> {
     }
 }
 
-fn split_mount_options(mount: &str) -> Vec<String> {
+pub(crate) fn split_mount_options(mount: &str) -> Vec<String> {
     let mut options = Vec::new();
     let mut current = String::new();
     let mut in_quotes = false;
