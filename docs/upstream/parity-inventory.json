@@ -1,0 +1,1648 @@
+{
+	"upstreamCommit": "39685cf1aa58b5b11e90085bd32562fad61f4103",
+	"sourcePath": "upstream/src/spec-node/devContainersSpecCLI.ts",
+	"summary": {
+		"commandPathsTotal": 20,
+		"commandPathsDeclared": 20,
+		"optionsTotal": 200,
+		"optionsReferenced": 94,
+		"optionsMissing": 106
+	},
+	"commands": [
+		{
+			"group": null,
+			"path": "up",
+			"description": "Create and run dev container",
+			"declared": true,
+			"optionSummary": {
+				"total": 43,
+				"referenced": 18,
+				"missing": 25
+			},
+			"options": [
+				{
+					"name": "additional-features",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "build-no-cache",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/mod.rs"
+					]
+				},
+				{
+					"name": "buildkit",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "cache-from",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/args.rs"
+					]
+				},
+				{
+					"name": "cache-to",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/args.rs"
+					]
+				},
+				{
+					"name": "config",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "container-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "container-session-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "container-system-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "default-user-env-probe",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "docker-compose-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "docker-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "dotfiles-install-command",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "dotfiles-repository",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "dotfiles-target-path",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "expect-existing-container",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/container.rs"
+					]
+				},
+				{
+					"name": "experimental-frozen-lockfile",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "experimental-lockfile",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "gpu-availability",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "id-label",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/compose/override_file.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "include-configuration",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/mod.rs"
+					]
+				},
+				{
+					"name": "include-merged-configuration",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/mod.rs"
+					]
+				},
+				{
+					"name": "log-format",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "mount",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/container.rs"
+					]
+				},
+				{
+					"name": "mount-git-worktree-common-dir",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "mount-workspace-git-root",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "omit-config-remote-env-from-metadata",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "omit-syntax-directive",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "override-config",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "remote-env",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "remove-existing-container",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/container.rs"
+					]
+				},
+				{
+					"name": "secrets-file",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "skip-non-blocking-commands",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
+				},
+				{
+					"name": "skip-post-attach",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
+				},
+				{
+					"name": "skip-post-create",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
+				},
+				{
+					"name": "terminal-columns",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-rows",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "update-remote-user-uid-default",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "user-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "workspace-mount-consistency",
+					"sourceReferenced": false,
+					"evidence": []
+				}
+			],
+			"knownGaps": [
+				"Native runtime does not integrate Feature resolution/build layering.",
+				"Several upstream flags remain unimplemented or are only partially honored."
+			]
+		},
+		{
+			"group": null,
+			"path": "set-up",
+			"description": "Set up an existing container as a dev container",
+			"declared": true,
+			"optionSummary": {
+				"total": 20,
+				"referenced": 9,
+				"missing": 11
+			},
+			"options": [
+				{
+					"name": "config",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "container-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "container-id",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "container-session-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "container-system-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "default-user-env-probe",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "docker-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "dotfiles-install-command",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "dotfiles-repository",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "dotfiles-target-path",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "include-configuration",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/mod.rs"
+					]
+				},
+				{
+					"name": "include-merged-configuration",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/mod.rs"
+					]
+				},
+				{
+					"name": "log-format",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "remote-env",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "skip-non-blocking-commands",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
+				},
+				{
+					"name": "skip-post-create",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
+				},
+				{
+					"name": "terminal-columns",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-rows",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "user-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				}
+			],
+			"knownGaps": [
+				"Lifecycle execution is native, but upstream secrets and some setup flags are still missing."
+			]
+		},
+		{
+			"group": null,
+			"path": "build",
+			"description": "Build a dev container image",
+			"declared": true,
+			"optionSummary": {
+				"total": 22,
+				"referenced": 12,
+				"missing": 10
+			},
+			"options": [
+				{
+					"name": "additional-features",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "buildkit",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "cache-from",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/args.rs"
+					]
+				},
+				{
+					"name": "cache-to",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/args.rs"
+					]
+				},
+				{
+					"name": "config",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "docker-compose-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "docker-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "experimental-frozen-lockfile",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "experimental-lockfile",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "image-name",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs"
+					]
+				},
+				{
+					"name": "label",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/args.rs",
+						"cmd/devcontainer/src/runtime/container.rs"
+					]
+				},
+				{
+					"name": "log-format",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "no-cache",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/mod.rs"
+					]
+				},
+				{
+					"name": "omit-syntax-directive",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "output",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "platform",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/args.rs"
+					]
+				},
+				{
+					"name": "push",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/mod.rs"
+					]
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "skip-persisting-customizations-from-features",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "user-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Native runtime does not integrate Feature resolution/build layering.",
+				"Several upstream build flags are still unimplemented or are only partially honored."
+			]
+		},
+		{
+			"group": null,
+			"path": "run-user-commands",
+			"description": "Run user commands",
+			"declared": true,
+			"optionSummary": {
+				"total": 27,
+				"referenced": 10,
+				"missing": 17
+			},
+			"options": [
+				{
+					"name": "config",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "container-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "container-id",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "container-session-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "container-system-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "default-user-env-probe",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "docker-compose-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "docker-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "dotfiles-install-command",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "dotfiles-repository",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "dotfiles-target-path",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "id-label",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/compose/override_file.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "log-format",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "mount-git-worktree-common-dir",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "mount-workspace-git-root",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "override-config",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "remote-env",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "secrets-file",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "skip-non-blocking-commands",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
+				},
+				{
+					"name": "skip-post-attach",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
+				},
+				{
+					"name": "stop-for-personalization",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-columns",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-rows",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "user-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Lifecycle execution is native, but upstream secrets and some runtime flags are still missing."
+			]
+		},
+		{
+			"group": null,
+			"path": "read-configuration",
+			"description": "Read configuration",
+			"declared": true,
+			"optionSummary": {
+				"total": 18,
+				"referenced": 9,
+				"missing": 9
+			},
+			"options": [
+				{
+					"name": "additional-features",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "config",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/commands/configuration/load.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "container-id",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/load.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "docker-compose-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "docker-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "id-label",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/compose/override_file.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "include-features-configuration",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+					]
+				},
+				{
+					"name": "include-merged-configuration",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/mod.rs"
+					]
+				},
+				{
+					"name": "log-format",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "mount-git-worktree-common-dir",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "mount-workspace-git-root",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "override-config",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-columns",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-rows",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "user-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/commands/configuration/load.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"`--include-features-configuration` currently reports raw config features rather than upstream-style resolved feature sets.",
+				"Variable substitution support is still narrower than upstream."
+			]
+		},
+		{
+			"group": null,
+			"path": "outdated",
+			"description": "Show current and available versions",
+			"declared": true,
+			"optionSummary": {
+				"total": 8,
+				"referenced": 4,
+				"missing": 4
+			},
+			"options": [
+				{
+					"name": "config",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/commands/configuration/load.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+					]
+				},
+				{
+					"name": "log-format",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "output-format",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+					]
+				},
+				{
+					"name": "terminal-columns",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-rows",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "user-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/commands/configuration/load.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Backed by fixture/manual catalog data rather than real upstream registry resolution."
+			]
+		},
+		{
+			"group": null,
+			"path": "upgrade",
+			"description": "Upgrade lockfile",
+			"declared": true,
+			"optionSummary": {
+				"total": 8,
+				"referenced": 7,
+				"missing": 1
+			},
+			"options": [
+				{
+					"name": "config",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/commands/configuration/load.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+					]
+				},
+				{
+					"name": "docker-compose-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+					]
+				},
+				{
+					"name": "docker-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs"
+					]
+				},
+				{
+					"name": "dry-run",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+					]
+				},
+				{
+					"name": "feature",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "target-version",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+					]
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/commands/configuration/load.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Backed by fixture/manual catalog data rather than real upstream registry resolution."
+			]
+		},
+		{
+			"group": null,
+			"path": "features",
+			"description": "Features commands",
+			"declared": true,
+			"optionSummary": {
+				"total": 0,
+				"referenced": 0,
+				"missing": 0
+			},
+			"options": [],
+			"knownGaps": [
+				"Top-level command exists, but several subcommands still use local/offline substitutes rather than real OCI flows."
+			]
+		},
+		{
+			"group": "features",
+			"path": "features test",
+			"description": "Test Features",
+			"declared": true,
+			"optionSummary": {
+				"total": 13,
+				"referenced": 10,
+				"missing": 3
+			},
+			"options": [
+				{
+					"name": "base-image",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs"
+					]
+				},
+				{
+					"name": "features",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs",
+						"cmd/devcontainer/src/commands/collections/templates.rs",
+						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+					]
+				},
+				{
+					"name": "filter",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs"
+					]
+				},
+				{
+					"name": "global-scenarios-only",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "permit-randomization",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "preserve-test-containers",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs",
+						"cmd/devcontainer/src/commands/collections/tests/feature_tests.rs"
+					]
+				},
+				{
+					"name": "project-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs",
+						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs"
+					]
+				},
+				{
+					"name": "quiet",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "remote-user",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs"
+					]
+				},
+				{
+					"name": "skip-autogenerated",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs"
+					]
+				},
+				{
+					"name": "skip-duplicated",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs"
+					]
+				},
+				{
+					"name": "skip-scenarios",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Native test runner exists, but parity with upstream feature resolution and registry-backed dependencies is incomplete."
+			]
+		},
+		{
+			"group": "features",
+			"path": "features package",
+			"description": "Package Features",
+			"declared": true,
+			"optionSummary": {
+				"total": 0,
+				"referenced": 0,
+				"missing": 0
+			},
+			"options": [],
+			"knownGaps": [
+				"Packages local targets, but broader upstream collection behavior is still limited."
+			]
+		},
+		{
+			"group": "features",
+			"path": "features publish",
+			"description": "Package and publish Features",
+			"declared": true,
+			"optionSummary": {
+				"total": 0,
+				"referenced": 0,
+				"missing": 0
+			},
+			"options": [],
+			"knownGaps": [
+				"Publishes a local OCI layout rather than a real authenticated registry push flow."
+			]
+		},
+		{
+			"group": "features",
+			"path": "features info",
+			"description": "Fetch metadata for a published Feature",
+			"declared": true,
+			"optionSummary": {
+				"total": 2,
+				"referenced": 0,
+				"missing": 2
+			},
+			"options": [
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "output-format",
+					"sourceReferenced": false,
+					"evidence": []
+				}
+			],
+			"knownGaps": [
+				"Only `manifest` mode is implemented natively; `tags`, `dependencies`, and `verbose` are missing."
+			]
+		},
+		{
+			"group": "features",
+			"path": "features resolve-dependencies",
+			"description": "Read and resolve dependency graph from a configuration",
+			"declared": true,
+			"optionSummary": {
+				"total": 2,
+				"referenced": 1,
+				"missing": 1
+			},
+			"options": [
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/collections/templates.rs",
+						"cmd/devcontainer/src/commands/collections/tests/features.rs",
+						"cmd/devcontainer/src/commands/common.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Current implementation is config-order based and does not compute the upstream dependency graph."
+			]
+		},
+		{
+			"group": "features",
+			"path": "features generate-docs",
+			"description": "Generate documentation",
+			"declared": true,
+			"optionSummary": {
+				"total": 6,
+				"referenced": 1,
+				"missing": 5
+			},
+			"options": [
+				{
+					"name": "github-owner",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "github-repo",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "namespace",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "project-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs",
+						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs"
+					]
+				},
+				{
+					"name": "registry",
+					"sourceReferenced": false,
+					"evidence": []
+				}
+			],
+			"knownGaps": [
+				"Documentation generation is minimal compared with upstream."
+			]
+		},
+		{
+			"group": null,
+			"path": "templates",
+			"description": "Templates commands",
+			"declared": true,
+			"optionSummary": {
+				"total": 0,
+				"referenced": 0,
+				"missing": 0
+			},
+			"options": [],
+			"knownGaps": [
+				"Top-level command exists, but published-template flows still rely on embedded/local substitutes."
+			]
+		},
+		{
+			"group": "templates",
+			"path": "templates apply",
+			"description": "Apply a template to the project",
+			"declared": true,
+			"optionSummary": {
+				"total": 7,
+				"referenced": 4,
+				"missing": 3
+			},
+			"options": [
+				{
+					"name": "features",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs",
+						"cmd/devcontainer/src/commands/collections/templates.rs",
+						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "omit-paths",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "template-args",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/templates.rs",
+						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+					]
+				},
+				{
+					"name": "template-id",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/templates.rs"
+					]
+				},
+				{
+					"name": "tmp-dir",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/collections/templates.rs",
+						"cmd/devcontainer/src/commands/collections/tests/features.rs",
+						"cmd/devcontainer/src/commands/common.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Published template application is still based on embedded/local substitutes instead of real OCI fetches."
+			]
+		},
+		{
+			"group": "templates",
+			"path": "templates publish",
+			"description": "Package and publish templates",
+			"declared": true,
+			"optionSummary": {
+				"total": 0,
+				"referenced": 0,
+				"missing": 0
+			},
+			"options": [],
+			"knownGaps": [
+				"Publishes a local OCI layout rather than a real authenticated registry push flow."
+			]
+		},
+		{
+			"group": "templates",
+			"path": "templates metadata",
+			"description": "Fetch a published Template\\'s metadata",
+			"declared": true,
+			"optionSummary": {
+				"total": 1,
+				"referenced": 0,
+				"missing": 1
+			},
+			"options": [
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				}
+			],
+			"knownGaps": [
+				"Published template metadata is still based on embedded/local substitutes instead of real OCI fetches."
+			]
+		},
+		{
+			"group": "templates",
+			"path": "templates generate-docs",
+			"description": "Generate documentation",
+			"declared": true,
+			"optionSummary": {
+				"total": 4,
+				"referenced": 1,
+				"missing": 3
+			},
+			"options": [
+				{
+					"name": "github-owner",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "github-repo",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "project-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs",
+						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Documentation generation is minimal compared with upstream."
+			]
+		},
+		{
+			"group": null,
+			"path": "exec",
+			"description": "Execute a command on a running dev container",
+			"declared": true,
+			"optionSummary": {
+				"total": 19,
+				"referenced": 8,
+				"missing": 11
+			},
+			"options": [
+				{
+					"name": "config",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "container-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "container-id",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "container-system-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "default-user-env-probe",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "docker-compose-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "docker-path",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "id-label",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/compose/override_file.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "log-format",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs"
+					]
+				},
+				{
+					"name": "log-level",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "mount-git-worktree-common-dir",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "mount-workspace-git-root",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "override-config",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "remote-env",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-columns",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "terminal-rows",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "user-data-folder",
+					"sourceReferenced": false,
+					"evidence": []
+				},
+				{
+					"name": "workspace-folder",
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
+				}
+			],
+			"knownGaps": [
+				"Core exec path is native, but upstream option coverage is still narrower."
+			]
+		}
+	]
+}
