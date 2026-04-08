@@ -4,8 +4,10 @@ use serde_json::json;
 
 use super::support::unique_temp_dir;
 use crate::commands::common::resolve_read_configuration_path;
-use crate::commands::configuration::{build_read_configuration_payload, should_use_native_read_configuration};
 use crate::commands::configuration::merge::merge_configuration;
+use crate::commands::configuration::{
+    build_read_configuration_payload, should_use_native_read_configuration,
+};
 
 #[test]
 fn resolves_modern_config_path_from_workspace_folder() {

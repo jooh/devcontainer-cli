@@ -9,7 +9,11 @@ pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
     let include_features = common::has_flag(args, "--include-features-configuration");
     let loaded = load_optional_config(args)?;
     let inspected = if let Some(container_id) = common::parse_option_value(args, "--container-id") {
-        Some(super::inspect::inspect_container(args, &container_id, loaded.as_ref())?)
+        Some(super::inspect::inspect_container(
+            args,
+            &container_id,
+            loaded.as_ref(),
+        )?)
     } else {
         None
     };

@@ -98,7 +98,9 @@ pub(super) fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
     entries.extend(
         fixture_catalog()
             .into_iter()
-            .filter(|(feature_id, _)| super::upgrade::feature_id_without_version(feature_id) == base)
+            .filter(|(feature_id, _)| {
+                super::upgrade::feature_id_without_version(feature_id) == base
+            })
             .map(|(_, entry)| entry),
     );
     entries.sort_by(|left, right| compare_versions_desc(&left.version, &right.version));

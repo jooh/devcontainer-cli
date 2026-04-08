@@ -184,8 +184,7 @@ fn generate_lockfile_entry(feature: &FeatureReference) -> Option<(String, Lockfi
         } else if tag.matches('.').count() == 2 {
             tag.to_string()
         } else {
-            let wanted = resolve_wanted_version(feature, None)?;
-            wanted
+            resolve_wanted_version(feature, None)?
         }
     } else {
         latest_version(&feature.base)?

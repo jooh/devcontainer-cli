@@ -126,7 +126,11 @@ fn insert_if_non_empty_object(merged: &mut Map<String, Value>, key: &str, value:
 }
 
 fn insert_last_value(merged: &mut Map<String, Value>, key: &str, entries: &[Value]) {
-    if let Some(value) = entries.iter().filter_map(|entry| entry.get(key)).next_back() {
+    if let Some(value) = entries
+        .iter()
+        .filter_map(|entry| entry.get(key))
+        .next_back()
+    {
         merged.insert(key.to_string(), value.clone());
     }
 }
