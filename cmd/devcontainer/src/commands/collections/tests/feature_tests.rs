@@ -6,6 +6,8 @@ use crate::commands::collections::feature_tests::{
     discover_feature_test_scenarios, execute_feature_tests_with_runtime, FeatureTestRuntime,
 };
 
+const UPSTREAM_DEFAULT_BASE_IMAGE: &str = "mcr.microsoft.com/devcontainers/base:ubuntu";
+
 #[derive(Default)]
 struct FakeFeatureTestRuntime {
     build_calls: Vec<(String, PathBuf, PathBuf)>,
@@ -200,6 +202,48 @@ fn features_test_defaults_per_feature_scenarios_to_enclosing_feature() {
         .iter()
         .map(|(_, _, context_path)| context_path.join("feature-0-demo").join("install.sh"))
         .any(|install_path| install_path.is_file()));
+    for (_, workspace_dir) in &runtime.start_calls {
+        let _ = fs::remove_dir_all(workspace_dir);
+    }
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn features_test_uses_upstream_default_base_image_without_override() {
+    let root = unique_temp_dir();
+    let src = root.join("src").join("demo");
+    let test = root.join("test").join("demo");
+    fs::create_dir_all(&src).expect("feature src");
+    fs::create_dir_all(&test).expect("feature test");
+    fs::write(
+        src.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("manifest");
+    fs::write(src.join("install.sh"), "#!/bin/sh\nexit 0\n").expect("install script");
+    fs::write(test.join("test.sh"), "#!/bin/sh\nexit 0\n").expect("test script");
+
+    let mut runtime = FakeFeatureTestRuntime::default();
+    execute_feature_tests_with_runtime(
+        &[
+            "--preserve-test-containers".to_string(),
+            root.display().to_string(),
+        ],
+        &mut runtime,
+    )
+    .expect("test execution");
+
+    let dockerfiles = runtime
+        .build_calls
+        .iter()
+        .map(|(_, dockerfile_path, _)| {
+            fs::read_to_string(dockerfile_path).expect("dockerfile contents")
+        })
+        .collect::<Vec<_>>();
+    assert!(dockerfiles
+        .iter()
+        .any(|dockerfile| dockerfile.contains(&format!("FROM {UPSTREAM_DEFAULT_BASE_IMAGE}"))));
+
     for (_, workspace_dir) in &runtime.start_calls {
         let _ = fs::remove_dir_all(workspace_dir);
     }

@@ -10,7 +10,8 @@ use crate::commands::common;
 
 pub(super) use runtime::FeatureTestRuntime;
 
-pub(super) const DEFAULT_FEATURE_TEST_BASE_IMAGE: &str = "ghcr.io/devcontainers/base:ubuntu";
+pub(super) const DEFAULT_FEATURE_TEST_BASE_IMAGE: &str =
+    "mcr.microsoft.com/devcontainers/base:ubuntu";
 pub(super) const FEATURE_TEST_LIBRARY_SCRIPT_NAME: &str = "dev-container-features-test-lib";
 pub(super) const FEATURE_TEST_LIBRARY_SCRIPT: &str = r#"#!/bin/bash
 SCRIPT_FOLDER="$(cd "$(dirname $0)" && pwd)"

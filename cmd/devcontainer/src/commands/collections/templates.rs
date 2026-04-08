@@ -9,6 +9,8 @@ use super::registry::{
 };
 use crate::commands::common;
 
+const UPSTREAM_DEFAULT_BASE_IMAGE: &str = "mcr.microsoft.com/devcontainers/base:ubuntu";
+
 pub(super) fn apply_template_target(
     template_root: &Path,
     workspace_root: &Path,
@@ -117,7 +119,7 @@ pub(super) fn apply_catalog_template(
 
     let devcontainer = json!({
         "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("Docker from Docker".to_string())),
-        "image": "ghcr.io/devcontainers/base:ubuntu",
+        "image": UPSTREAM_DEFAULT_BASE_IMAGE,
         "features": features,
     });
     let config_dir = workspace_root.join(".devcontainer");
@@ -165,7 +167,7 @@ fn apply_generic_published_template(
     );
     devcontainer.insert(
         "image".to_string(),
-        Value::String("ghcr.io/devcontainers/base:ubuntu".to_string()),
+        Value::String(UPSTREAM_DEFAULT_BASE_IMAGE.to_string()),
     );
 
     let mut features = Map::new();

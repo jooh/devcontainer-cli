@@ -5,6 +5,8 @@ use serde_json::Value;
 use crate::support::runtime_harness::RuntimeHarness;
 use crate::support::test_support::{devcontainer_command, unique_temp_dir};
 
+const UPSTREAM_DEFAULT_BASE_IMAGE: &str = "mcr.microsoft.com/devcontainers/base:ubuntu";
+
 #[test]
 fn features_test_emits_a_local_report() {
     let harness = RuntimeHarness::new();
@@ -117,6 +119,7 @@ fn templates_apply_supports_published_template_ids() {
     assert!(file.contains("\"version\": \"20.10\""));
     assert!(file.contains("\"moby\": \"true\""));
     assert!(file.contains("\"enableNonRootDocker\": \"true\""));
+    assert!(file.contains(&format!("\"image\": \"{UPSTREAM_DEFAULT_BASE_IMAGE}\"")));
     assert!(file.contains("ghcr.io/devcontainers/features/common-utils:1"));
     assert!(file.contains("ghcr.io/devcontainers/features/docker-from-docker:1"));
     assert!(file.contains("ghcr.io/devcontainers/features/azure-cli:1"));
@@ -228,6 +231,7 @@ fn templates_apply_supports_additional_published_template_ids() {
     let file = fs::read_to_string(workspace.join(".devcontainer").join("devcontainer.json"))
         .expect("devcontainer file");
     assert!(file.contains("\"name\": \"Anaconda Postgres\""));
+    assert!(file.contains(&format!("\"image\": \"{UPSTREAM_DEFAULT_BASE_IMAGE}\"")));
     assert!(file.contains("ghcr.io/devcontainers/features/azure-cli:1"));
     assert!(file.contains("ghcr.io/devcontainers/features/git:1"));
 
