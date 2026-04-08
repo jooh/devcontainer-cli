@@ -173,22 +173,104 @@ pub(super) fn humanize_collection_slug(slug: &str) -> String {
 
 fn embedded_template_manifest(reference: &str) -> Option<Value> {
     match collection_slug(reference)?.as_str() {
-        "alpine" => serde_json::from_str(include_str!(
-            "../../../../../upstream/src/test/container-templates/example-templates-sets/simple/src/alpine/devcontainer-template.json"
-        ))
-        .ok(),
-        "cpp" => serde_json::from_str(include_str!(
-            "../../../../../upstream/src/test/container-templates/example-templates-sets/simple/src/cpp/devcontainer-template.json"
-        ))
-        .ok(),
-        "mytemplate" => serde_json::from_str(include_str!(
-            "../../../../../upstream/src/test/container-templates/example-templates-sets/simple/src/mytemplate/devcontainer-template.json"
-        ))
-        .ok(),
-        "node-mongo" => serde_json::from_str(include_str!(
-            "../../../../../upstream/src/test/container-templates/example-templates-sets/simple/src/node-mongo/devcontainer-template.json"
-        ))
-        .ok(),
+        "alpine" => Some(json!({
+            "id": "alpine",
+            "version": "1.0.0",
+            "name": "Alpine",
+            "options": {
+                "imageVariant": {
+                    "type": "string",
+                    "description": "Alpine version:",
+                    "proposals": ["3.16", "3.15", "3.14", "3.13"],
+                    "default": "3.16"
+                }
+            },
+            "platforms": ["Any"]
+        })),
+        "cpp" => Some(json!({
+            "id": "cpp",
+            "version": "1.0.0",
+            "name": "C++",
+            "options": {
+                "imageVariant": {
+                    "type": "string",
+                    "description": "Debian / Ubuntu version (use Debian 11, Ubuntu 18.04/22.04 on local arm64/Apple Silicon):",
+                    "proposals": [
+                        "debian-11",
+                        "debian-10",
+                        "ubuntu-22.04",
+                        "ubuntu-20.04",
+                        "ubuntu-18.04"
+                    ],
+                    "default": "debian-11"
+                }
+            },
+            "platforms": ["C++"]
+        })),
+        "mytemplate" => Some(json!({
+            "id": "mytemplate",
+            "version": "1.0.0",
+            "name": "My Template",
+            "description": "Simple test",
+            "documentationURL": "https://github.com/codspace/templates/tree/main/src/test",
+            "publisher": "codspace",
+            "licenseURL": "https://github.com/devcontainers/templates/blob/main/LICENSE",
+            "platforms": ["Any"],
+            "options": {
+                "anOption": {
+                    "type": "string",
+                    "description": "A great option",
+                    "proposals": ["8.0", "7.0", "6.0"],
+                    "default": "8.0"
+                },
+                "userUid": {
+                    "type": "string",
+                    "description": "The user's UID",
+                    "proposals": ["1000", "1001", "1002"],
+                    "default": "1000"
+                }
+            },
+            "optionalPaths": [".github/*", "example-projects/exampleA/*", "c1.ts"]
+        })),
+        "node-mongo" => Some(json!({
+            "id": "node-mongo",
+            "version": "1.0.0",
+            "name": "Node.js & Mongo DB",
+            "options": {
+                "imageVariant": {
+                    "type": "string",
+                    "description": "Node.js version (use -bullseye variants on local arm64/Apple Silicon):",
+                    "proposals": [
+                        "18",
+                        "16",
+                        "14",
+                        "18-bullseye",
+                        "16-bullseye",
+                        "14-bullseye",
+                        "18-buster",
+                        "16-buster",
+                        "14-buster"
+                    ],
+                    "default": "16-bullseye"
+                }
+            },
+            "platforms": ["Node.js", "JavaScript", "Mongo DB"]
+        })),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::embedded_template_manifest;
+
+    #[test]
+    fn embedded_cpp_template_manifest_is_available() {
+        let manifest = embedded_template_manifest("ghcr.io/devcontainers/templates/cpp:latest")
+            .expect("cpp template manifest");
+
+        assert_eq!(manifest["id"], "cpp");
+        assert_eq!(manifest["name"], "C++");
+        assert_eq!(manifest["options"]["imageVariant"]["default"], "debian-11");
     }
 }

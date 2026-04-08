@@ -237,30 +237,80 @@ fn manual_catalog_entries() -> Vec<(String, CatalogEntry)> {
 }
 
 fn fixture_catalog() -> Vec<(String, CatalogEntry)> {
-    let mut entries = Vec::new();
-    for fixture in [
-        include_str!(
-            "../../../../../upstream/src/test/container-features/configs/lockfile-upgrade-command/upgraded.devcontainer-lock.json"
+    vec![
+        (
+            "ghcr.io/devcontainers/features/azure-cli:1.2.1".to_string(),
+            CatalogEntry {
+                version: "1.2.1".to_string(),
+                resolved: "ghcr.io/devcontainers/features/azure-cli@sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134".to_string(),
+                integrity: "sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134".to_string(),
+                depends_on: None,
+            },
         ),
-        include_str!(
-            "../../../../../upstream/src/test/container-features/configs/lockfile-dependson/expected.devcontainer-lock.json"
+        (
+            "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c".to_string(),
+            CatalogEntry {
+                version: "1.0.6".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c".to_string(),
+                integrity: "sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c".to_string(),
+                depends_on: None,
+            },
         ),
-    ] {
-        let lockfile: Lockfile =
-            serde_json::from_str(fixture).expect("embedded lockfile fixture should parse");
-        entries.extend(lockfile.features.into_iter().map(|(feature_id, entry)| {
-            (
-                feature_id,
-                CatalogEntry {
-                    version: entry.version,
-                    resolved: entry.resolved,
-                    integrity: entry.integrity,
-                    depends_on: entry.depends_on,
-                },
-            )
-        }));
-    }
-    entries
+        (
+            "ghcr.io/devcontainers/features/git:1.1.5".to_string(),
+            CatalogEntry {
+                version: "1.1.5".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:2ab83ca71d55d5c00a1255b07f3a83a53cd2de77ce8b9637abad38095d672a5b".to_string(),
+                integrity: "sha256:2ab83ca71d55d5c00a1255b07f3a83a53cd2de77ce8b9637abad38095d672a5b".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/github-cli:1.0.9".to_string(),
+            CatalogEntry {
+                version: "1.0.9".to_string(),
+                resolved: "ghcr.io/devcontainers/features/github-cli@sha256:9024deeca80347dea7603a3bb5b4951988f0bf5894ba036a6ee3f29c025692c6".to_string(),
+                integrity: "sha256:9024deeca80347dea7603a3bb5b4951988f0bf5894ba036a6ee3f29c025692c6".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/codspace/dependson/A:2".to_string(),
+            CatalogEntry {
+                version: "2.0.1".to_string(),
+                resolved: "ghcr.io/codspace/dependson/a@sha256:932027ef71da186210e6ceb3294c3459caaf6b548d2b547d5d26be3fc4b2264a".to_string(),
+                integrity: "sha256:932027ef71da186210e6ceb3294c3459caaf6b548d2b547d5d26be3fc4b2264a".to_string(),
+                depends_on: Some(vec!["ghcr.io/codspace/dependson/E".to_string()]),
+            },
+        ),
+        (
+            "ghcr.io/codspace/dependson/E".to_string(),
+            CatalogEntry {
+                version: "2.0.0".to_string(),
+                resolved: "ghcr.io/codspace/dependson/e@sha256:9f36f159c70f8bebff57f341904b030733adb17ef12a5d58d4b3d89b2a6c7d5a".to_string(),
+                integrity: "sha256:9f36f159c70f8bebff57f341904b030733adb17ef12a5d58d4b3d89b2a6c7d5a".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/codspace/dependson/E:1".to_string(),
+            CatalogEntry {
+                version: "1.0.0".to_string(),
+                resolved: "ghcr.io/codspace/dependson/e@sha256:90b84127edab28ecb169cd6c6f2101ce0ea1d77589cee01951fec7f879f3a11c".to_string(),
+                integrity: "sha256:90b84127edab28ecb169cd6c6f2101ce0ea1d77589cee01951fec7f879f3a11c".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "https://github.com/codspace/tgz-features-with-dependson/releases/download/0.0.2/devcontainer-feature-A.tgz".to_string(),
+            CatalogEntry {
+                version: "2.0.1".to_string(),
+                resolved: "https://github.com/codspace/tgz-features-with-dependson/releases/download/0.0.2/devcontainer-feature-A.tgz".to_string(),
+                integrity: "sha256:f2dd5be682cceedb5497f9a734b5d5e7834424ade75b8cc700927242585ec671".to_string(),
+                depends_on: Some(vec!["ghcr.io/codspace/dependson/E".to_string()]),
+            },
+        ),
+    ]
 }
 
 fn compare_versions_desc(left: &str, right: &str) -> Ordering {
@@ -326,6 +376,31 @@ impl VersionSelector {
             }
             VersionSelector::Exact(expected) => parsed == *expected,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{catalog_entries, exact_catalog_entry};
+
+    #[test]
+    fn fixture_catalog_keeps_dependson_edges() {
+        let entry =
+            exact_catalog_entry("ghcr.io/codspace/dependson/A:2").expect("dependson fixture entry");
+
+        assert_eq!(entry.version, "2.0.1");
+        assert_eq!(
+            entry.depends_on,
+            Some(vec!["ghcr.io/codspace/dependson/E".to_string()])
+        );
+    }
+
+    #[test]
+    fn fixture_catalog_exposes_upgrade_versions() {
+        let entries =
+            catalog_entries("ghcr.io/devcontainers/features/git").expect("git catalog entries");
+
+        assert!(entries.iter().any(|entry| entry.version == "1.1.5"));
     }
 }
 
