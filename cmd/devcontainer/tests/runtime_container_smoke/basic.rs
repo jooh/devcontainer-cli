@@ -88,3 +88,53 @@ fn up_uses_workspace_mount_target_for_remote_workdir_when_workspace_folder_is_om
     assert!(invocations
         .contains("exec --workdir /custom-target fake-container-id /bin/sh -lc echo ready"));
 }
+
+#[test]
+fn up_applies_feature_runtime_metadata_to_container_creation() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let feature_dir = workspace.join(".devcontainer").join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\",\n  \"containerEnv\": {\n    \"FEATURE_FLAG\": \"enabled\"\n  },\n  \"init\": true,\n  \"privileged\": true,\n  \"capAdd\": [\"SYS_ADMIN\"],\n  \"securityOpt\": [\"seccomp=unconfined\"],\n  \"postCreateCommand\": \"echo feature-ready\"\n}\n",
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nset -eu\n").expect("install script");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/workspace\",\n  \"features\": {\n    \"./local-feature\": {}\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--include-configuration",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(
+        payload["configuration"]["containerEnv"]["FEATURE_FLAG"],
+        "enabled"
+    );
+    assert_eq!(payload["configuration"]["init"], true);
+    assert_eq!(payload["configuration"]["privileged"], true);
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("--init"));
+    assert!(invocations.contains("--privileged"));
+    assert!(invocations.contains("--cap-add SYS_ADMIN"));
+    assert!(invocations.contains("--security-opt seccomp=unconfined"));
+    assert!(invocations.contains("-e FEATURE_FLAG=enabled"));
+
+    let exec_log = harness.read_exec_log();
+    assert!(exec_log.contains("/bin/sh -lc echo feature-ready"));
+}

@@ -8,30 +8,21 @@ use crate::commands::common;
 pub(super) fn build_features_resolve_dependencies_payload(
     args: &[String],
 ) -> Result<Value, String> {
-    let (_, _, configuration) = common::load_resolved_config(args)?;
-    let features = configuration
-        .get("features")
-        .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
-    let mut ordered = Vec::new();
-
-    if let Some(override_order) = configuration
-        .get("overrideFeatureInstallOrder")
-        .and_then(Value::as_array)
-    {
-        for entry in override_order.iter().filter_map(Value::as_str) {
-            if features.contains_key(entry) {
-                ordered.push(Value::String(entry.to_string()));
-            }
-        }
-    }
-
-    for feature in features.keys() {
-        if !ordered.iter().any(|value| value == feature) {
-            ordered.push(Value::String(feature.clone()));
-        }
-    }
+    let (workspace_folder, config_file, configuration) = common::load_resolved_config(args)?;
+    let ordered = crate::commands::configuration::resolve_feature_support(
+        args,
+        &workspace_folder,
+        &config_file,
+        &configuration,
+    )?
+    .map(|resolved| {
+        resolved
+            .ordered_feature_ids
+            .into_iter()
+            .map(Value::String)
+            .collect::<Vec<_>>()
+    })
+    .unwrap_or_default();
 
     Ok(json!({
         "outcome": "success",

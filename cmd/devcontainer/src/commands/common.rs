@@ -101,14 +101,74 @@ pub(crate) fn load_resolved_config(args: &[String]) -> Result<(PathBuf, PathBuf,
     let (workspace_folder, config_file) = resolve_read_configuration_path(args)?;
     let raw = fs::read_to_string(&config_file).map_err(|error| error.to_string())?;
     let parsed = config::parse_jsonc_value(&raw)?;
+    let base_context = ConfigContext {
+        workspace_folder: workspace_folder.clone(),
+        env: env::vars().collect(),
+        container_workspace_folder: None,
+        id_labels: id_label_map(args, &workspace_folder, &config_file),
+    };
+    let container_workspace_folder = parsed
+        .get("workspaceFolder")
+        .and_then(Value::as_str)
+        .map(|value| {
+            config::substitute_local_context(&Value::String(value.to_string()), &base_context)
+        })
+        .and_then(|value| value.as_str().map(str::to_string))
+        .or_else(|| {
+            parsed
+                .get("workspaceMount")
+                .and_then(Value::as_str)
+                .and_then(|mount| {
+                    let substituted = config::substitute_local_context(
+                        &Value::String(mount.to_string()),
+                        &base_context,
+                    );
+                    substituted
+                        .as_str()
+                        .and_then(crate::runtime::metadata::mount_option_target)
+                })
+        })
+        .or_else(|| {
+            Some(crate::runtime::context::default_remote_workspace_folder(
+                Some(&workspace_folder),
+            ))
+        });
     let substituted = config::substitute_local_context(
         &parsed,
         &ConfigContext {
-            workspace_folder: workspace_folder.clone(),
-            env: env::vars().collect(),
+            workspace_folder: base_context.workspace_folder.clone(),
+            env: base_context.env,
+            container_workspace_folder,
+            id_labels: base_context.id_labels,
         },
     );
     Ok((workspace_folder, config_file, substituted))
+}
+
+pub(crate) fn id_label_map(
+    args: &[String],
+    workspace_folder: &Path,
+    config_file: &Path,
+) -> HashMap<String, String> {
+    let mut labels = parse_option_values(args, "--id-label")
+        .into_iter()
+        .filter_map(|entry| {
+            entry
+                .split_once('=')
+                .map(|(key, value)| (key.to_string(), value.to_string()))
+        })
+        .collect::<HashMap<_, _>>();
+    if labels.is_empty() {
+        labels.insert(
+            "devcontainer.local_folder".to_string(),
+            workspace_folder.display().to_string(),
+        );
+        labels.insert(
+            "devcontainer.config_file".to_string(),
+            config_file.display().to_string(),
+        );
+    }
+    labels
 }
 
 pub(crate) fn parse_manifest(root: &Path, manifest_name: &str) -> Result<Value, String> {

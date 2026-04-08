@@ -80,6 +80,167 @@ fn build_passes_configured_build_args_to_the_engine() {
 }
 
 #[test]
+fn build_wraps_image_configs_with_feature_layers() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let feature_dir = workspace.join(".devcontainer").join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\",\n  \"options\": {\n    \"favorite\": {\n      \"type\": \"string\",\n      \"default\": \"blue\"\n    }\n  }\n}\n",
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nset -eu\n").expect("install script");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"./local-feature\": {\n      \"favorite\": \"red\"\n    }\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--image-name",
+            "example/native-build:features",
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("--tag example/native-build:features"));
+    assert_eq!(
+        invocations
+            .lines()
+            .filter(|line| line.starts_with("build "))
+            .count(),
+        1
+    );
+}
+
+#[test]
+fn build_layers_features_on_top_of_dockerfile_builds() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let feature_dir = workspace.join(".devcontainer").join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nset -eu\n").expect("install script");
+    fs::write(
+        workspace.join(".devcontainer").join("Dockerfile"),
+        "FROM scratch\n",
+    )
+    .expect("dockerfile");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"build\": {\n    \"dockerfile\": \"Dockerfile\",\n    \"context\": \".devcontainer\"\n  },\n  \"features\": {\n    \"./local-feature\": {}\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--image-name",
+            "example/native-build:feature-stack",
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("--tag example/native-build:feature-stack-base"));
+    assert!(invocations.contains("--tag example/native-build:feature-stack"));
+    assert_eq!(
+        invocations
+            .lines()
+            .filter(|line| line.starts_with("build "))
+            .count(),
+        2
+    );
+}
+
+#[test]
+fn build_writes_feature_lockfile_when_requested() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/git:1.0\": {}\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--experimental-lockfile",
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let lockfile = fs::read_to_string(
+        workspace
+            .join(".devcontainer")
+            .join("devcontainer-lock.json"),
+    )
+    .expect("lockfile");
+    assert!(lockfile.contains("ghcr.io/devcontainers/features/git:1.0"));
+    assert!(lockfile.contains("\"resolved\":"));
+}
+
+#[test]
+fn build_rejects_outdated_frozen_feature_lockfile() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let config_dir = workspace.join(".devcontainer");
+    fs::create_dir_all(&config_dir).expect("workspace config dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/git:1.0\": {}\n  }\n}\n",
+    );
+    fs::write(
+        config_dir.join("devcontainer-lock.json"),
+        "{\n  \"features\": {}\n}\n",
+    )
+    .expect("lockfile");
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--experimental-frozen-lockfile",
+        ],
+        &[],
+    );
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.contains("Lockfile"));
+    assert!(stderr.contains("out of date"));
+}
+
+#[test]
 fn up_honors_build_no_cache() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();

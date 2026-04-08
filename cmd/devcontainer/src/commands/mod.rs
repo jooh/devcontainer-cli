@@ -1,6 +1,6 @@
 mod collections;
 pub(crate) mod common;
-mod configuration;
+pub(crate) mod configuration;
 mod exec;
 
 use std::process::ExitCode;

@@ -17,7 +17,7 @@ pub(super) fn embedded_template_source_dir(reference: &str) -> Option<PathBuf> {
     }
 }
 
-pub(super) fn published_feature_install_script(feature_id: &str) -> &'static str {
+pub(crate) fn published_feature_install_script(feature_id: &str) -> &'static str {
     match normalize_collection_reference(feature_id).as_str() {
         "ghcr.io/devcontainers/features/common-utils" => {
             r#"#!/bin/sh
@@ -41,7 +41,7 @@ set -eu
     }
 }
 
-pub(super) fn published_feature_manifest(feature_id: &str) -> Option<Value> {
+pub(crate) fn published_feature_manifest(feature_id: &str) -> Option<Value> {
     let normalized = normalize_collection_reference(feature_id);
     let manifest = match normalized.as_str() {
         "ghcr.io/devcontainers/features/azure-cli" => Some(json!({
@@ -120,7 +120,7 @@ pub(super) fn published_template_manifest(template_id: &str) -> Option<Value> {
     }))
 }
 
-pub(super) fn normalize_collection_reference(reference: &str) -> String {
+pub(crate) fn normalize_collection_reference(reference: &str) -> String {
     if let Some(index) = reference.find('@') {
         return reference[..index].to_string();
     }
@@ -131,7 +131,7 @@ pub(super) fn normalize_collection_reference(reference: &str) -> String {
     reference.to_string()
 }
 
-pub(super) fn collection_slug(reference: &str) -> Option<String> {
+pub(crate) fn collection_slug(reference: &str) -> Option<String> {
     normalize_collection_reference(reference)
         .rsplit('/')
         .next()

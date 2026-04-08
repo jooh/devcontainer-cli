@@ -110,6 +110,8 @@ pub(super) fn inspect_container(
         let context = ConfigContext {
             workspace_folder,
             env: std::env::vars().collect(),
+            container_workspace_folder: None,
+            id_labels: HashMap::new(),
         };
         metadata_entries = metadata_entries
             .into_iter()
@@ -130,10 +132,12 @@ pub(super) fn inspect_container(
 pub(super) fn merged_configuration_payload(
     configuration: &Value,
     inspected: Option<&InspectedContainer>,
+    additional_metadata_entries: &[Value],
 ) -> Value {
     let mut metadata_entries = inspected
         .map(|value| value.metadata_entries.clone())
         .unwrap_or_default();
+    metadata_entries.extend(additional_metadata_entries.iter().cloned());
     let config_metadata = pick_config_metadata(configuration);
     if config_metadata
         .as_object()

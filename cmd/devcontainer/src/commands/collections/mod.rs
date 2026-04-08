@@ -1,7 +1,7 @@
 mod feature_tests;
 mod features;
 mod publish;
-mod registry;
+pub(crate) mod registry;
 mod templates;
 
 use std::process::ExitCode;

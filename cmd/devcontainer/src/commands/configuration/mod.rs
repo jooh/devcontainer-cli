@@ -1,4 +1,5 @@
 mod catalog;
+mod features;
 mod inspect;
 mod load;
 mod merge;
@@ -11,6 +12,8 @@ use std::process::ExitCode;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+
+pub(crate) use features::FeatureInstallation;
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 struct Lockfile {
@@ -63,6 +66,38 @@ struct InspectedContainer {
 
 pub(crate) fn build_read_configuration_payload(args: &[String]) -> Result<Value, String> {
     read::build_read_configuration_payload(args)
+}
+
+pub(crate) fn resolve_feature_support(
+    args: &[String],
+    workspace_folder: &std::path::Path,
+    config_file: &std::path::Path,
+    configuration: &Value,
+) -> Result<Option<features::ResolvedFeatureSupport>, String> {
+    features::resolve_feature_support(args, workspace_folder, config_file, configuration)
+}
+
+pub(crate) fn materialize_feature_installation(
+    installation: &features::FeatureInstallation,
+    destination: &std::path::Path,
+) -> Result<(), String> {
+    features::materialize_feature_installation(installation, destination)
+}
+
+pub(crate) fn feature_installation_name(installation: &features::FeatureInstallation) -> String {
+    features::feature_installation_name(installation)
+}
+
+pub(crate) fn apply_feature_metadata(configuration: &Value, metadata_entries: &[Value]) -> Value {
+    features::apply_feature_metadata(configuration, metadata_entries)
+}
+
+pub(crate) fn ensure_native_lockfile(
+    args: &[String],
+    config_file: &std::path::Path,
+    configuration: &Value,
+) -> Result<(), String> {
+    upgrade::ensure_native_lockfile(args, config_file, configuration)
 }
 
 pub(crate) fn should_use_native_read_configuration(args: &[String]) -> bool {

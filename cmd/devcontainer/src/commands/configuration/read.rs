@@ -2,6 +2,7 @@ use serde_json::{json, Map, Value};
 
 use super::inspect::{merged_configuration_payload, read_configuration_value, workspace_payload};
 use super::load::load_optional_config;
+use super::resolve_feature_support;
 use crate::commands::common;
 
 pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value, String> {
@@ -20,6 +21,22 @@ pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
     let configuration = read_configuration_value(loaded.as_ref(), inspected.as_ref());
     let mut payload = Map::new();
     payload.insert("configuration".to_string(), configuration.clone());
+    let resolved_features = if inspected.is_none() {
+        loaded
+            .as_ref()
+            .map(|loaded| {
+                resolve_feature_support(
+                    args,
+                    &loaded.workspace_folder,
+                    &loaded.config_file,
+                    &loaded.configuration,
+                )
+            })
+            .transpose()?
+            .flatten()
+    } else {
+        None
+    };
 
     if let Some(loaded) = loaded.as_ref() {
         payload.insert(
@@ -29,20 +46,26 @@ pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
     }
 
     if include_features || (include_merged && inspected.is_none()) {
-        if let Some(loaded) = loaded.as_ref() {
-            payload.insert(
-                "featuresConfiguration".to_string(),
-                json!({
-                    "features": loaded.configuration.get("features").cloned().unwrap_or_else(|| json!({})),
-                }),
-            );
-        }
+        payload.insert(
+            "featuresConfiguration".to_string(),
+            resolved_features
+                .as_ref()
+                .map(|resolved| resolved.features_configuration.clone())
+                .unwrap_or_else(|| json!({ "featureSets": [] })),
+        );
     }
 
     if include_merged {
         payload.insert(
             "mergedConfiguration".to_string(),
-            merged_configuration_payload(&configuration, inspected.as_ref()),
+            merged_configuration_payload(
+                &configuration,
+                inspected.as_ref(),
+                resolved_features
+                    .as_ref()
+                    .map(|resolved| resolved.metadata_entries.as_slice())
+                    .unwrap_or(&[]),
+            ),
         );
     }
 
@@ -50,7 +73,7 @@ pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
 }
 
 pub(super) fn should_use_native_read_configuration(args: &[String]) -> bool {
-    const SUPPORTED_OPTIONS: [&str; 8] = [
+    const SUPPORTED_OPTIONS: [&str; 10] = [
         "--workspace-folder",
         "--config",
         "--container-id",
@@ -59,6 +82,8 @@ pub(super) fn should_use_native_read_configuration(args: &[String]) -> bool {
         "--docker-compose-path",
         "--include-merged-configuration",
         "--include-features-configuration",
+        "--additional-features",
+        "--skip-feature-auto-mapping",
     ];
     let mut index = 0;
     while index < args.len() {
@@ -71,7 +96,9 @@ pub(super) fn should_use_native_read_configuration(args: &[String]) -> bool {
         }
         index += if matches!(
             arg.as_str(),
-            "--include-merged-configuration" | "--include-features-configuration"
+            "--include-merged-configuration"
+                | "--include-features-configuration"
+                | "--skip-feature-auto-mapping"
         ) {
             1
         } else {

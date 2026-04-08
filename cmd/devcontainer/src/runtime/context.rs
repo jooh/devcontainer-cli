@@ -220,6 +220,8 @@ fn inspect_container_context(
             &ConfigContext {
                 workspace_folder: workspace_folder.clone(),
                 env: env::vars().collect(),
+                container_workspace_folder: None,
+                id_labels: HashMap::new(),
             },
         );
     }

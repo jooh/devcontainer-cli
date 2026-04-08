@@ -204,6 +204,22 @@ fn start_container(
         "--mount".to_string(),
         workspace_mount(resolved, remote_workspace_folder),
     ];
+    if resolved
+        .configuration
+        .get("init")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        engine_args.push("--init".to_string());
+    }
+    if resolved
+        .configuration
+        .get("privileged")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        engine_args.push("--privileged".to_string());
+    }
     for label in common::parse_option_values(args, "--id-label") {
         engine_args.push("--label".to_string());
         engine_args.push(label);
@@ -211,6 +227,16 @@ fn start_container(
     for mount in common::parse_option_values(args, "--mount") {
         engine_args.push("--mount".to_string());
         engine_args.push(mount);
+    }
+    if let Some(mounts) = resolved
+        .configuration
+        .get("mounts")
+        .and_then(Value::as_array)
+    {
+        for mount in mounts.iter().filter_map(mount_argument) {
+            engine_args.push("--mount".to_string());
+            engine_args.push(mount);
+        }
     }
     if let Some(run_args) = resolved
         .configuration
@@ -233,6 +259,26 @@ fn start_container(
             }
         }
     }
+    if let Some(cap_add) = resolved
+        .configuration
+        .get("capAdd")
+        .and_then(Value::as_array)
+    {
+        for capability in cap_add.iter().filter_map(Value::as_str) {
+            engine_args.push("--cap-add".to_string());
+            engine_args.push(capability.to_string());
+        }
+    }
+    if let Some(security_opt) = resolved
+        .configuration
+        .get("securityOpt")
+        .and_then(Value::as_array)
+    {
+        for option in security_opt.iter().filter_map(Value::as_str) {
+            engine_args.push("--security-opt".to_string());
+            engine_args.push(option.to_string());
+        }
+    }
     engine_args.push(image_name.to_string());
     engine_args.push("/bin/sh".to_string());
     engine_args.push("-lc".to_string());
@@ -249,6 +295,28 @@ fn start_container(
     }
 
     Ok(container_id)
+}
+
+fn mount_argument(value: &Value) -> Option<String> {
+    match value {
+        Value::String(mount) => Some(mount.clone()),
+        Value::Object(entries) => {
+            let mut options = Vec::new();
+            for key in ["type", "source", "target", "external"] {
+                if let Some(value) = entries.get(key) {
+                    let text = match value {
+                        Value::Bool(boolean) => boolean.to_string(),
+                        Value::Number(number) => number.to_string(),
+                        Value::String(text) => text.clone(),
+                        _ => continue,
+                    };
+                    options.push(format!("{key}={text}"));
+                }
+            }
+            (!options.is_empty()).then(|| options.join(","))
+        }
+        _ => None,
+    }
 }
 
 fn start_existing_container(args: &[String], container_id: &str) -> Result<(), String> {
