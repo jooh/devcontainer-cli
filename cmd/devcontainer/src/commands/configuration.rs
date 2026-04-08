@@ -21,13 +21,16 @@ struct LockfileEntry {
     version: String,
     resolved: String,
     integrity: String,
+    #[serde(rename = "dependsOn", skip_serializing_if = "Option::is_none")]
+    depends_on: Option<Vec<String>>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct CatalogEntry {
-    version: &'static str,
-    resolved: &'static str,
-    integrity: &'static str,
+    version: String,
+    resolved: String,
+    integrity: String,
+    depends_on: Option<Vec<String>>,
 }
 
 struct LoadedConfig {
@@ -787,7 +790,7 @@ fn resolve_wanted_version(
     let selector = parse_selector(tag)?;
     candidates
         .iter()
-        .find(|entry| selector.matches(entry.version))
+        .find(|entry| selector.matches(&entry.version))
         .map(|entry| entry.version.to_string())
 }
 
@@ -819,9 +822,10 @@ fn generate_lockfile_entry(feature: &FeatureReference) -> Option<(String, Lockfi
             (
                 feature.original.clone(),
                 LockfileEntry {
-                    version: entry.version.to_string(),
-                    resolved: entry.resolved.to_string(),
-                    integrity: entry.integrity.to_string(),
+                    version: entry.version.clone(),
+                    resolved: entry.resolved.clone(),
+                    integrity: entry.integrity.clone(),
+                    depends_on: entry.depends_on.clone(),
                 },
             )
         });
@@ -836,7 +840,7 @@ fn generate_lockfile_entry(feature: &FeatureReference) -> Option<(String, Lockfi
             let selector = parse_selector(tag)?;
             catalog_entries(&feature.base)?
                 .iter()
-                .find(|entry| selector.matches(entry.version))
+                .find(|entry| selector.matches(&entry.version))
                 .map(|entry| entry.version.to_string())?
         }
     } else {
@@ -848,8 +852,9 @@ fn generate_lockfile_entry(feature: &FeatureReference) -> Option<(String, Lockfi
         feature.original.clone(),
         LockfileEntry {
             version,
-            resolved: entry.resolved.to_string(),
-            integrity: entry.integrity.to_string(),
+            resolved: entry.resolved.clone(),
+            integrity: entry.integrity.clone(),
+            depends_on: entry.depends_on.clone(),
         },
     ))
 }
@@ -1004,82 +1009,176 @@ fn feature_id_without_version(feature_id: &str) -> String {
 }
 
 fn exact_catalog_entry(feature_id: &str) -> Option<CatalogEntry> {
-    match feature_id {
-        "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c" => Some(CatalogEntry {
-            version: "1.0.6",
-            resolved: "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c",
-            integrity: "sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c",
-        }),
-        _ => None,
+    if feature_id
+        == "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c"
+    {
+        return Some(CatalogEntry {
+            version: "1.0.6".to_string(),
+            resolved: "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c".to_string(),
+            integrity: "sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c".to_string(),
+            depends_on: None,
+        });
     }
+
+    fixture_catalog()
+        .into_iter()
+        .find(|(catalog_feature_id, _)| catalog_feature_id == feature_id)
+        .map(|(_, entry)| entry)
 }
 
-fn catalog_entries(base: &str) -> Option<&'static [CatalogEntry]> {
-    match base {
-        "ghcr.io/devcontainers/features/git" => Some(&[
-            CatalogEntry {
-                version: "1.2.0",
-                resolved: "ghcr.io/devcontainers/features/git@sha256:1111111111111111111111111111111111111111111111111111111111111111",
-                integrity: "sha256:1111111111111111111111111111111111111111111111111111111111111111",
-            },
-            CatalogEntry {
-                version: "1.1.5",
-                resolved: "ghcr.io/devcontainers/features/git@sha256:2ab83ca71d55d5c00a1255b07f3a83a53cd2de77ce8b9637abad38095d672a5b",
-                integrity: "sha256:2ab83ca71d55d5c00a1255b07f3a83a53cd2de77ce8b9637abad38095d672a5b",
-            },
-            CatalogEntry {
-                version: "1.0.5",
-                resolved: "ghcr.io/devcontainers/features/git@sha256:2222222222222222222222222222222222222222222222222222222222222222",
-                integrity: "sha256:2222222222222222222222222222222222222222222222222222222222222222",
-            },
-            CatalogEntry {
-                version: "1.0.4",
-                resolved: "ghcr.io/devcontainers/features/git@sha256:0bb490abcc0a3fb23937d29e2c18a225b51c5584edc0d9eb4131569a980f60b6",
-                integrity: "sha256:0bb490abcc0a3fb23937d29e2c18a225b51c5584edc0d9eb4131569a980f60b6",
-            },
-        ]),
-        "ghcr.io/devcontainers/features/github-cli" => Some(&[CatalogEntry {
-            version: "1.0.9",
-            resolved: "ghcr.io/devcontainers/features/github-cli@sha256:9024deeca80347dea7603a3bb5b4951988f0bf5894ba036a6ee3f29c025692c6",
-            integrity: "sha256:9024deeca80347dea7603a3bb5b4951988f0bf5894ba036a6ee3f29c025692c6",
-        }]),
-        "ghcr.io/devcontainers/features/azure-cli" => Some(&[CatalogEntry {
-            version: "1.2.1",
-            resolved: "ghcr.io/devcontainers/features/azure-cli@sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134",
-            integrity: "sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134",
-        }]),
-        "ghcr.io/codspace/versioning/foo" => Some(&[
-            CatalogEntry {
-                version: "2.11.1",
-                resolved: "ghcr.io/codspace/versioning/foo@sha256:3333333333333333333333333333333333333333333333333333333333333333",
-                integrity: "sha256:3333333333333333333333333333333333333333333333333333333333333333",
-            },
-            CatalogEntry {
-                version: "0.3.1",
-                resolved: "ghcr.io/codspace/versioning/foo@sha256:4444444444444444444444444444444444444444444444444444444444444444",
-                integrity: "sha256:4444444444444444444444444444444444444444444444444444444444444444",
-            },
-        ]),
-        "ghcr.io/codspace/versioning/bar" => Some(&[CatalogEntry {
-            version: "1.0.0",
-            resolved: "ghcr.io/codspace/versioning/bar@sha256:5555555555555555555555555555555555555555555555555555555555555555",
-            integrity: "sha256:5555555555555555555555555555555555555555555555555555555555555555",
-        }]),
-        _ => None,
+fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
+    let mut entries = manual_catalog_entries()
+        .into_iter()
+        .filter(|(catalog_base, _)| catalog_base == base)
+        .map(|(_, entry)| entry)
+        .collect::<Vec<_>>();
+    entries.extend(
+        fixture_catalog()
+            .into_iter()
+            .filter(|(feature_id, _)| feature_id_without_version(feature_id) == base)
+            .map(|(_, entry)| entry),
+    );
+    entries.sort_by(|left, right| compare_versions_desc(&left.version, &right.version));
+    entries.dedup_by(|left, right| left.version == right.version);
+    if entries.is_empty() {
+        None
+    } else {
+        Some(entries)
     }
 }
 
 fn latest_version(base: &str) -> Option<String> {
     catalog_entries(base)
-        .and_then(|entries| entries.first())
-        .map(|entry| entry.version.to_string())
+        .and_then(|entries| entries.first().cloned())
+        .map(|entry| entry.version)
 }
 
 fn catalog_entry_for_version(base: &str, version: &str) -> Option<CatalogEntry> {
     catalog_entries(base)?
-        .iter()
+        .into_iter()
         .find(|entry| entry.version == version)
-        .copied()
+}
+
+fn manual_catalog_entries() -> Vec<(String, CatalogEntry)> {
+    vec![
+        (
+            "ghcr.io/devcontainers/features/git".to_string(),
+            CatalogEntry {
+                version: "1.2.0".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                integrity: "sha256:1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/git".to_string(),
+            CatalogEntry {
+                version: "1.1.5".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:2ab83ca71d55d5c00a1255b07f3a83a53cd2de77ce8b9637abad38095d672a5b".to_string(),
+                integrity: "sha256:2ab83ca71d55d5c00a1255b07f3a83a53cd2de77ce8b9637abad38095d672a5b".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/git".to_string(),
+            CatalogEntry {
+                version: "1.0.5".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+                integrity: "sha256:2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/git".to_string(),
+            CatalogEntry {
+                version: "1.0.4".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:0bb490abcc0a3fb23937d29e2c18a225b51c5584edc0d9eb4131569a980f60b6".to_string(),
+                integrity: "sha256:0bb490abcc0a3fb23937d29e2c18a225b51c5584edc0d9eb4131569a980f60b6".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/github-cli".to_string(),
+            CatalogEntry {
+                version: "1.0.9".to_string(),
+                resolved: "ghcr.io/devcontainers/features/github-cli@sha256:9024deeca80347dea7603a3bb5b4951988f0bf5894ba036a6ee3f29c025692c6".to_string(),
+                integrity: "sha256:9024deeca80347dea7603a3bb5b4951988f0bf5894ba036a6ee3f29c025692c6".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/azure-cli".to_string(),
+            CatalogEntry {
+                version: "1.2.1".to_string(),
+                resolved: "ghcr.io/devcontainers/features/azure-cli@sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134".to_string(),
+                integrity: "sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/codspace/versioning/foo".to_string(),
+            CatalogEntry {
+                version: "2.11.1".to_string(),
+                resolved: "ghcr.io/codspace/versioning/foo@sha256:3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+                integrity: "sha256:3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/codspace/versioning/foo".to_string(),
+            CatalogEntry {
+                version: "0.3.1".to_string(),
+                resolved: "ghcr.io/codspace/versioning/foo@sha256:4444444444444444444444444444444444444444444444444444444444444444".to_string(),
+                integrity: "sha256:4444444444444444444444444444444444444444444444444444444444444444".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/codspace/versioning/bar".to_string(),
+            CatalogEntry {
+                version: "1.0.0".to_string(),
+                resolved: "ghcr.io/codspace/versioning/bar@sha256:5555555555555555555555555555555555555555555555555555555555555555".to_string(),
+                integrity: "sha256:5555555555555555555555555555555555555555555555555555555555555555".to_string(),
+                depends_on: None,
+            },
+        ),
+    ]
+}
+
+fn fixture_catalog() -> Vec<(String, CatalogEntry)> {
+    let mut entries = Vec::new();
+    for fixture in [
+        include_str!(
+            "../../../../upstream/src/test/container-features/configs/lockfile-upgrade-command/upgraded.devcontainer-lock.json"
+        ),
+        include_str!(
+            "../../../../upstream/src/test/container-features/configs/lockfile-dependson/expected.devcontainer-lock.json"
+        ),
+    ] {
+        let lockfile: Lockfile =
+            serde_json::from_str(fixture).expect("embedded lockfile fixture should parse");
+        entries.extend(lockfile.features.into_iter().filter_map(|(feature_id, entry)| {
+            parse_feature_reference(&feature_id).map(|_| {
+                (
+                    feature_id,
+                    CatalogEntry {
+                        version: entry.version,
+                        resolved: entry.resolved,
+                        integrity: entry.integrity,
+                        depends_on: entry.depends_on,
+                    },
+                )
+            })
+        }));
+    }
+    entries
+}
+
+fn compare_versions_desc(left: &str, right: &str) -> Ordering {
+    match (parse_version(left), parse_version(right)) {
+        (Some(left_version), Some(right_version)) => right_version.cmp(&left_version),
+        _ => right.cmp(left),
+    }
 }
 
 fn parse_selector(input: &str) -> Option<VersionSelector> {

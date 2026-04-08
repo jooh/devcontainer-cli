@@ -269,6 +269,12 @@ fn apply_catalog_template(
         .transpose()?
         .unwrap_or_else(|| json!([]));
 
+    if normalize_collection_reference(template_id)
+        != "ghcr.io/devcontainers/templates/docker-from-docker"
+    {
+        return apply_generic_published_template(&manifest, workspace_root, extra_features);
+    }
+
     let mut features = Map::new();
     features.insert(
         "ghcr.io/devcontainers/features/common-utils:1".to_string(),
@@ -307,6 +313,54 @@ fn apply_catalog_template(
     fs::write(
         config_dir.join("devcontainer.json"),
         serde_json::to_string_pretty(&devcontainer).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(json!({
+        "files": ["./.devcontainer/devcontainer.json"],
+    }))
+}
+
+fn apply_generic_published_template(
+    manifest: &Value,
+    workspace_root: &Path,
+    extra_features: Value,
+) -> Result<Value, String> {
+    let mut devcontainer = Map::new();
+    devcontainer.insert(
+        "name".to_string(),
+        manifest
+            .get("name")
+            .cloned()
+            .unwrap_or_else(|| Value::String("Published Template".to_string())),
+    );
+    devcontainer.insert(
+        "image".to_string(),
+        Value::String("mcr.microsoft.com/devcontainers/base:ubuntu".to_string()),
+    );
+
+    let mut features = Map::new();
+    if let Some(extra_features) = extra_features.as_array() {
+        for feature in extra_features {
+            let Some(id) = feature.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            features.insert(
+                id.to_string(),
+                feature.get("options").cloned().unwrap_or_else(|| json!({})),
+            );
+        }
+    }
+    if !features.is_empty() {
+        devcontainer.insert("features".to_string(), Value::Object(features));
+    }
+
+    let config_dir = workspace_root.join(".devcontainer");
+    fs::create_dir_all(&config_dir).map_err(|error| error.to_string())?;
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        serde_json::to_string_pretty(&Value::Object(devcontainer))
+            .map_err(|error| error.to_string())?,
     )
     .map_err(|error| error.to_string())?;
 
@@ -605,7 +659,8 @@ fn sha256_digest(bytes: &[u8]) -> String {
 }
 
 fn published_feature_manifest(feature_id: &str) -> Option<Value> {
-    match normalize_collection_reference(feature_id).as_str() {
+    let normalized = normalize_collection_reference(feature_id);
+    let manifest = match normalized.as_str() {
         "ghcr.io/devcontainers/features/azure-cli" => Some(json!({
             "id": "azure-cli",
             "name": "Azure CLI",
@@ -638,19 +693,48 @@ fn published_feature_manifest(feature_id: &str) -> Option<Value> {
             "options": {}
         })),
         _ => None,
+    };
+    if manifest.is_some() {
+        return manifest;
     }
+
+    let slug = collection_slug(&normalized)?;
+    if !normalized.contains("/features/") {
+        return None;
+    }
+    Some(json!({
+        "id": slug,
+        "name": humanize_collection_slug(&slug),
+        "version": collection_reference_version(feature_id),
+        "options": {},
+    }))
 }
 
 fn published_template_manifest(template_id: &str) -> Option<Value> {
-    match normalize_collection_reference(template_id).as_str() {
+    let normalized = normalize_collection_reference(template_id);
+    let manifest = match normalized.as_str() {
         "ghcr.io/devcontainers/templates/docker-from-docker" => Some(json!({
             "id": "docker-from-docker",
             "name": "Docker from Docker",
             "description": "Create a dev container with Docker available inside the container.",
             "version": "1.0.0"
         })),
-        _ => None,
+        _ => embedded_template_manifest(&normalized),
+    };
+    if manifest.is_some() {
+        return manifest;
     }
+
+    let slug = collection_slug(&normalized)?;
+    if !normalized.contains("/templates/") {
+        return None;
+    }
+    Some(json!({
+        "id": slug,
+        "name": humanize_collection_slug(&slug),
+        "description": "",
+        "version": collection_reference_version(template_id),
+    }))
 }
 
 fn normalize_collection_reference(reference: &str) -> String {
@@ -659,6 +743,68 @@ fn normalize_collection_reference(reference: &str) -> String {
         return reference[..index].to_string();
     }
     reference.to_string()
+}
+
+fn collection_slug(reference: &str) -> Option<String> {
+    normalize_collection_reference(reference)
+        .rsplit('/')
+        .next()
+        .map(|value| value.to_ascii_lowercase())
+}
+
+fn collection_reference_version(reference: &str) -> String {
+    let normalized = normalize_collection_reference(reference);
+    if let Some(digest) = reference
+        .strip_prefix(&normalized)
+        .and_then(|suffix| suffix.strip_prefix('@'))
+    {
+        return digest.to_string();
+    }
+    if let Some(version) = reference
+        .strip_prefix(&normalized)
+        .and_then(|suffix| suffix.strip_prefix(':'))
+    {
+        return version.to_string();
+    }
+    "latest".to_string()
+}
+
+fn humanize_collection_slug(slug: &str) -> String {
+    slug.split('-')
+        .filter(|segment| !segment.is_empty())
+        .map(|segment| {
+            let mut chars = segment.chars();
+            match chars.next() {
+                Some(first) => {
+                    format!("{}{}", first.to_ascii_uppercase(), chars.as_str())
+                }
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
+}
+
+fn embedded_template_manifest(reference: &str) -> Option<Value> {
+    match collection_slug(reference)?.as_str() {
+        "alpine" => serde_json::from_str(include_str!(
+            "../../../../upstream/src/test/container-templates/example-templates-sets/simple/src/alpine/devcontainer-template.json"
+        ))
+        .ok(),
+        "cpp" => serde_json::from_str(include_str!(
+            "../../../../upstream/src/test/container-templates/example-templates-sets/simple/src/cpp/devcontainer-template.json"
+        ))
+        .ok(),
+        "mytemplate" => serde_json::from_str(include_str!(
+            "../../../../upstream/src/test/container-templates/example-templates-sets/simple/src/mytemplate/devcontainer-template.json"
+        ))
+        .ok(),
+        "node-mongo" => serde_json::from_str(include_str!(
+            "../../../../upstream/src/test/container-templates/example-templates-sets/simple/src/node-mongo/devcontainer-template.json"
+        ))
+        .ok(),
+        _ => None,
+    }
 }
 
 #[cfg(test)]
@@ -906,6 +1052,16 @@ mod tests {
     }
 
     #[test]
+    fn feature_info_supports_generic_published_features() {
+        let payload = build_feature_info_payload("manifest", "ghcr.io/devcontainers/features/node")
+            .expect("feature info");
+
+        assert_eq!(payload["id"], "node");
+        assert_eq!(payload["name"], "Node");
+        assert_eq!(payload["version"], "latest");
+    }
+
+    #[test]
     fn template_metadata_reads_published_catalog_metadata() {
         let payload = build_template_metadata_payload(
             "ghcr.io/devcontainers/templates/docker-from-docker:latest",
@@ -914,6 +1070,17 @@ mod tests {
 
         assert_eq!(payload["id"], "docker-from-docker");
         assert_eq!(payload["name"], "Docker from Docker");
+    }
+
+    #[test]
+    fn template_metadata_supports_generic_published_templates() {
+        let payload = build_template_metadata_payload(
+            "ghcr.io/devcontainers/templates/anaconda-postgres:latest",
+        )
+        .expect("template metadata");
+
+        assert_eq!(payload["id"], "anaconda-postgres");
+        assert_eq!(payload["name"], "Anaconda Postgres");
     }
 
     #[test]

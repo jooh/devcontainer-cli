@@ -397,6 +397,73 @@ fn templates_metadata_supports_published_template_ids() {
 }
 
 #[test]
+fn features_info_supports_additional_published_feature_ids() {
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "features",
+            "info",
+            "manifest",
+            "ghcr.io/devcontainers/features/node",
+        ])
+        .output()
+        .expect("features info should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("feature info payload");
+    assert_eq!(payload["id"], "node");
+    assert_eq!(payload["name"], "Node");
+}
+
+#[test]
+fn templates_metadata_supports_additional_published_template_ids() {
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "metadata",
+            "ghcr.io/devcontainers/templates/anaconda-postgres:latest",
+        ])
+        .output()
+        .expect("templates metadata should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("metadata payload");
+    assert_eq!(payload["id"], "anaconda-postgres");
+}
+
+#[test]
+fn templates_apply_supports_additional_published_template_ids() {
+    let workspace = unique_temp_dir();
+    fs::create_dir_all(&workspace).expect("workspace");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "apply",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--template-id",
+            "ghcr.io/devcontainers/templates/anaconda-postgres:latest",
+            "--template-args",
+            "{ \"nodeVersion\": \"lts/*\" }",
+            "--features",
+            "[{ \"id\": \"ghcr.io/devcontainers/features/azure-cli:1\", \"options\": {} }, { \"id\": \"ghcr.io/devcontainers/features/git:1\", \"options\": { \"version\": \"latest\", \"ppa\": true } }]",
+        ])
+        .output()
+        .expect("templates apply should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("apply payload");
+    assert_eq!(payload["files"][0], "./.devcontainer/devcontainer.json");
+    let file = fs::read_to_string(workspace.join(".devcontainer").join("devcontainer.json"))
+        .expect("devcontainer file");
+    assert!(file.contains("\"name\": \"Anaconda Postgres\""));
+    assert!(file.contains("ghcr.io/devcontainers/features/azure-cli:1"));
+    assert!(file.contains("ghcr.io/devcontainers/features/git:1"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn outdated_supports_upstream_json_output_fixture() {
     let root = repo_root();
     let fixture = root
@@ -561,6 +628,43 @@ fn upgrade_with_feature_updates_config_and_dry_run_lockfile() {
     assert_eq!(
         payload["features"]["ghcr.io/codspace/versioning/foo:2"]["version"],
         "2.11.1"
+    );
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn upgrade_supports_upstream_dependson_lockfile_fixture() {
+    let root = repo_root();
+    let fixture = root
+        .join("upstream")
+        .join("src")
+        .join("test")
+        .join("container-features")
+        .join("configs")
+        .join("lockfile-dependson");
+    let workspace = unique_temp_dir();
+    copy_recursive(&fixture, &workspace);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "upgrade",
+            "--dry-run",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ])
+        .output()
+        .expect("upgrade should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("dry-run lockfile");
+    assert_eq!(
+        payload["features"]["ghcr.io/codspace/dependson/A:2"]["version"],
+        "2.0.1"
+    );
+    assert_eq!(
+        payload["features"]["ghcr.io/codspace/dependson/E:1"]["version"],
+        "1.0.0"
     );
 
     let _ = fs::remove_dir_all(workspace);
