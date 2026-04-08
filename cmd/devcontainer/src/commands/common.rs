@@ -8,6 +8,14 @@ use serde_json::{Map, Value};
 use crate::config::{self, ConfigContext};
 use crate::process_runner::{self, ProcessRequest};
 
+#[derive(Default)]
+pub(crate) struct ManifestDocOptions {
+    pub(crate) registry: Option<String>,
+    pub(crate) namespace: Option<String>,
+    pub(crate) github_owner: Option<String>,
+    pub(crate) github_repo: Option<String>,
+}
+
 pub(crate) fn parse_option_value(args: &[String], option: &str) -> Option<String> {
     args.windows(2)
         .find(|window| window[0] == option)
@@ -40,6 +48,28 @@ pub(crate) fn parse_option_values(args: &[String], option: &str) -> Vec<String> 
         }
     }
     values
+}
+
+pub(crate) fn parse_json_string_array_option(
+    args: &[String],
+    option: &str,
+) -> Result<Vec<String>, String> {
+    let Some(value) = parse_option_value(args, option) else {
+        return Ok(Vec::new());
+    };
+    let parsed = config::parse_jsonc_value(&value)?;
+    let values = parsed
+        .as_array()
+        .ok_or_else(|| format!("{option} must be a JSON array"))?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_string)
+                .ok_or_else(|| format!("{option} entries must be strings"))
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(values)
 }
 
 pub(crate) fn has_flag(args: &[String], flag: &str) -> bool {
@@ -283,6 +313,7 @@ pub(crate) fn generate_manifest_docs(
     root: &Path,
     manifest_name: &str,
     fallback_title: &str,
+    options: &ManifestDocOptions,
 ) -> Result<PathBuf, String> {
     let manifest = parse_manifest(root, manifest_name)?;
     let readme_path = root.join("README.md");
@@ -294,8 +325,25 @@ pub(crate) fn generate_manifest_docs(
         .get("description")
         .and_then(Value::as_str)
         .unwrap_or("Generated documentation.");
-    fs::write(&readme_path, format!("# {name}\n\n{description}\n"))
-        .map_err(|error| error.to_string())?;
+    let mut contents = format!("# {name}\n\n{description}\n");
+    if let (Some(registry), Some(namespace), Some(id)) = (
+        options.registry.as_deref(),
+        options.namespace.as_deref(),
+        manifest.get("id").and_then(Value::as_str),
+    ) {
+        contents.push_str(&format!(
+            "\n## OCI Reference\n\n`{registry}/{namespace}/{id}`\n"
+        ));
+    }
+    if let (Some(owner), Some(repo)) = (
+        options.github_owner.as_deref(),
+        options.github_repo.as_deref(),
+    ) {
+        contents.push_str(&format!(
+            "\n## Source Repository\n\nhttps://github.com/{owner}/{repo}\n"
+        ));
+    }
+    fs::write(&readme_path, contents).map_err(|error| error.to_string())?;
     Ok(readme_path)
 }
 

@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 113,
-		"optionsMissing": 87
+		"optionsReferenced": 127,
+		"optionsMissing": 73
 	},
 	"commands": [
 		{
@@ -16,8 +16,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 43,
-				"referenced": 22,
-				"missing": 21
+				"referenced": 24,
+				"missing": 19
 			},
 			"options": [
 				{
@@ -219,8 +219,13 @@
 				},
 				{
 					"name": "override-config",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "remote-env",
@@ -239,8 +244,11 @@
 				},
 				{
 					"name": "secrets-file",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "skip-feature-auto-mapping",
@@ -313,7 +321,7 @@
 				}
 			],
 			"knownGaps": [
-				"Native runtime now layers Features for image/dockerfile configs, but compose Feature flows are still missing.",
+				"Native runtime now layers Features for image, dockerfile, and Docker Compose configs.",
 				"Several upstream flags remain unimplemented or are only partially honored."
 			]
 		},
@@ -455,7 +463,7 @@
 				}
 			],
 			"knownGaps": [
-				"Lifecycle execution is native, but upstream secrets and some setup flags are still missing."
+				"Lifecycle execution is native, but several upstream setup and dotfiles flags are still missing."
 			]
 		},
 		{
@@ -549,7 +557,8 @@
 					"name": "image-name",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/build.rs"
+						"cmd/devcontainer/src/runtime/build.rs",
+						"cmd/devcontainer/src/runtime/compose/mod.rs"
 					]
 				},
 				{
@@ -644,7 +653,7 @@
 				}
 			],
 			"knownGaps": [
-				"Native runtime now layers Features for image/dockerfile configs, but compose Feature flows are still missing.",
+				"Native runtime now layers Features for image, dockerfile, and Docker Compose configs.",
 				"Several upstream build flags are still unimplemented or are only partially honored."
 			]
 		},
@@ -655,8 +664,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 27,
-				"referenced": 10,
-				"missing": 17
+				"referenced": 12,
+				"missing": 15
 			},
 			"options": [
 				{
@@ -763,8 +772,11 @@
 				},
 				{
 					"name": "override-config",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "remote-env",
@@ -776,8 +788,11 @@
 				},
 				{
 					"name": "secrets-file",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "skip-feature-auto-mapping",
@@ -831,7 +846,7 @@
 				}
 			],
 			"knownGaps": [
-				"Lifecycle execution is native, but upstream secrets and some runtime flags are still missing."
+				"Lifecycle execution is native, but several upstream runtime and dotfiles flags are still missing."
 			]
 		},
 		{
@@ -841,8 +856,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 18,
-				"referenced": 11,
-				"missing": 7
+				"referenced": 12,
+				"missing": 6
 			},
 			"options": [
 				{
@@ -949,8 +964,13 @@
 				},
 				{
 					"name": "override-config",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "skip-feature-auto-mapping",
@@ -1328,7 +1348,7 @@
 				}
 			],
 			"knownGaps": [
-				"Only `manifest` mode is implemented natively; `tags`, `dependencies`, and `verbose` are missing."
+				"Info modes are native, but published metadata still comes from embedded/manual catalog data instead of real OCI fetches."
 			]
 		},
 		{
@@ -1356,6 +1376,7 @@
 						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/collections/templates.rs",
 						"cmd/devcontainer/src/commands/collections/tests/features.rs",
+						"cmd/devcontainer/src/commands/collections/tests/templates.rs",
 						"cmd/devcontainer/src/commands/common.rs"
 					]
 				}
@@ -1371,19 +1392,23 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 6,
-				"referenced": 2,
-				"missing": 4
+				"referenced": 6,
+				"missing": 0
 			},
 			"options": [
 				{
 					"name": "github-owner",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "github-repo",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "log-level",
@@ -1394,8 +1419,12 @@
 				},
 				{
 					"name": "namespace",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/collections/publish.rs",
+						"cmd/devcontainer/src/commands/collections/tests/publish.rs"
+					]
 				},
 				{
 					"name": "project-folder",
@@ -1407,8 +1436,12 @@
 				},
 				{
 					"name": "registry",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/collections/publish.rs",
+						"cmd/devcontainer/src/commands/collections/tests/publish.rs"
+					]
 				}
 			],
 			"knownGaps": [
@@ -1437,8 +1470,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 7,
-				"referenced": 5,
-				"missing": 2
+				"referenced": 7,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -1459,8 +1492,11 @@
 				},
 				{
 					"name": "omit-paths",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/templates.rs",
+						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+					]
 				},
 				{
 					"name": "template-args",
@@ -1479,8 +1515,11 @@
 				},
 				{
 					"name": "tmp-dir",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/templates.rs",
+						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",
@@ -1489,6 +1528,7 @@
 						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/collections/templates.rs",
 						"cmd/devcontainer/src/commands/collections/tests/features.rs",
+						"cmd/devcontainer/src/commands/collections/tests/templates.rs",
 						"cmd/devcontainer/src/commands/common.rs"
 					]
 				}
@@ -1542,19 +1582,23 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 4,
-				"referenced": 2,
-				"missing": 2
+				"referenced": 4,
+				"missing": 0
 			},
 			"options": [
 				{
 					"name": "github-owner",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "github-repo",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "log-level",
@@ -1583,8 +1627,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 19,
-				"referenced": 8,
-				"missing": 11
+				"referenced": 9,
+				"missing": 10
 			},
 			"options": [
 				{
@@ -1671,8 +1715,11 @@
 				},
 				{
 					"name": "override-config",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "remote-env",

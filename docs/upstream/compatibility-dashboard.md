@@ -8,15 +8,15 @@
 ## Current snapshot
 
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped Rust sources: `113/200`
+- Upstream options with a native source reference in mapped Rust sources: `127/200`
 - The parity inventory is a static source-evidence report. It is intended to identify obvious gaps and track drift, not to claim semantic parity by itself.
 
 ## Highest-Impact Gaps
 
-- `build` and `up` now layer Features for image/dockerfile configs, but Docker Compose Feature flows are still missing.
+- `build` and `up` now layer Features for image, dockerfile, and Docker Compose configs, but several upstream runtime flags are still only partially covered.
 - `read-configuration --include-features-configuration` now resolves native Feature sets, but still relies on fixture/manual manifests rather than full OCI resolution.
 - `outdated` and `upgrade` still rely on repo-owned fixture/manual catalog data instead of real upstream registry resolution.
-- `features` and `templates` published flows still use repo-owned local/offline substitutes instead of real OCI registry fetch/publish behavior.
+- `features` and `templates` published flows still use local OCI layouts and embedded/local substitutes instead of real OCI registry fetch/publish behavior.
 - Several upstream command flags remain unimplemented or only partially honored; see `docs/upstream/parity-inventory.md` for the per-command inventory.
 
 ## Guardrails

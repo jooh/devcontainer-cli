@@ -15,6 +15,9 @@ pub(super) fn publish_collection_target_to_oci(
 ) -> Result<Value, String> {
     let manifest = common::parse_manifest(target, manifest_name)?;
     let archive = common::package_collection_target(target, manifest_name, prefix)?;
+    let registry =
+        common::parse_option_value(args, "--registry").unwrap_or_else(|| "ghcr.io".to_string());
+    let namespace = common::parse_option_value(args, "--namespace");
     let output_dir = common::parse_option_value(args, "--output-dir")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
@@ -23,7 +26,13 @@ pub(super) fn publish_collection_target_to_oci(
                 .unwrap_or(target)
                 .join(format!("{prefix}-oci-layout"))
         });
-    let digest = write_oci_layout(&output_dir, &archive, &manifest)?;
+    let resource = namespace.as_ref().and_then(|namespace| {
+        manifest
+            .get("id")
+            .and_then(Value::as_str)
+            .map(|id| format!("{registry}/{namespace}/{id}"))
+    });
+    let digest = write_oci_layout(&output_dir, &archive, &manifest, resource.as_deref())?;
     Ok(json!({
         "outcome": "success",
         "command": command,
@@ -32,10 +41,18 @@ pub(super) fn publish_collection_target_to_oci(
         "layout": output_dir,
         "digest": digest,
         "mode": "local-oci-layout",
+        "registry": registry,
+        "namespace": namespace,
+        "resource": resource,
     }))
 }
 
-fn write_oci_layout(output_dir: &Path, archive: &Path, metadata: &Value) -> Result<String, String> {
+fn write_oci_layout(
+    output_dir: &Path,
+    archive: &Path,
+    metadata: &Value,
+    resource: Option<&str>,
+) -> Result<String, String> {
     fs::create_dir_all(output_dir.join("blobs").join("sha256"))
         .map_err(|error| error.to_string())?;
     fs::write(
@@ -60,6 +77,18 @@ fn write_oci_layout(output_dir: &Path, archive: &Path, metadata: &Value) -> Resu
     )
     .map_err(|error| error.to_string())?;
 
+    let mut annotations = json!({
+        "dev.containers.metadata": serde_json::to_string(metadata).map_err(|error| error.to_string())?,
+    });
+    if let Some(resource) = resource {
+        annotations
+            .as_object_mut()
+            .expect("annotations object")
+            .insert(
+                "org.opencontainers.image.ref.name".to_string(),
+                Value::String(resource.to_string()),
+            );
+    }
     let manifest_json = json!({
         "schemaVersion": 2,
         "mediaType": "application/vnd.oci.image.manifest.v1+json",
@@ -73,9 +102,7 @@ fn write_oci_layout(output_dir: &Path, archive: &Path, metadata: &Value) -> Resu
             "digest": format!("sha256:{layer_digest}"),
             "size": layer_bytes.len(),
         }],
-        "annotations": {
-            "dev.containers.metadata": serde_json::to_string(metadata).map_err(|error| error.to_string())?,
-        }
+        "annotations": annotations,
     });
     let manifest_bytes =
         serde_json::to_vec_pretty(&manifest_json).map_err(|error| error.to_string())?;

@@ -32,7 +32,7 @@ The Rust CLI now declares every pinned upstream command path, but command-depth 
 
 The highest-impact remaining gaps are still substantive:
 
-- integrating Features into native `build` / `up` / `read-configuration`
+- replacing fixture/manual Feature metadata resolution with real OCI-backed fetch and dependency behavior
 - replacing fixture/manual lockfile catalogs with real registry-backed resolution
-- replacing offline `features` / `templates` published flows with real OCI behavior
+- replacing local-layout `features` / `templates` published flows with real OCI registry behavior
 - broadening parity-harness and runtime coverage beyond the current pinned scenarios

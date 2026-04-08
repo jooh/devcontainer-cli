@@ -5,6 +5,7 @@ use serde_json::json;
 use super::support::unique_temp_dir;
 use crate::commands::collections::templates::{
     apply_catalog_template, apply_template_target, build_template_metadata_payload,
+    run_template_apply,
 };
 
 #[test]
@@ -73,6 +74,45 @@ fn template_apply_copies_template_src_into_workspace() {
     assert!(workspace_root.join("README.md").is_file());
     let _ = fs::remove_dir_all(template_root);
     let _ = fs::remove_dir_all(workspace_root);
+}
+
+#[test]
+fn template_apply_supports_omit_paths_and_tmp_dir() {
+    let template_root = unique_temp_dir();
+    let template_src = template_root.join("src");
+    let workspace_root = unique_temp_dir();
+    let tmp_dir = unique_temp_dir();
+    fs::create_dir_all(template_src.join(".github")).expect("failed to create template src");
+    fs::write(
+        template_root.join("devcontainer-template.json"),
+        "{\n  \"id\": \"demo-template\",\n  \"name\": \"Demo Template\"\n}\n",
+    )
+    .expect("failed to write template manifest");
+    fs::write(template_src.join("README.md"), "# template\n")
+        .expect("failed to write template file");
+    fs::write(
+        template_src.join(".github").join("workflows.yml"),
+        "name: ci\n",
+    )
+    .expect("failed to write omitted file");
+
+    run_template_apply(&[
+        template_root.display().to_string(),
+        "--workspace-folder".to_string(),
+        workspace_root.display().to_string(),
+        "--omit-paths".to_string(),
+        "[\".github/*\"]".to_string(),
+        "--tmp-dir".to_string(),
+        tmp_dir.display().to_string(),
+    ])
+    .expect("apply template");
+
+    assert!(workspace_root.join("README.md").is_file());
+    assert!(!workspace_root.join(".github").exists());
+    assert!(tmp_dir.is_dir());
+    let _ = fs::remove_dir_all(template_root);
+    let _ = fs::remove_dir_all(workspace_root);
+    let _ = fs::remove_dir_all(tmp_dir);
 }
 
 #[test]

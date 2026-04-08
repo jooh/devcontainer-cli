@@ -71,10 +71,18 @@ pub(crate) fn run_features(args: &[String]) -> ExitCode {
             if args.len() < 2 {
                 Err("features generate-docs requires <target>".to_string())
             } else {
+                let options = common::ManifestDocOptions {
+                    registry: common::parse_option_value(&args[2..], "--registry")
+                        .or_else(|| Some("ghcr.io".to_string())),
+                    namespace: common::parse_option_value(&args[2..], "--namespace"),
+                    github_owner: common::parse_option_value(&args[2..], "--github-owner"),
+                    github_repo: common::parse_option_value(&args[2..], "--github-repo"),
+                };
                 crate::commands::common::generate_manifest_docs(
                     std::path::Path::new(&args[1]),
                     "devcontainer-feature.json",
                     "Feature",
+                    &options,
                 )
                 .map(|readme| {
                     serde_json::json!({
@@ -127,10 +135,16 @@ pub(crate) fn run_templates(args: &[String]) -> ExitCode {
             if args.len() < 2 {
                 Err("templates generate-docs requires <target>".to_string())
             } else {
+                let options = common::ManifestDocOptions {
+                    github_owner: common::parse_option_value(&args[2..], "--github-owner"),
+                    github_repo: common::parse_option_value(&args[2..], "--github-repo"),
+                    ..Default::default()
+                };
                 crate::commands::common::generate_manifest_docs(
                     std::path::Path::new(&args[1]),
                     "devcontainer-template.json",
                     "Template",
+                    &options,
                 )
                 .map(|readme| {
                     serde_json::json!({

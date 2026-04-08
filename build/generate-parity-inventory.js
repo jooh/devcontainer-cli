@@ -18,18 +18,18 @@ const outputMarkdownPath = path.join(repositoryRoot, 'docs', 'upstream', 'parity
 
 const KNOWN_GAPS = {
 	'up': [
-		'Native runtime now layers Features for image/dockerfile configs, but compose Feature flows are still missing.',
+		'Native runtime now layers Features for image, dockerfile, and Docker Compose configs.',
 		'Several upstream flags remain unimplemented or are only partially honored.',
 	],
 	'set-up': [
-		'Lifecycle execution is native, but upstream secrets and some setup flags are still missing.',
+		'Lifecycle execution is native, but several upstream setup and dotfiles flags are still missing.',
 	],
 	'build': [
-		'Native runtime now layers Features for image/dockerfile configs, but compose Feature flows are still missing.',
+		'Native runtime now layers Features for image, dockerfile, and Docker Compose configs.',
 		'Several upstream build flags are still unimplemented or are only partially honored.',
 	],
 	'run-user-commands': [
-		'Lifecycle execution is native, but upstream secrets and some runtime flags are still missing.',
+		'Lifecycle execution is native, but several upstream runtime and dotfiles flags are still missing.',
 	],
 	'read-configuration': [
 		'`--include-features-configuration` resolves local/published Feature sets natively, but still relies on fixture/manual manifests rather than full OCI resolution.',
@@ -54,7 +54,7 @@ const KNOWN_GAPS = {
 		'Publishes a local OCI layout rather than a real authenticated registry push flow.',
 	],
 	'features info': [
-		'Only `manifest` mode is implemented natively; `tags`, `dependencies`, and `verbose` are missing.',
+		'Info modes are native, but published metadata still comes from embedded/manual catalog data instead of real OCI fetches.',
 	],
 	'features resolve-dependencies': [
 		'Current implementation follows declared `dependsOn` edges, but still relies on local/manual manifests rather than full OCI graph resolution.',
