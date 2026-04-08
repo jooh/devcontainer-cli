@@ -955,7 +955,10 @@ fn cell(value: Option<&Value>) -> String {
 }
 
 fn parse_feature_reference(feature_id: &str) -> Option<FeatureReference> {
-    if !feature_id.starts_with("ghcr.io/") {
+    if !feature_id.starts_with("ghcr.io/")
+        && !feature_id.starts_with("https://")
+        && !feature_id.starts_with("http://")
+    {
         return None;
     }
 
@@ -1157,18 +1160,16 @@ fn fixture_catalog() -> Vec<(String, CatalogEntry)> {
     ] {
         let lockfile: Lockfile =
             serde_json::from_str(fixture).expect("embedded lockfile fixture should parse");
-        entries.extend(lockfile.features.into_iter().filter_map(|(feature_id, entry)| {
-            parse_feature_reference(&feature_id).map(|_| {
-                (
-                    feature_id,
-                    CatalogEntry {
-                        version: entry.version,
-                        resolved: entry.resolved,
-                        integrity: entry.integrity,
-                        depends_on: entry.depends_on,
-                    },
-                )
-            })
+        entries.extend(lockfile.features.into_iter().map(|(feature_id, entry)| {
+            (
+                feature_id,
+                CatalogEntry {
+                    version: entry.version,
+                    resolved: entry.resolved,
+                    integrity: entry.integrity,
+                    depends_on: entry.depends_on,
+                },
+            )
         }));
     }
     entries

@@ -666,6 +666,10 @@ fn upgrade_supports_upstream_dependson_lockfile_fixture() {
         payload["features"]["ghcr.io/codspace/dependson/E:1"]["version"],
         "1.0.0"
     );
+    assert_eq!(
+        payload["features"]["https://github.com/codspace/tgz-features-with-dependson/releases/download/0.0.2/devcontainer-feature-A.tgz"]["version"],
+        "2.0.1"
+    );
 
     let _ = fs::remove_dir_all(workspace);
 }
