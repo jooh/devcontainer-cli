@@ -12,6 +12,19 @@ use super::super::metadata::{serialized_container_metadata, split_mount_options}
 
 static NEXT_OVERRIDE_FILE_ID: AtomicU64 = AtomicU64::new(0);
 
+enum ComposeVolumeEntry {
+    Short(String),
+    Long(ComposeMountDefinition),
+}
+
+struct ComposeMountDefinition {
+    mount_type: String,
+    source: Option<String>,
+    target: String,
+    read_only: bool,
+    external: Option<bool>,
+}
+
 pub(super) fn compose_metadata_override_file(
     resolved: &ResolvedConfig,
     args: &[String],
@@ -54,17 +67,16 @@ pub(super) fn compose_metadata_override_file(
             escape_compose_scalar(image_name)
         ));
     }
+    let mut volumes = Vec::new();
     if let Some(volume) = compose_workspace_volume(resolved, args, remote_workspace_folder) {
-        content.push_str(&format!(
-            "\n    volumes:\n      - '{}'\n",
-            escape_compose_scalar(&volume)
-        ));
+        volumes.push(volume);
     }
-    for volume in compose_additional_volumes(&resolved.configuration) {
-        if !content.contains("\n    volumes:\n") {
-            content.push_str("\n    volumes:\n");
+    volumes.extend(compose_additional_volumes(resolved, args));
+    if !volumes.is_empty() {
+        content.push_str("\n    volumes:\n");
+        for volume in volumes {
+            content.push_str(&render_compose_volume_entry(&volume));
         }
-        content.push_str(&format!("      - '{}'\n", escape_compose_scalar(&volume)));
     }
     if let Some(environment) = compose_environment(&resolved.configuration) {
         content.push_str("    environment:\n");
@@ -151,13 +163,14 @@ fn compose_workspace_volume(
     resolved: &ResolvedConfig,
     args: &[String],
     remote_workspace_folder: &str,
-) -> Option<String> {
+) -> Option<ComposeVolumeEntry> {
     if resolved.configuration.get("workspaceMount").is_none() {
         return derived_workspace_mount(&resolved.workspace_folder, args).map(|derived| {
-            format!(
-                "{}:{remote_workspace_folder}",
-                derived.host_mount_folder.display()
-            )
+            ComposeVolumeEntry::Short(format!(
+                "{}:{}",
+                derived.host_mount_folder.display(),
+                derived.container_mount_folder
+            ))
         });
     }
     let mount = workspace_mount_for_args(resolved, remote_workspace_folder, args);
@@ -194,37 +207,147 @@ fn compose_workspace_volume(
     if read_only {
         volume.push_str(":ro");
     }
-    Some(volume)
+    Some(ComposeVolumeEntry::Short(volume))
 }
 
-fn compose_additional_volumes(configuration: &Value) -> Vec<String> {
-    configuration
+fn compose_additional_volumes(
+    resolved: &ResolvedConfig,
+    args: &[String],
+) -> Vec<ComposeVolumeEntry> {
+    let mut volumes: Vec<ComposeVolumeEntry> = resolved
+        .configuration
         .get("mounts")
         .and_then(Value::as_array)
-        .map(|mounts| mounts.iter().filter_map(compose_mount_scalar).collect())
-        .unwrap_or_default()
+        .map(|mounts| mounts.iter().filter_map(compose_mount_definition).collect())
+        .unwrap_or_default();
+    if resolved.configuration.get("workspaceMount").is_none() {
+        if let Some(derived) = derived_workspace_mount(&resolved.workspace_folder, args) {
+            volumes.extend(
+                derived
+                    .additional_mounts
+                    .iter()
+                    .filter_map(|mount| compose_mount_definition_from_str(mount))
+                    .map(ComposeVolumeEntry::Long),
+            );
+        }
+    }
+    volumes
 }
 
-fn compose_mount_scalar(value: &Value) -> Option<String> {
+fn compose_mount_definition(value: &Value) -> Option<ComposeVolumeEntry> {
     match value {
-        Value::String(text) => Some(text.clone()),
+        Value::String(text) => {
+            compose_mount_definition_from_str(text).map(ComposeVolumeEntry::Long)
+        }
         Value::Object(entries) => {
-            let mut parts = Vec::new();
-            for key in ["type", "source", "target", "external"] {
-                let Some(value) = entries.get(key) else {
-                    continue;
-                };
-                let text = match value {
-                    Value::Bool(boolean) => boolean.to_string(),
-                    Value::Number(number) => number.to_string(),
-                    Value::String(text) => text.clone(),
-                    _ => continue,
-                };
-                parts.push(format!("{key}={text}"));
-            }
-            (!parts.is_empty()).then(|| parts.join(","))
+            let mount_type = entries
+                .get("type")
+                .and_then(Value::as_str)
+                .unwrap_or("bind")
+                .to_string();
+            let source = entries
+                .get("source")
+                .or_else(|| entries.get("src"))
+                .and_then(Value::as_str)
+                .map(str::to_string);
+            let target = entries
+                .get("target")
+                .or_else(|| entries.get("destination"))
+                .or_else(|| entries.get("dst"))
+                .and_then(Value::as_str)?
+                .to_string();
+            let read_only = entries
+                .get("readonly")
+                .or_else(|| entries.get("readOnly"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
+            let external = entries.get("external").and_then(Value::as_bool);
+            Some(ComposeVolumeEntry::Long(ComposeMountDefinition {
+                mount_type,
+                source,
+                target,
+                read_only,
+                external,
+            }))
         }
         _ => None,
+    }
+}
+
+fn compose_mount_definition_from_str(mount: &str) -> Option<ComposeMountDefinition> {
+    let mut mount_type = "bind".to_string();
+    let mut source = None;
+    let mut target = None;
+    let mut read_only = false;
+    let mut external = None;
+    for option in split_mount_options(mount) {
+        if option == "readonly" || option == "ro" {
+            read_only = true;
+            continue;
+        }
+        if let Some(value) = option.strip_prefix("type=") {
+            mount_type = value.trim_matches('"').to_string();
+        } else if let Some(value) = option
+            .strip_prefix("source=")
+            .or_else(|| option.strip_prefix("src="))
+        {
+            source = Some(value.trim_matches('"').to_string());
+        } else if let Some(value) = option
+            .strip_prefix("target=")
+            .or_else(|| option.strip_prefix("destination="))
+            .or_else(|| option.strip_prefix("dst="))
+        {
+            target = Some(value.trim_matches('"').to_string());
+        } else if let Some(value) = option.strip_prefix("external=") {
+            external = match value.trim_matches('"') {
+                "true" => Some(true),
+                "false" => Some(false),
+                _ => None,
+            };
+        }
+    }
+
+    Some(ComposeMountDefinition {
+        mount_type,
+        source,
+        target: target?,
+        read_only,
+        external,
+    })
+}
+
+fn render_compose_volume_entry(entry: &ComposeVolumeEntry) -> String {
+    match entry {
+        ComposeVolumeEntry::Short(volume) => {
+            format!("      - '{}'\n", escape_compose_scalar(volume))
+        }
+        ComposeVolumeEntry::Long(definition) => {
+            let mut rendered = format!(
+                "      - type: '{}'\n",
+                escape_compose_scalar(&definition.mount_type)
+            );
+            if let Some(source) = &definition.source {
+                rendered.push_str(&format!(
+                    "        source: '{}'\n",
+                    escape_compose_scalar(source)
+                ));
+            }
+            rendered.push_str(&format!(
+                "        target: '{}'\n",
+                escape_compose_scalar(&definition.target)
+            ));
+            if definition.read_only {
+                rendered.push_str("        read_only: true\n");
+            }
+            if let Some(external) = definition.external {
+                rendered.push_str("        volume:\n");
+                rendered.push_str(&format!(
+                    "          external: {}\n",
+                    if external { "true" } else { "false" }
+                ));
+            }
+            rendered
+        }
     }
 }
 

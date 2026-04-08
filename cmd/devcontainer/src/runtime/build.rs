@@ -66,6 +66,7 @@ pub(crate) fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<
                 .unwrap_or_else(|| default_image_name(&resolved.workspace_folder));
             let built =
                 build_feature_image(args, &image_name, &image, &feature_support.installations)?;
+            maybe_push_image(args, &built)?;
             configuration::ensure_native_lockfile(
                 args,
                 &resolved.config_file,
@@ -88,6 +89,7 @@ pub(crate) fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<
             &base_image,
             &feature_support.installations,
         )?;
+        maybe_push_image(args, &built)?;
         configuration::ensure_native_lockfile(
             args,
             &resolved.config_file,
@@ -97,6 +99,7 @@ pub(crate) fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<
     }
 
     build_base_image(resolved, args, &image_name)?;
+    maybe_push_image(args, &image_name)?;
     Ok(image_name)
 }
 
@@ -138,14 +141,6 @@ fn build_base_image(
         return Err(engine::stderr_or_stdout(&result));
     }
 
-    if common::has_flag(args, "--push") {
-        let push_result =
-            engine::run_engine(args, vec!["push".to_string(), image_name.to_string()])?;
-        if push_result.status_code != 0 {
-            return Err(engine::stderr_or_stdout(&push_result));
-        }
-    }
-
     Ok(())
 }
 
@@ -169,6 +164,19 @@ pub(crate) fn build_feature_image(
     }
     cleanup.map_err(|error| error.to_string())?;
     Ok(image_name.to_string())
+}
+
+fn maybe_push_image(args: &[String], image_name: &str) -> Result<(), String> {
+    if !common::has_flag(args, "--push") {
+        return Ok(());
+    }
+
+    let push_result = engine::run_engine(args, vec!["push".to_string(), image_name.to_string()])?;
+    if push_result.status_code != 0 {
+        return Err(engine::stderr_or_stdout(&push_result));
+    }
+
+    Ok(())
 }
 
 fn write_feature_dockerfile(

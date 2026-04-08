@@ -189,9 +189,17 @@ fn metadata_override_file_mounts_workspace_by_default() {
         .expect("override result")
         .expect("override path");
     let override_content = fs::read_to_string(&override_file).expect("override content");
+    let expected_mount_target = format!(
+        "/workspaces/{}",
+        root.file_name().unwrap().to_string_lossy()
+    );
 
     assert!(override_content.contains("volumes:"));
-    assert!(override_content.contains(&format!("- '{}:/workspaces/project'", root.display())));
+    assert!(override_content.contains(&format!(
+        "- '{}:{}'",
+        root.display(),
+        expected_mount_target
+    )));
 
     let _ = fs::remove_file(override_file);
     let _ = fs::remove_dir_all(root);
