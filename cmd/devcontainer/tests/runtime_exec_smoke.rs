@@ -196,3 +196,60 @@ fn compose_up_persists_metadata_for_followup_exec_with_container_id() {
         "exec --workdir /persisted-compose-workspace --user vscode -e TEST_REMOTE_ENV=from-compose-config fake-compose-container-id /bin/echo hello-from-compose-metadata"
     ));
 }
+
+#[test]
+fn exec_injects_secrets_file_environment() {
+    let harness = RuntimeHarness::new();
+    let inspect_path = harness.root.join("inspect.json");
+    let secrets_path = harness.root.join("secrets.json");
+    fs::write(
+        &secrets_path,
+        "{\n  \"SECRET_TOKEN\": \"from-secret-file\"\n}\n",
+    )
+    .expect("secrets file");
+    fs::write(
+        &inspect_path,
+        json!([{
+            "Config": {
+                "Labels": {
+                    "devcontainer.metadata": "{}",
+                    "devcontainer.local_folder": "/host/project"
+                }
+            },
+            "Mounts": [{
+                "Source": "/host/project",
+                "Destination": "/container/project"
+            }]
+        }])
+        .to_string(),
+    )
+    .expect("inspect json");
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--container-id",
+            "fake-container-id",
+            "--secrets-file",
+            secrets_path.to_string_lossy().as_ref(),
+            "/bin/sh",
+            "-lc",
+            "printf %s \"$SECRET_TOKEN\"",
+        ],
+        &[(
+            "FAKE_PODMAN_INSPECT_FILE",
+            inspect_path.to_string_lossy().as_ref(),
+        )],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "from-secret-file"
+    );
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("-e SECRET_TOKEN=from-secret-file"));
+}

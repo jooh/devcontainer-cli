@@ -18,11 +18,7 @@ pub fn resolve_config_path(
     explicit_config: Option<&Path>,
 ) -> Result<PathBuf, String> {
     let config_path = if let Some(config) = explicit_config {
-        if config.is_absolute() {
-            config.to_path_buf()
-        } else {
-            workspace_folder.join(config)
-        }
+        expected_config_path(workspace_folder, Some(config))
     } else {
         let modern = workspace_folder
             .join(".devcontainer")
@@ -43,6 +39,20 @@ pub fn resolve_config_path(
     }
 
     Ok(fs::canonicalize(&config_path).unwrap_or(config_path))
+}
+
+pub fn expected_config_path(workspace_folder: &Path, explicit_config: Option<&Path>) -> PathBuf {
+    if let Some(config) = explicit_config {
+        if config.is_absolute() {
+            config.to_path_buf()
+        } else {
+            workspace_folder.join(config)
+        }
+    } else {
+        workspace_folder
+            .join(".devcontainer")
+            .join("devcontainer.json")
+    }
 }
 
 fn strip_jsonc_comments(text: &str) -> String {

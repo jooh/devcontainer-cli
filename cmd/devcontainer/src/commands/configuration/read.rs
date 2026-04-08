@@ -73,9 +73,10 @@ pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
 }
 
 pub(super) fn should_use_native_read_configuration(args: &[String]) -> bool {
-    const SUPPORTED_OPTIONS: [&str; 10] = [
+    const SUPPORTED_OPTIONS: [&str; 11] = [
         "--workspace-folder",
         "--config",
+        "--override-config",
         "--container-id",
         "--id-label",
         "--docker-path",

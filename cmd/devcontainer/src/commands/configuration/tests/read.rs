@@ -102,6 +102,40 @@ fn infers_workspace_root_for_nested_devcontainer_configs() {
 }
 
 #[test]
+fn override_config_can_supply_configuration_without_workspace_devcontainer_file() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    let override_config = config_dir.join("override.json");
+    fs::create_dir_all(&config_dir).expect("failed to create config dir");
+    fs::write(&override_config, "{\n  \"image\": \"alpine:3.20\"\n}\n")
+        .expect("failed to write override config");
+
+    let args = vec![
+        "--override-config".to_string(),
+        override_config.display().to_string(),
+    ];
+    let (workspace_folder, config_file) =
+        resolve_read_configuration_path(&args).expect("expected config resolution");
+    let payload = build_read_configuration_payload(&args).expect("payload");
+
+    assert_eq!(
+        workspace_folder,
+        fs::canonicalize(&root).expect("failed to canonicalize workspace")
+    );
+    let expected_config = fs::canonicalize(&root)
+        .expect("failed to canonicalize workspace")
+        .join(".devcontainer")
+        .join("devcontainer.json");
+    assert_eq!(config_file, expected_config);
+    assert_eq!(payload["configuration"]["image"], "alpine:3.20");
+    assert_eq!(
+        payload["configuration"]["configFilePath"],
+        expected_config.display().to_string()
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn read_configuration_with_additional_flags_is_supported_natively() {
     assert!(should_use_native_read_configuration(&[
         "--workspace-folder".to_string(),
@@ -117,6 +151,15 @@ fn read_configuration_accepts_docker_compose_path_flag() {
         "/workspace".to_string(),
         "--docker-compose-path".to_string(),
         "trigger-compose-v2".to_string(),
+    ]));
+}
+
+#[test]
+fn read_configuration_accepts_override_config_flag() {
+    assert!(should_use_native_read_configuration(&[
+        "--override-config".to_string(),
+        "/workspace/.devcontainer/override.json".to_string(),
+        "--include-merged-configuration".to_string(),
     ]));
 }
 

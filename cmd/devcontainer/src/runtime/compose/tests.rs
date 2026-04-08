@@ -175,13 +175,63 @@ fn metadata_override_file_mounts_workspace_by_default() {
         }),
     };
 
-    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project")
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project", None)
         .expect("override result")
         .expect("override path");
     let override_content = fs::read_to_string(&override_file).expect("override content");
 
     assert!(override_content.contains("volumes:"));
     assert!(override_content.contains(&format!("- '{}:/workspaces/project'", root.display())));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_can_pin_image_and_runtime_settings() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "containerEnv": {
+                "FEATURE_FLAG": "enabled"
+            },
+            "remoteUser": "vscode",
+            "privileged": true,
+            "init": true,
+            "capAdd": ["SYS_ADMIN"],
+            "securityOpt": ["seccomp=unconfined"],
+            "mounts": [{
+                "type": "volume",
+                "source": "feature-cache",
+                "target": "/cache"
+            }]
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(
+        &resolved,
+        &[],
+        "/workspaces/project",
+        Some("example/compose-featured:test"),
+    )
+    .expect("override result")
+    .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("image: 'example/compose-featured:test'"));
+    assert!(override_content.contains("environment:"));
+    assert!(override_content.contains("FEATURE_FLAG: 'enabled'"));
+    assert!(override_content.contains("user: 'vscode'"));
+    assert!(override_content.contains("privileged: true"));
+    assert!(override_content.contains("init: true"));
+    assert!(override_content.contains("cap_add:"));
+    assert!(override_content.contains("security_opt:"));
+    assert!(override_content.contains("type=volume,source=feature-cache,target=/cache"));
 
     let _ = fs::remove_file(override_file);
     let _ = fs::remove_dir_all(root);

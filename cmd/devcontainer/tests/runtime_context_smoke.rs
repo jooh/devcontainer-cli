@@ -160,3 +160,61 @@ fn exec_from_workspace_directory_loads_local_config() {
         "exec --workdir /configured-workspace --user vscode -e TEST_REMOTE_ENV=from-config fake-container-id /bin/echo hello-from-workspace"
     ));
 }
+
+#[test]
+fn exec_with_override_config_uses_override_contents_and_workspace_config_labels() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let caller_dir = harness.root.join("caller");
+    let override_dir = workspace.join(".devcontainer");
+    let override_path = override_dir.join("override.json");
+    fs::create_dir_all(&override_dir).expect("override dir");
+    fs::create_dir_all(&caller_dir).expect("caller dir");
+    fs::write(
+        &override_path,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/override-workspace\",\n  \"remoteUser\": \"vscode\"\n}\n",
+    )
+    .expect("override write");
+    let expected_workspace = workspace
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.clone());
+    let expected_config = expected_workspace
+        .join(".devcontainer")
+        .join("devcontainer.json");
+
+    let required_labels = format!(
+        "devcontainer.local_folder={}\ndevcontainer.config_file={}",
+        expected_workspace.display(),
+        expected_config.display()
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run_in_dir(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--override-config",
+            override_path.to_string_lossy().as_ref(),
+            "/bin/echo",
+            "hello-from-override",
+        ],
+        &[("FAKE_PODMAN_PS_REQUIRE_LABELS", required_labels.as_str())],
+        Some(&caller_dir),
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-override\n"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(&format!(
+        "--filter label=devcontainer.config_file={}",
+        expected_config.display()
+    )));
+    assert!(invocations.contains(
+        "exec --workdir /override-workspace --user vscode fake-container-id /bin/echo hello-from-override"
+    ));
+}

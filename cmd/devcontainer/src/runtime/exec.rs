@@ -14,7 +14,9 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
                 | "--docker-compose-path"
                 | "--workspace-folder"
                 | "--config"
+                | "--override-config"
                 | "--remote-env"
+                | "--secrets-file"
                 | "--container-id"
                 | "--id-label"
         ) {
@@ -45,7 +47,7 @@ pub(crate) fn exec_engine_args(
     container_id: &str,
     command_args: Vec<String>,
     interactive: bool,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     let mut engine_args = vec!["exec".to_string()];
     if interactive {
         engine_args.push("-i".to_string());
@@ -59,13 +61,13 @@ pub(crate) fn exec_engine_args(
         engine_args.push("--user".to_string());
         engine_args.push(user.to_string());
     }
-    for (key, value) in combined_remote_env(args, Some(configuration)) {
+    for (key, value) in combined_remote_env(args, Some(configuration))? {
         engine_args.push("-e".to_string());
         engine_args.push(format!("{key}={value}"));
     }
     engine_args.push(container_id.to_string());
     engine_args.extend(command_args);
-    engine_args
+    Ok(engine_args)
 }
 
 #[cfg(test)]
@@ -100,7 +102,8 @@ mod tests {
             "container-id",
             vec!["/bin/echo".to_string(), "hello".to_string()],
             false,
-        );
+        )
+        .expect("engine args");
 
         assert_eq!(args[0], "exec");
         assert!(args.contains(&"--workdir".to_string()));

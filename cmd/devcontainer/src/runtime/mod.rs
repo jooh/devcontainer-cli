@@ -155,7 +155,7 @@ pub fn run_exec(args: &[String]) -> Result<ExecResult, String> {
         &context.container_id,
         command_args,
         interactive,
-    );
+    )?;
 
     if interactive {
         engine::run_engine_streaming(args, engine_args).map(ExecResult::Streaming)

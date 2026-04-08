@@ -391,6 +391,52 @@ fn build_passes_no_cache_to_compose_builds() {
 }
 
 #[test]
+fn compose_build_layers_features_on_top_of_service_images() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let feature_dir = workspace.join(".devcontainer").join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nset -eu\n").expect("install script");
+    fs::write(
+        workspace.join(".devcontainer").join("Dockerfile"),
+        "FROM scratch\n",
+    )
+    .expect("dockerfile");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: example/native-compose:featured\n    build:\n      context: .\n      dockerfile: Dockerfile\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"features\": {\n    \"./local-feature\": {}\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("compose --project-name workspace_devcontainer -f "));
+    assert!(invocations.contains(" build --pull app"));
+    assert!(invocations.contains("build --tag example/native-compose:featured"));
+}
+
+#[test]
 fn build_rejects_cache_to_for_compose_builds() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();

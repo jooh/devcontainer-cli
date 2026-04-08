@@ -149,7 +149,7 @@ fn build_base_image(
     Ok(())
 }
 
-fn build_feature_image(
+pub(crate) fn build_feature_image(
     args: &[String],
     image_name: &str,
     base_image: &str,

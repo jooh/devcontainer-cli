@@ -16,6 +16,7 @@ pub(super) fn compose_metadata_override_file(
     resolved: &ResolvedConfig,
     args: &[String],
     remote_workspace_folder: &str,
+    image_name: Option<&str>,
 ) -> Result<Option<PathBuf>, String> {
     let metadata = serialized_container_metadata(&resolved.configuration, remote_workspace_folder)?;
     let mut labels = vec![
@@ -47,10 +48,89 @@ pub(super) fn compose_metadata_override_file(
             .map(|label| format!("\n      - '{}'", escape_compose_label(label)))
             .collect::<String>()
     ));
+    if let Some(image_name) = image_name {
+        content.push_str(&format!(
+            "    image: '{}'\n",
+            escape_compose_scalar(image_name)
+        ));
+    }
     if let Some(volume) = compose_workspace_volume(resolved, remote_workspace_folder) {
         content.push_str(&format!(
             "\n    volumes:\n      - '{}'\n",
             escape_compose_scalar(&volume)
+        ));
+    }
+    for volume in compose_additional_volumes(&resolved.configuration) {
+        if !content.contains("\n    volumes:\n") {
+            content.push_str("\n    volumes:\n");
+        }
+        content.push_str(&format!("      - '{}'\n", escape_compose_scalar(&volume)));
+    }
+    if let Some(environment) = compose_environment(&resolved.configuration) {
+        content.push_str("    environment:\n");
+        for (key, value) in environment {
+            content.push_str(&format!(
+                "      {}: '{}'\n",
+                key,
+                escape_compose_scalar(&value)
+            ));
+        }
+    }
+    if let Some(user) = resolved
+        .configuration
+        .get("containerUser")
+        .or_else(|| resolved.configuration.get("remoteUser"))
+        .and_then(Value::as_str)
+    {
+        content.push_str(&format!("    user: '{}'\n", escape_compose_scalar(user)));
+    }
+    if resolved
+        .configuration
+        .get("privileged")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        content.push_str("    privileged: true\n");
+    }
+    if resolved
+        .configuration
+        .get("init")
+        .and_then(Value::as_bool)
+        .unwrap_or(false)
+    {
+        content.push_str("    init: true\n");
+    }
+    if let Some(cap_add) = resolved
+        .configuration
+        .get("capAdd")
+        .and_then(Value::as_array)
+    {
+        content.push_str("    cap_add:\n");
+        for capability in cap_add.iter().filter_map(Value::as_str) {
+            content.push_str(&format!(
+                "      - '{}'\n",
+                escape_compose_scalar(capability)
+            ));
+        }
+    }
+    if let Some(security_opt) = resolved
+        .configuration
+        .get("securityOpt")
+        .and_then(Value::as_array)
+    {
+        content.push_str("    security_opt:\n");
+        for option in security_opt.iter().filter_map(Value::as_str) {
+            content.push_str(&format!("      - '{}'\n", escape_compose_scalar(option)));
+        }
+    }
+    if let Some(entrypoint) = resolved
+        .configuration
+        .get("entrypoint")
+        .and_then(Value::as_str)
+    {
+        content.push_str(&format!(
+            "    entrypoint: '{}'\n",
+            escape_compose_scalar(entrypoint)
         ));
     }
 
@@ -106,6 +186,47 @@ fn compose_workspace_volume(
         volume.push_str(":ro");
     }
     Some(volume)
+}
+
+fn compose_additional_volumes(configuration: &Value) -> Vec<String> {
+    configuration
+        .get("mounts")
+        .and_then(Value::as_array)
+        .map(|mounts| mounts.iter().filter_map(compose_mount_scalar).collect())
+        .unwrap_or_default()
+}
+
+fn compose_mount_scalar(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) => Some(text.clone()),
+        Value::Object(entries) => {
+            let mut parts = Vec::new();
+            for key in ["type", "source", "target", "external"] {
+                let Some(value) = entries.get(key) else {
+                    continue;
+                };
+                let text = match value {
+                    Value::Bool(boolean) => boolean.to_string(),
+                    Value::Number(number) => number.to_string(),
+                    Value::String(text) => text.clone(),
+                    _ => continue,
+                };
+                parts.push(format!("{key}={text}"));
+            }
+            (!parts.is_empty()).then(|| parts.join(","))
+        }
+        _ => None,
+    }
+}
+
+fn compose_environment(configuration: &Value) -> Option<Vec<(String, String)>> {
+    let env = configuration
+        .get("containerEnv")
+        .and_then(Value::as_object)?
+        .iter()
+        .filter_map(|(key, value)| value.as_str().map(|text| (key.clone(), text.to_string())))
+        .collect::<Vec<_>>();
+    (!env.is_empty()).then_some(env)
 }
 
 fn unique_override_file_path() -> PathBuf {

@@ -132,7 +132,7 @@ pub(crate) fn configured_user(configuration: &Value) -> Option<&str> {
 pub(crate) fn combined_remote_env(
     args: &[String],
     configuration: Option<&Value>,
-) -> HashMap<String, String> {
+) -> Result<HashMap<String, String>, String> {
     let mut remote_env = HashMap::new();
     if let Some(config_env) = configuration
         .and_then(|value| value.get("remoteEnv"))
@@ -144,8 +144,9 @@ pub(crate) fn combined_remote_env(
             }
         }
     }
+    remote_env.extend(common::secrets_env(args)?);
     remote_env.extend(common::remote_env_overrides(args));
-    remote_env
+    Ok(remote_env)
 }
 
 pub(crate) fn remote_workspace_folder(resolved: &ResolvedConfig) -> String {

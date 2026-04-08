@@ -207,3 +207,42 @@ fn read_configuration_merged_output_uses_upstream_pluralized_fields() {
 
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn read_configuration_supports_override_config_without_workspace_devcontainer_file() {
+    let root = unique_temp_dir("devcontainer-cli-smoke");
+    let config_dir = root.join(".devcontainer");
+    let override_path = config_dir.join("override.json");
+    fs::create_dir_all(&config_dir).expect("config dir");
+    fs::write(
+        &override_path,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/override-workspace\"\n}\n",
+    )
+    .expect("override config write");
+
+    let (output, payload) = run_read_configuration(
+        &[
+            "--override-config",
+            override_path.to_string_lossy().as_ref(),
+        ],
+        None,
+    );
+
+    assert!(output.status.success());
+    assert_eq!(payload["configuration"]["image"], "alpine:3.20");
+    let expected_config = root
+        .canonicalize()
+        .expect("canonical workspace")
+        .join(".devcontainer")
+        .join("devcontainer.json");
+    assert_eq!(
+        payload["configuration"]["configFilePath"],
+        expected_config.display().to_string()
+    );
+    assert_eq!(
+        payload["workspace"]["workspaceFolder"],
+        "/override-workspace"
+    );
+
+    let _ = fs::remove_dir_all(root);
+}

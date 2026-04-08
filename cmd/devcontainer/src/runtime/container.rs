@@ -20,7 +20,7 @@ pub(crate) fn ensure_up_container(
     remote_workspace_folder: &str,
 ) -> Result<UpContainer, String> {
     if compose::uses_compose_config(&resolved.configuration) {
-        return ensure_compose_up_container(resolved, args, remote_workspace_folder);
+        return ensure_compose_up_container(resolved, args, image_name, remote_workspace_folder);
     }
 
     ensure_engine_up_container(resolved, args, image_name, remote_workspace_folder)
@@ -29,17 +29,19 @@ pub(crate) fn ensure_up_container(
 fn ensure_compose_up_container(
     resolved: &ResolvedConfig,
     args: &[String],
+    image_name: &str,
     remote_workspace_folder: &str,
 ) -> Result<UpContainer, String> {
     let remove_existing = common::has_flag(args, "--remove-existing-container");
     if let Some(container_id) = compose::resolve_container_id(resolved, args)? {
         if remove_existing {
             compose::remove_service(resolved, args)?;
-            return create_compose_container(resolved, args, remote_workspace_folder);
+            return create_compose_container(resolved, args, image_name, remote_workspace_folder);
         }
         return refresh_compose_container(
             resolved,
             args,
+            image_name,
             remote_workspace_folder,
             &container_id,
             LifecycleMode::UpReused,
@@ -49,11 +51,12 @@ fn ensure_compose_up_container(
     if let Some(container_id) = compose::resolve_container_id_including_stopped(resolved, args)? {
         if remove_existing {
             compose::remove_service(resolved, args)?;
-            return create_compose_container(resolved, args, remote_workspace_folder);
+            return create_compose_container(resolved, args, image_name, remote_workspace_folder);
         }
         return refresh_compose_container(
             resolved,
             args,
+            image_name,
             remote_workspace_folder,
             &container_id,
             LifecycleMode::UpStarted,
@@ -64,7 +67,7 @@ fn ensure_compose_up_container(
         return Err("Dev container not found.".to_string());
     }
 
-    create_compose_container(resolved, args, remote_workspace_folder)
+    create_compose_container(resolved, args, image_name, remote_workspace_folder)
 }
 
 fn ensure_engine_up_container(
@@ -117,9 +120,10 @@ fn ensure_engine_up_container(
 fn create_compose_container(
     resolved: &ResolvedConfig,
     args: &[String],
+    image_name: &str,
     remote_workspace_folder: &str,
 ) -> Result<UpContainer, String> {
-    compose::up_service(resolved, args, remote_workspace_folder)?;
+    compose::up_service(resolved, args, remote_workspace_folder, image_name)?;
     let container_id = compose::resolve_container_id(resolved, args)?
         .ok_or_else(|| "Dev container not found.".to_string())?;
     Ok(UpContainer {
@@ -131,11 +135,12 @@ fn create_compose_container(
 fn refresh_compose_container(
     resolved: &ResolvedConfig,
     args: &[String],
+    image_name: &str,
     remote_workspace_folder: &str,
     previous_container_id: &str,
     unchanged_mode: LifecycleMode,
 ) -> Result<UpContainer, String> {
-    compose::up_service(resolved, args, remote_workspace_folder)?;
+    compose::up_service(resolved, args, remote_workspace_folder, image_name)?;
     let updated_container_id = compose::resolve_container_id(resolved, args)?
         .ok_or_else(|| "Dev container not found.".to_string())?;
     Ok(UpContainer {
