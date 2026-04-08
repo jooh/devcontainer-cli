@@ -18,21 +18,21 @@ const outputMarkdownPath = path.join(repositoryRoot, 'docs', 'upstream', 'parity
 
 const KNOWN_GAPS = {
 	'up': [
-		'Native runtime does not integrate Feature resolution/build layering.',
+		'Native runtime now layers Features for image/dockerfile configs, but compose Feature flows are still missing.',
 		'Several upstream flags remain unimplemented or are only partially honored.',
 	],
 	'set-up': [
 		'Lifecycle execution is native, but upstream secrets and some setup flags are still missing.',
 	],
 	'build': [
-		'Native runtime does not integrate Feature resolution/build layering.',
+		'Native runtime now layers Features for image/dockerfile configs, but compose Feature flows are still missing.',
 		'Several upstream build flags are still unimplemented or are only partially honored.',
 	],
 	'run-user-commands': [
 		'Lifecycle execution is native, but upstream secrets and some runtime flags are still missing.',
 	],
 	'read-configuration': [
-		'`--include-features-configuration` currently reports raw config features rather than upstream-style resolved feature sets.',
+		'`--include-features-configuration` resolves local/published Feature sets natively, but still relies on fixture/manual manifests rather than full OCI resolution.',
 		'Variable substitution support is still narrower than upstream.',
 	],
 	'outdated': [
@@ -57,7 +57,7 @@ const KNOWN_GAPS = {
 		'Only `manifest` mode is implemented natively; `tags`, `dependencies`, and `verbose` are missing.',
 	],
 	'features resolve-dependencies': [
-		'Current implementation is config-order based and does not compute the upstream dependency graph.',
+		'Current implementation follows declared `dependsOn` edges, but still relies on local/manual manifests rather than full OCI graph resolution.',
 	],
 	'features generate-docs': [
 		'Documentation generation is minimal compared with upstream.',
@@ -85,6 +85,7 @@ const KNOWN_GAPS = {
 const COMMAND_SOURCE_PATHS = {
 	'up': [
 		'cmd/devcontainer/src/runtime',
+		'cmd/devcontainer/src/commands/configuration',
 		'cmd/devcontainer/src/commands/common.rs',
 		'cmd/devcontainer/src/commands/mod.rs',
 		'cmd/devcontainer/src/cli.rs',
@@ -99,6 +100,7 @@ const COMMAND_SOURCE_PATHS = {
 	],
 	'build': [
 		'cmd/devcontainer/src/runtime',
+		'cmd/devcontainer/src/commands/configuration',
 		'cmd/devcontainer/src/commands/common.rs',
 		'cmd/devcontainer/src/commands/mod.rs',
 		'cmd/devcontainer/src/cli.rs',

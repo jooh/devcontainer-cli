@@ -5,7 +5,7 @@ Generated from the pinned upstream CLI command matrix and static source evidence
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped files: `94/200`
+- Upstream options with a native source reference in mapped files: `105/200`
 
 This report is a static inventory, not a semantic parity proof. A referenced option can still be only partially implemented, and command-level known gaps are called out explicitly below.
 
@@ -13,11 +13,11 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 | Command | Declared | Option refs | Missing refs | Known gaps |
 | --- | --- | --- | --- | --- |
-| `up` | yes | 18/43 | 25 | 2 |
+| `up` | yes | 22/43 | 21 | 2 |
 | `set-up` | yes | 9/20 | 11 | 1 |
-| `build` | yes | 12/22 | 10 | 2 |
+| `build` | yes | 17/22 | 5 | 2 |
 | `run-user-commands` | yes | 10/27 | 17 | 1 |
-| `read-configuration` | yes | 9/18 | 9 | 2 |
+| `read-configuration` | yes | 11/18 | 7 | 2 |
 | `outdated` | yes | 4/8 | 4 | 1 |
 | `upgrade` | yes | 7/8 | 1 | 1 |
 | `features` | yes | 0/0 | 0 | 1 |
@@ -38,9 +38,9 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Create and run dev container
 - Declared natively: yes
-- Option source references: 18/43
-- Missing option references: `additional-features`, `buildkit`, `container-data-folder`, `container-session-data-folder`, `container-system-data-folder`, `default-user-env-probe`, `dotfiles-install-command`, `dotfiles-repository`, `dotfiles-target-path`, `experimental-frozen-lockfile`, `experimental-lockfile`, `gpu-availability`, `log-level`, `mount-git-worktree-common-dir`, `mount-workspace-git-root`, `omit-config-remote-env-from-metadata`, `omit-syntax-directive`, `override-config`, `secrets-file`, `skip-feature-auto-mapping`, `terminal-columns`, `terminal-rows`, `update-remote-user-uid-default`, `user-data-folder`, `workspace-mount-consistency`
-- Known gaps: Native runtime does not integrate Feature resolution/build layering. Several upstream flags remain unimplemented or are only partially honored.
+- Option source references: 22/43
+- Missing option references: `buildkit`, `container-data-folder`, `container-session-data-folder`, `container-system-data-folder`, `default-user-env-probe`, `dotfiles-install-command`, `dotfiles-repository`, `dotfiles-target-path`, `gpu-availability`, `log-level`, `mount-git-worktree-common-dir`, `mount-workspace-git-root`, `omit-config-remote-env-from-metadata`, `omit-syntax-directive`, `override-config`, `secrets-file`, `terminal-columns`, `terminal-rows`, `update-remote-user-uid-default`, `user-data-folder`, `workspace-mount-consistency`
+- Known gaps: Native runtime now layers Features for image/dockerfile configs, but compose Feature flows are still missing. Several upstream flags remain unimplemented or are only partially honored.
 
 ## `set-up`
 
@@ -54,9 +54,9 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Build a dev container image
 - Declared natively: yes
-- Option source references: 12/22
-- Missing option references: `additional-features`, `buildkit`, `experimental-frozen-lockfile`, `experimental-lockfile`, `log-level`, `omit-syntax-directive`, `output`, `skip-feature-auto-mapping`, `skip-persisting-customizations-from-features`, `user-data-folder`
-- Known gaps: Native runtime does not integrate Feature resolution/build layering. Several upstream build flags are still unimplemented or are only partially honored.
+- Option source references: 17/22
+- Missing option references: `buildkit`, `log-level`, `omit-syntax-directive`, `skip-persisting-customizations-from-features`, `user-data-folder`
+- Known gaps: Native runtime now layers Features for image/dockerfile configs, but compose Feature flows are still missing. Several upstream build flags are still unimplemented or are only partially honored.
 
 ## `run-user-commands`
 
@@ -70,9 +70,9 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Read configuration
 - Declared natively: yes
-- Option source references: 9/18
-- Missing option references: `additional-features`, `log-level`, `mount-git-worktree-common-dir`, `mount-workspace-git-root`, `override-config`, `skip-feature-auto-mapping`, `terminal-columns`, `terminal-rows`, `user-data-folder`
-- Known gaps: `--include-features-configuration` currently reports raw config features rather than upstream-style resolved feature sets. Variable substitution support is still narrower than upstream.
+- Option source references: 11/18
+- Missing option references: `log-level`, `mount-git-worktree-common-dir`, `mount-workspace-git-root`, `override-config`, `terminal-columns`, `terminal-rows`, `user-data-folder`
+- Known gaps: `--include-features-configuration` resolves local/published Feature sets natively, but still relies on fixture/manual manifests rather than full OCI resolution. Variable substitution support is still narrower than upstream.
 
 ## `outdated`
 
@@ -136,7 +136,7 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 - Declared natively: yes
 - Option source references: 1/2
 - Missing option references: `log-level`
-- Known gaps: Current implementation is config-order based and does not compute the upstream dependency graph.
+- Known gaps: Current implementation follows declared `dependsOn` edges, but still relies on local/manual manifests rather than full OCI graph resolution.
 
 ## `features generate-docs`
 
