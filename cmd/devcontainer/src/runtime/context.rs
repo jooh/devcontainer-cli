@@ -8,6 +8,7 @@ use serde_json::{Map, Value};
 use crate::commands::common;
 use crate::config::{self, ConfigContext};
 
+use super::compose;
 use super::container;
 use super::engine;
 use super::metadata::{merged_container_metadata, mount_option_target};
@@ -57,6 +58,19 @@ pub(crate) fn resolve_existing_container_context(
     args: &[String],
 ) -> Result<ExistingContainerContext, String> {
     let resolved = load_optional_config(args)?;
+    let explicit_container_id = common::parse_option_value(args, "--container-id");
+    if let Some(resolved) = &resolved {
+        if explicit_container_id.is_none() && compose::uses_compose_config(&resolved.configuration)
+        {
+            let container_id = compose::resolve_container_id(resolved, args)?
+                .ok_or_else(|| "Dev container not found.".to_string())?;
+            return Ok(ExistingContainerContext {
+                container_id,
+                configuration: resolved.configuration.clone(),
+                remote_workspace_folder: remote_workspace_folder(resolved),
+            });
+        }
+    }
     let workspace_folder = if let Some(resolved) = &resolved {
         Some(resolved.workspace_folder.clone())
     } else {

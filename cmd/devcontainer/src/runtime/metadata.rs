@@ -1,15 +1,7 @@
 use serde_json::{Map, Value};
 
 pub(crate) fn merged_container_metadata(metadata_label: Option<&str>) -> Value {
-    let Some(metadata_label) = metadata_label else {
-        return Value::Object(Map::new());
-    };
-    let parsed = serde_json::from_str::<Value>(metadata_label).ok();
-    let entries = match parsed {
-        Some(Value::Array(values)) => values,
-        Some(Value::Object(entries)) => vec![Value::Object(entries)],
-        _ => Vec::new(),
-    };
+    let entries = metadata_entries(metadata_label);
 
     let mut merged = Map::new();
     merge_last_metadata_value(&entries, &mut merged, "waitFor");
@@ -33,6 +25,17 @@ pub(crate) fn merged_container_metadata(metadata_label: Option<&str>) -> Value {
     }
 
     Value::Object(merged)
+}
+
+pub(crate) fn metadata_entries(metadata_label: Option<&str>) -> Vec<Value> {
+    let Some(metadata_label) = metadata_label else {
+        return Vec::new();
+    };
+    match serde_json::from_str::<Value>(metadata_label).ok() {
+        Some(Value::Array(values)) => values,
+        Some(Value::Object(entries)) => vec![Value::Object(entries)],
+        _ => Vec::new(),
+    }
 }
 
 pub(crate) fn serialized_container_metadata(
@@ -133,7 +136,7 @@ fn flatten_lifecycle_values(value: &Value) -> Vec<Value> {
     }
 }
 
-fn split_mount_options(mount: &str) -> Vec<String> {
+pub(crate) fn split_mount_options(mount: &str) -> Vec<String> {
     let mut options = Vec::new();
     let mut current = String::new();
     let mut in_quotes = false;
@@ -160,7 +163,7 @@ fn split_mount_options(mount: &str) -> Vec<String> {
 mod tests {
     use serde_json::json;
 
-    use super::{merged_container_metadata, mount_option_target};
+    use super::{merged_container_metadata, metadata_entries, mount_option_target};
 
     #[test]
     fn merged_container_metadata_prefers_last_scalar_and_merges_objects() {
@@ -215,5 +218,13 @@ mod tests {
             mount_option_target(r#"type=bind,source=/tmp/src,target="/workspace,with,comma""#),
             Some("/workspace,with,comma".to_string())
         );
+    }
+
+    #[test]
+    fn metadata_entries_accepts_single_object_labels() {
+        let entries = metadata_entries(Some(r#"{"postCreateCommand":"echo ready"}"#));
+
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0]["postCreateCommand"], "echo ready");
     }
 }

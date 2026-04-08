@@ -130,6 +130,104 @@ shift
 printf '%s %s\n' "$COMMAND" "$*" >> "$LOG_DIR/invocations.log"
 
 case "$COMMAND" in
+  compose)
+    COMPOSE_FILES=""
+    while [ "$#" -gt 0 ]; do
+      case "${1:-}" in
+        --project-name)
+          shift 2
+          ;;
+        -f)
+          if [ -n "$COMPOSE_FILES" ]; then
+            COMPOSE_FILES="$COMPOSE_FILES
+${2:-}"
+          else
+            COMPOSE_FILES="${2:-}"
+          fi
+          shift 2
+          ;;
+        *)
+          break
+          ;;
+      esac
+    done
+    SUBCOMMAND="${1:-}"
+    shift || true
+    case "$SUBCOMMAND" in
+      build)
+        exit 0
+        ;;
+      version)
+        if [ "${1:-}" = "--short" ] && [ -n "${FAKE_PODMAN_COMPOSE_VERSION:-}" ]; then
+          printf '%s\n' "${FAKE_PODMAN_COMPOSE_VERSION}"
+          exit 0
+        fi
+        echo "${FAKE_PODMAN_COMPOSE_VERSION:-2.24.0}"
+        exit 0
+        ;;
+      up)
+        : > "$LOG_DIR/compose-up-called"
+        compose_labels_file="$LOG_DIR/compose-last-run-labels"
+        : > "$compose_labels_file"
+        if [ -n "$COMPOSE_FILES" ]; then
+          old_ifs="${IFS- }"
+          IFS='
+'
+          for compose_file in $COMPOSE_FILES; do
+            [ -f "$compose_file" ] || continue
+            while IFS= read -r line; do
+              case "$line" in
+                *"- '"*"'"|*"- \""*"\""|*" - "*"="*)
+                  label="$(printf '%s' "$line" | sed -E "s/^[[:space:]]*-[[:space:]]*//; s/^['\"]//; s/['\"]$//")"
+                  case "$label" in
+                    *=*) printf '%s\n' "$label" >> "$compose_labels_file" ;;
+                  esac
+                  ;;
+              esac
+            done < "$compose_file"
+          done
+          IFS="$old_ifs"
+        fi
+        : > "$LOG_DIR/compose-service-running"
+        exit 0
+        ;;
+      ps)
+        if [ -n "${FAKE_PODMAN_COMPOSE_PS_OUTPUT_BEFORE_UP:-}" ] || [ -n "${FAKE_PODMAN_COMPOSE_PS_OUTPUT_AFTER_UP:-}" ]; then
+          if [ -f "$LOG_DIR/compose-up-called" ]; then
+            printf '%s\n' "${FAKE_PODMAN_COMPOSE_PS_OUTPUT_AFTER_UP:-}"
+          else
+            printf '%s\n' "${FAKE_PODMAN_COMPOSE_PS_OUTPUT_BEFORE_UP:-}"
+          fi
+          exit 0
+        fi
+        if [ "${FAKE_PODMAN_COMPOSE_PS_REQUIRE_ALL:-0}" = "1" ]; then
+          if [ ! -f "$LOG_DIR/compose-service-running" ]; then
+            case " $* " in
+              *" -a "*) ;;
+              *) exit 0 ;;
+            esac
+          fi
+        fi
+        if [ -n "${FAKE_PODMAN_COMPOSE_PS_OUTPUT:-}" ]; then
+          printf '%s\n' "${FAKE_PODMAN_COMPOSE_PS_OUTPUT}"
+          exit 0
+        fi
+        if [ -f "$LOG_DIR/compose-service-running" ]; then
+          echo "fake-compose-container-id"
+          exit 0
+        fi
+        exit 0
+        ;;
+      rm)
+        rm -f "$LOG_DIR/compose-service-running"
+        exit 0
+        ;;
+      *)
+        echo "unsupported fake podman compose command: $SUBCOMMAND" >&2
+        exit 1
+        ;;
+    esac
+    ;;
   build)
     exit 0
     ;;
@@ -225,6 +323,19 @@ case "$COMMAND" in
         fi
         labels_json="$labels_json\"$escaped_key\":\"$escaped_value\""
       done < "$LOG_DIR/last-run-labels"
+    fi
+    if [ -f "$LOG_DIR/compose-last-run-labels" ]; then
+      while IFS= read -r label; do
+        [ -n "$label" ] || continue
+        key="${label%%=*}"
+        value="${label#*=}"
+        escaped_key="$(json_escape "$key")"
+        escaped_value="$(json_escape "$value")"
+        if [ -n "$labels_json" ]; then
+          labels_json="$labels_json,"
+        fi
+        labels_json="$labels_json\"$escaped_key\":\"$escaped_value\""
+      done < "$LOG_DIR/compose-last-run-labels"
     fi
     mounts_json=""
     if [ -f "$LOG_DIR/last-run-mounts" ]; then

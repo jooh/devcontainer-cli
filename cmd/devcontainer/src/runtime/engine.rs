@@ -26,6 +26,33 @@ pub(crate) fn run_engine_streaming(
     process_runner::run_process_streaming(&engine_request(args, engine_args))
 }
 
+pub(crate) fn compose_request(args: &[String], compose_args: Vec<String>) -> ProcessRequest {
+    if let Some(compose_program) = common::parse_option_value(args, "--docker-compose-path") {
+        ProcessRequest {
+            program: compose_program,
+            args: compose_args,
+            cwd: None,
+            env: HashMap::new(),
+        }
+    } else {
+        let mut args_with_subcommand = vec!["compose".to_string()];
+        args_with_subcommand.extend(compose_args);
+        ProcessRequest {
+            program: engine_program(args),
+            args: args_with_subcommand,
+            cwd: None,
+            env: HashMap::new(),
+        }
+    }
+}
+
+pub(crate) fn run_compose(
+    args: &[String],
+    compose_args: Vec<String>,
+) -> Result<ProcessResult, String> {
+    process_runner::run_process(&compose_request(args, compose_args))
+}
+
 pub(crate) fn stderr_or_stdout(result: &ProcessResult) -> String {
     if result.stderr.trim().is_empty() {
         result.stdout.trim().to_string()

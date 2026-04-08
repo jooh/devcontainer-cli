@@ -1,10 +1,11 @@
 mod build;
+pub(crate) mod compose;
 mod container;
-mod context;
-mod engine;
+pub(crate) mod context;
+pub(crate) mod engine;
 mod exec;
 mod lifecycle;
-mod metadata;
+pub(crate) mod metadata;
 
 use serde_json::{json, Value};
 
@@ -33,6 +34,7 @@ pub fn run_build(args: &[String]) -> Result<Value, String> {
 pub fn run_up(args: &[String]) -> Result<Value, String> {
     let resolved = context::load_required_config(args)?;
     lifecycle::run_initialize_command(&resolved.configuration, &resolved.workspace_folder)?;
+    let compose_project_name = compose::load_compose_spec(&resolved)?.map(|spec| spec.project_name);
     let image_name = build::runtime_image_name(&resolved, args)?;
     let remote_workspace_folder = context::remote_workspace_folder(&resolved);
     let up_container =
@@ -49,6 +51,7 @@ pub fn run_up(args: &[String]) -> Result<Value, String> {
         "outcome": "success",
         "command": "up",
         "containerId": up_container.container_id,
+        "composeProjectName": compose_project_name,
         "remoteUser": context::remote_user(&resolved.configuration),
         "remoteWorkspaceFolder": remote_workspace_folder,
         "configuration": if common::has_flag(args, "--include-configuration") { resolved.configuration.clone() } else { Value::Null },

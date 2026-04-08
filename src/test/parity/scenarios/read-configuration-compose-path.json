@@ -1,0 +1,10 @@
+{
+	"name": "read-configuration-compose-path",
+	"fixtureWorkspacePath": "upstream/src/test/configs/compose-image-without-features",
+	"workspaceConfigPath": ".devcontainer/devcontainer.json",
+	"additionalArgs": [
+		"--docker-compose-path",
+		"trigger-compose-v2"
+	],
+	"outputGoldenPath": "src/test/parity/golden/read-configuration-basic.json"
+}

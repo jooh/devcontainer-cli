@@ -27,6 +27,22 @@ fn repo_root() -> PathBuf {
         .expect("repo root")
 }
 
+fn copy_recursive(source: &Path, destination: &Path) {
+    let metadata = fs::metadata(source).expect("metadata");
+    if metadata.is_dir() {
+        fs::create_dir_all(destination).expect("create dir");
+        for entry in fs::read_dir(source).expect("read dir") {
+            let entry = entry.expect("dir entry");
+            copy_recursive(&entry.path(), &destination.join(entry.file_name()));
+        }
+    } else {
+        if let Some(parent) = destination.parent() {
+            fs::create_dir_all(parent).expect("create parent");
+        }
+        fs::copy(source, destination).expect("copy file");
+    }
+}
+
 fn run_read_configuration(
     args: &[&str],
     current_dir: Option<&Path>,
@@ -81,7 +97,7 @@ fn read_configuration_command_returns_configuration_payload() {
     assert!(output.status.success());
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(stdout.contains("\"configuration\""));
-    assert!(stdout.contains("\"metadata\""));
+    assert!(stdout.contains("\"workspace\""));
 
     let _ = fs::remove_dir_all(root);
 }
@@ -116,12 +132,16 @@ fn read_configuration_supports_upstream_subfolder_config() {
         "true"
     );
     assert_eq!(
-        payload["metadata"]["configFile"],
+        payload["configuration"]["configFilePath"],
         config
             .canonicalize()
             .expect("canonical config")
             .to_string_lossy()
             .as_ref()
+    );
+    assert_eq!(
+        payload["workspace"]["workspaceFolder"],
+        "/workspaces/dockerfile-without-features"
     );
 }
 
@@ -189,4 +209,467 @@ fn read_configuration_applies_upstream_style_local_substitution_defaults() {
         payload["configuration"]["containerEnv"]["MISSING_WITHOUT_DEFAULT"],
         "before--after"
     );
+}
+
+#[test]
+fn read_configuration_merged_output_uses_upstream_pluralized_fields() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    fs::create_dir_all(&config_dir).expect("config dir");
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"postAttachCommand\": \"echo attached\",\n  \"remoteUser\": \"vscode\"\n}\n",
+    )
+    .expect("config write");
+
+    let (_, payload) = run_read_configuration(
+        &[
+            "--workspace-folder",
+            root.to_string_lossy().as_ref(),
+            "--include-merged-configuration",
+        ],
+        None,
+    );
+
+    assert_eq!(
+        payload["configuration"]["postAttachCommand"],
+        "echo attached"
+    );
+    assert_eq!(
+        payload["mergedConfiguration"]["postAttachCommands"]
+            .as_array()
+            .expect("post attach commands")
+            .len(),
+        1
+    );
+    assert!(payload["mergedConfiguration"]
+        .get("postAttachCommand")
+        .is_none());
+    assert_eq!(payload["mergedConfiguration"]["remoteUser"], "vscode");
+
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn features_test_emits_a_local_report() {
+    let workspace = unique_temp_dir();
+    let src = workspace.join("src").join("demo");
+    let test = workspace.join("test").join("demo");
+    fs::create_dir_all(&src).expect("feature src");
+    fs::create_dir_all(&test).expect("feature test");
+    fs::write(
+        src.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("manifest");
+    fs::write(test.join("test.sh"), "#!/bin/sh\nexit 0\n").expect("test script");
+    fs::write(test.join("custom.sh"), "#!/bin/sh\nexit 0\n").expect("scenario script");
+    fs::write(
+        test.join("scenarios.json"),
+        "{\n  \"custom\": {\n    \"image\": \"ubuntu:latest\"\n  }\n}\n",
+    )
+    .expect("scenarios");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args(["features", "test", "--project-folder"])
+        .arg(workspace.to_string_lossy().as_ref())
+        .output()
+        .expect("features test should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("TEST REPORT"));
+    assert!(stdout.contains("'custom'"));
+    assert!(stdout.contains("'demo'"));
+    assert!(stdout.contains("Cleaning up 2 test containers"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn features_test_fails_when_a_test_script_fails() {
+    let workspace = unique_temp_dir();
+    let src = workspace.join("src").join("demo");
+    let test = workspace.join("test").join("demo");
+    fs::create_dir_all(&src).expect("feature src");
+    fs::create_dir_all(&test).expect("feature test");
+    fs::write(
+        src.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("manifest");
+    fs::write(test.join("test.sh"), "#!/bin/sh\nexit 1\n").expect("test script");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args(["features", "test", "--project-folder"])
+        .arg(workspace.to_string_lossy().as_ref())
+        .output()
+        .expect("features test should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("TEST REPORT"));
+    assert!(stdout.contains("❌ Failed:      'demo'"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn templates_apply_supports_published_template_ids() {
+    let workspace = unique_temp_dir();
+    fs::create_dir_all(&workspace).expect("workspace");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "apply",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--template-id",
+            "ghcr.io/devcontainers/templates/docker-from-docker:latest",
+            "--template-args",
+            "{ \"installZsh\": \"false\", \"upgradePackages\": \"true\", \"dockerVersion\": \"20.10\", \"moby\": \"true\", \"enableNonRootDocker\": \"true\" }",
+            "--features",
+            "[{ \"id\": \"ghcr.io/devcontainers/features/azure-cli:1\", \"options\": { \"version\": \"1\" } }]",
+        ])
+        .output()
+        .expect("templates apply should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("apply payload");
+    assert_eq!(payload["files"][0], "./.devcontainer/devcontainer.json");
+    let file = fs::read_to_string(workspace.join(".devcontainer").join("devcontainer.json"))
+        .expect("devcontainer file");
+    assert!(file.contains("\"name\": \"Docker from Docker\""));
+    assert!(file.contains("\"installZsh\": \"false\""));
+    assert!(file.contains("\"upgradePackages\": \"true\""));
+    assert!(file.contains("\"version\": \"20.10\""));
+    assert!(file.contains("\"moby\": \"true\""));
+    assert!(file.contains("\"enableNonRootDocker\": \"true\""));
+    assert!(file.contains("ghcr.io/devcontainers/features/common-utils:1"));
+    assert!(file.contains("ghcr.io/devcontainers/features/docker-from-docker:1"));
+    assert!(file.contains("ghcr.io/devcontainers/features/azure-cli:1"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn templates_apply_uses_upstream_defaults_for_published_template_ids() {
+    let workspace = unique_temp_dir();
+    fs::create_dir_all(&workspace).expect("workspace");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "apply",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--template-id",
+            "ghcr.io/devcontainers/templates/docker-from-docker:latest",
+        ])
+        .output()
+        .expect("templates apply should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let file = fs::read_to_string(workspace.join(".devcontainer").join("devcontainer.json"))
+        .expect("devcontainer file");
+    assert!(file.contains("\"installZsh\": \"true\""));
+    assert!(file.contains("\"upgradePackages\": \"false\""));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn templates_metadata_supports_published_template_ids() {
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "metadata",
+            "ghcr.io/devcontainers/templates/docker-from-docker:latest",
+        ])
+        .output()
+        .expect("templates metadata should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("metadata payload");
+    assert_eq!(payload["id"], "docker-from-docker");
+    assert_eq!(payload["name"], "Docker from Docker");
+}
+
+#[test]
+fn features_info_supports_additional_published_feature_ids() {
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "features",
+            "info",
+            "manifest",
+            "ghcr.io/devcontainers/features/node",
+        ])
+        .output()
+        .expect("features info should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("feature info payload");
+    assert_eq!(payload["id"], "node");
+    assert_eq!(payload["name"], "Node");
+}
+
+#[test]
+fn templates_metadata_supports_additional_published_template_ids() {
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "metadata",
+            "ghcr.io/devcontainers/templates/anaconda-postgres:latest",
+        ])
+        .output()
+        .expect("templates metadata should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("metadata payload");
+    assert_eq!(payload["id"], "anaconda-postgres");
+}
+
+#[test]
+fn templates_apply_supports_additional_published_template_ids() {
+    let workspace = unique_temp_dir();
+    fs::create_dir_all(&workspace).expect("workspace");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "apply",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--template-id",
+            "ghcr.io/devcontainers/templates/anaconda-postgres:latest",
+            "--template-args",
+            "{ \"nodeVersion\": \"lts/*\" }",
+            "--features",
+            "[{ \"id\": \"ghcr.io/devcontainers/features/azure-cli:1\", \"options\": {} }, { \"id\": \"ghcr.io/devcontainers/features/git:1\", \"options\": { \"version\": \"latest\", \"ppa\": true } }]",
+        ])
+        .output()
+        .expect("templates apply should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("apply payload");
+    assert_eq!(payload["files"][0], "./.devcontainer/devcontainer.json");
+    let file = fs::read_to_string(workspace.join(".devcontainer").join("devcontainer.json"))
+        .expect("devcontainer file");
+    assert!(file.contains("\"name\": \"Anaconda Postgres\""));
+    assert!(file.contains("ghcr.io/devcontainers/features/azure-cli:1"));
+    assert!(file.contains("ghcr.io/devcontainers/features/git:1"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn outdated_supports_upstream_json_output_fixture() {
+    let root = repo_root();
+    let fixture = root
+        .join("upstream")
+        .join("src")
+        .join("test")
+        .join("container-features")
+        .join("configs")
+        .join("lockfile-outdated-command");
+    let workspace = unique_temp_dir();
+    copy_recursive(&fixture, &workspace);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "outdated",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--output-format",
+            "json",
+        ])
+        .output()
+        .expect("outdated should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("json payload");
+    assert_eq!(
+        payload["features"]["ghcr.io/devcontainers/features/git:1.0"]["current"],
+        "1.0.4"
+    );
+    assert_eq!(
+        payload["features"]["ghcr.io/devcontainers/features/git:1.0"]["wanted"],
+        "1.0.5"
+    );
+    assert_eq!(
+        payload["features"]["ghcr.io/devcontainers/features/git:1.0"]["latest"],
+        "1.2.0"
+    );
+    assert_eq!(
+        payload["features"]["ghcr.io/codspace/versioning/foo:0.3.1"]["latest"],
+        "2.11.1"
+    );
+    assert!(payload["features"]
+        .as_object()
+        .expect("features object")
+        .contains_key("ghcr.io/codspace/doesnotexist:0.1.2"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn outdated_supports_text_output_fixture() {
+    let root = repo_root();
+    let fixture = root
+        .join("upstream")
+        .join("src")
+        .join("test")
+        .join("container-features")
+        .join("configs")
+        .join("lockfile-outdated-command");
+    let workspace = unique_temp_dir();
+    copy_recursive(&fixture, &workspace);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "outdated",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--output-format",
+            "text",
+        ])
+        .output()
+        .expect("outdated should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("Current"));
+    assert!(stdout.contains("Wanted"));
+    assert!(stdout.contains("Latest"));
+    assert!(stdout.contains("ghcr.io/devcontainers/features/git"));
+    assert!(stdout.contains("ghcr.io/devcontainers/features/azure-cli"));
+    assert!(!stdout.contains("mylocalfeature"));
+    assert!(!stdout.contains("terraform"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn upgrade_matches_upstream_lockfile_fixture() {
+    let root = repo_root();
+    let fixture = root
+        .join("upstream")
+        .join("src")
+        .join("test")
+        .join("container-features")
+        .join("configs")
+        .join("lockfile-upgrade-command");
+    let workspace = unique_temp_dir();
+    copy_recursive(&fixture, &workspace);
+    fs::copy(
+        workspace.join("outdated.devcontainer-lock.json"),
+        workspace.join(".devcontainer-lock.json"),
+    )
+    .expect("seed lockfile");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "upgrade",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ])
+        .output()
+        .expect("upgrade should run");
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(workspace.join(".devcontainer-lock.json")).expect("actual lockfile"),
+        fs::read_to_string(workspace.join("upgraded.devcontainer-lock.json"))
+            .expect("expected lockfile")
+    );
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn upgrade_with_feature_updates_config_and_dry_run_lockfile() {
+    let root = repo_root();
+    let fixture = root
+        .join("upstream")
+        .join("src")
+        .join("test")
+        .join("container-features")
+        .join("configs")
+        .join("lockfile-upgrade-feature");
+    let workspace = unique_temp_dir();
+    copy_recursive(&fixture, &workspace);
+    fs::copy(
+        workspace.join("input.devcontainer.json"),
+        workspace.join(".devcontainer.json"),
+    )
+    .expect("seed config");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "upgrade",
+            "--dry-run",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--feature",
+            "ghcr.io/codspace/versioning/foo",
+            "--target-version",
+            "2",
+        ])
+        .output()
+        .expect("upgrade should run");
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(workspace.join(".devcontainer.json")).expect("updated config"),
+        fs::read_to_string(workspace.join("expected.devcontainer.json")).expect("expected config")
+    );
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("dry-run lockfile");
+    assert_eq!(
+        payload["features"]["ghcr.io/codspace/versioning/foo:2"]["version"],
+        "2.11.1"
+    );
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn upgrade_supports_upstream_dependson_lockfile_fixture() {
+    let root = repo_root();
+    let fixture = root
+        .join("upstream")
+        .join("src")
+        .join("test")
+        .join("container-features")
+        .join("configs")
+        .join("lockfile-dependson");
+    let workspace = unique_temp_dir();
+    copy_recursive(&fixture, &workspace);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "upgrade",
+            "--dry-run",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ])
+        .output()
+        .expect("upgrade should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("dry-run lockfile");
+    assert_eq!(
+        payload["features"]["ghcr.io/codspace/dependson/A:2"]["version"],
+        "2.0.1"
+    );
+    assert_eq!(
+        payload["features"]["ghcr.io/codspace/dependson/E:1"]["version"],
+        "1.0.0"
+    );
+    assert_eq!(
+        payload["features"]["https://github.com/codspace/tgz-features-with-dependson/releases/download/0.0.2/devcontainer-feature-A.tgz"]["version"],
+        "2.0.1"
+    );
+
+    let _ = fs::remove_dir_all(workspace);
 }

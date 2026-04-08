@@ -1,10 +1,9 @@
 {
 	"requiredTopLevelKeys": [
 		"configuration",
-		"metadata"
+		"workspace"
 	],
-	"requiredMetadataKeys": [
-		"format",
-		"pathResolution"
+	"requiredWorkspaceKeys": [
+		"workspaceFolder"
 	]
 }

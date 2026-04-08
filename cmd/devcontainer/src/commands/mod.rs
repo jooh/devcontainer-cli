@@ -31,12 +31,8 @@ pub fn dispatch(command: &str, args: &[String]) -> DispatchResult {
         "run-user-commands" => {
             DispatchResult::Complete(print_json_result(runtime::run_user_commands(args)))
         }
-        "outdated" => DispatchResult::Complete(print_json_result(
-            configuration::build_outdated_payload(args),
-        )),
-        "upgrade" => {
-            DispatchResult::Complete(print_json_result(configuration::run_upgrade_lockfile(args)))
-        }
+        "outdated" => DispatchResult::Complete(configuration::run_outdated(args)),
+        "upgrade" => DispatchResult::Complete(configuration::run_upgrade(args)),
         "exec" => DispatchResult::Complete(exec::run(args)),
         "features" => DispatchResult::Complete(collections::run_features(args)),
         "templates" => DispatchResult::Complete(collections::run_templates(args)),

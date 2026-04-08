@@ -2,6 +2,7 @@ use serde_json::Value;
 
 use crate::commands::common;
 
+use super::compose;
 use super::context::{workspace_mount, ResolvedConfig};
 use super::engine;
 use super::lifecycle::LifecycleMode;
@@ -18,6 +19,76 @@ pub(crate) fn ensure_up_container(
     image_name: &str,
     remote_workspace_folder: &str,
 ) -> Result<UpContainer, String> {
+    if compose::uses_compose_config(&resolved.configuration) {
+        let running = compose::resolve_container_id(resolved, args)?;
+        match running {
+            Some(_) if common::has_flag(args, "--remove-existing-container") => {
+                compose::remove_service(resolved, args)?;
+                compose::up_service(resolved, args, remote_workspace_folder)?;
+                let container_id = compose::resolve_container_id(resolved, args)?
+                    .ok_or_else(|| "Dev container not found.".to_string())?;
+                return Ok(UpContainer {
+                    container_id,
+                    lifecycle_mode: LifecycleMode::UpCreated,
+                });
+            }
+            Some(container_id) => {
+                compose::up_service(resolved, args, remote_workspace_folder)?;
+                let updated_container_id = compose::resolve_container_id(resolved, args)?
+                    .ok_or_else(|| "Dev container not found.".to_string())?;
+                return Ok(UpContainer {
+                    lifecycle_mode: if updated_container_id == container_id {
+                        LifecycleMode::UpReused
+                    } else {
+                        LifecycleMode::UpCreated
+                    },
+                    container_id: updated_container_id,
+                });
+            }
+            None => {
+                let existing = compose::resolve_container_id_including_stopped(resolved, args)?;
+                match existing {
+                    Some(_) if common::has_flag(args, "--remove-existing-container") => {
+                        compose::remove_service(resolved, args)?;
+                        compose::up_service(resolved, args, remote_workspace_folder)?;
+                        let container_id = compose::resolve_container_id(resolved, args)?
+                            .ok_or_else(|| "Dev container not found.".to_string())?;
+                        return Ok(UpContainer {
+                            container_id,
+                            lifecycle_mode: LifecycleMode::UpCreated,
+                        });
+                    }
+                    Some(container_id) => {
+                        compose::up_service(resolved, args, remote_workspace_folder)?;
+                        let updated_container_id =
+                            compose::resolve_container_id(resolved, args)?
+                                .ok_or_else(|| "Dev container not found.".to_string())?;
+                        return Ok(UpContainer {
+                            lifecycle_mode: if updated_container_id == container_id {
+                                LifecycleMode::UpStarted
+                            } else {
+                                LifecycleMode::UpCreated
+                            },
+                            container_id: updated_container_id,
+                        });
+                    }
+                    None if common::has_flag(args, "--expect-existing-container") => {
+                        return Err("Dev container not found.".to_string());
+                    }
+                    None => {
+                        compose::up_service(resolved, args, remote_workspace_folder)?;
+                        let container_id = compose::resolve_container_id(resolved, args)?
+                            .ok_or_else(|| "Dev container not found.".to_string())?;
+                        return Ok(UpContainer {
+                            container_id,
+                            lifecycle_mode: LifecycleMode::UpCreated,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     let running = find_target_container(
         args,
         Some(resolved.workspace_folder.as_path()),

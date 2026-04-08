@@ -11,6 +11,7 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
         if matches!(
             arg.as_str(),
             "--docker-path"
+                | "--docker-compose-path"
                 | "--workspace-folder"
                 | "--config"
                 | "--remote-env"
@@ -110,5 +111,18 @@ mod tests {
         assert!(args.contains(&"/bin/echo".to_string()));
         assert!(args.iter().any(|arg| arg == "CONFIG_ENV=config"));
         assert!(args.iter().any(|arg| arg == "CLI_ENV=cli"));
+    }
+
+    #[test]
+    fn exec_command_and_args_accepts_docker_compose_path() {
+        let args = exec_command_and_args(&[
+            "--docker-compose-path".to_string(),
+            "/usr/local/bin/podman-compose".to_string(),
+            "/bin/echo".to_string(),
+            "hello".to_string(),
+        ])
+        .expect("command args");
+
+        assert_eq!(args, vec!["/bin/echo".to_string(), "hello".to_string()]);
     }
 }

@@ -141,3 +141,58 @@ fn up_persists_metadata_for_followup_exec_with_container_id() {
         "exec --workdir /persisted-workspace --user vscode -e TEST_REMOTE_ENV=from-config fake-container-id /bin/echo hello-from-persisted-metadata"
     ));
 }
+
+#[test]
+fn compose_up_persists_metadata_for_followup_exec_with_container_id() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/persisted-compose-workspace\",\n  \"remoteUser\": \"vscode\",\n  \"remoteEnv\": {\n    \"TEST_REMOTE_ENV\": \"from-compose-config\"\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let up_output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[],
+    );
+
+    assert!(up_output.status.success(), "{up_output:?}");
+    let exec_output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--container-id",
+            "fake-compose-container-id",
+            "/bin/echo",
+            "hello-from-compose-metadata",
+        ],
+        &[],
+    );
+
+    assert!(exec_output.status.success(), "{exec_output:?}");
+    assert_eq!(
+        String::from_utf8(exec_output.stdout).expect("utf8 stdout"),
+        "hello-from-compose-metadata\n"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("inspect fake-compose-container-id"));
+    assert!(invocations.contains("compose --project-name workspace_devcontainer -f "));
+    assert!(invocations.contains(
+        "exec --workdir /persisted-compose-workspace --user vscode -e TEST_REMOTE_ENV=from-compose-config fake-compose-container-id /bin/echo hello-from-compose-metadata"
+    ));
+}
