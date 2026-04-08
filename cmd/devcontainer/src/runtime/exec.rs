@@ -15,6 +15,7 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
                 | "--workspace-folder"
                 | "--config"
                 | "--override-config"
+                | "--workspace-mount-consistency"
                 | "--remote-env"
                 | "--secrets-file"
                 | "--container-id"
@@ -23,8 +24,19 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
             index += 2;
             continue;
         }
-        if arg == "--interactive" {
-            index += 1;
+        if matches!(
+            arg.as_str(),
+            "--interactive" | "--mount-workspace-git-root" | "--mount-git-worktree-common-dir"
+        ) {
+            index += if args
+                .get(index + 1)
+                .is_some_and(|next| !next.starts_with("--"))
+                && arg != "--interactive"
+            {
+                2
+            } else {
+                1
+            };
             continue;
         }
         if arg.starts_with("--") {
@@ -121,6 +133,23 @@ mod tests {
         let args = exec_command_and_args(&[
             "--docker-compose-path".to_string(),
             "/usr/local/bin/podman-compose".to_string(),
+            "/bin/echo".to_string(),
+            "hello".to_string(),
+        ])
+        .expect("command args");
+
+        assert_eq!(args, vec!["/bin/echo".to_string(), "hello".to_string()]);
+    }
+
+    #[test]
+    fn exec_command_and_args_accept_workspace_mount_flags() {
+        let args = exec_command_and_args(&[
+            "--workspace-folder".to_string(),
+            "/workspace/packages/app".to_string(),
+            "--mount-workspace-git-root".to_string(),
+            "false".to_string(),
+            "--workspace-mount-consistency".to_string(),
+            "delegated".to_string(),
             "/bin/echo".to_string(),
             "hello".to_string(),
         ])

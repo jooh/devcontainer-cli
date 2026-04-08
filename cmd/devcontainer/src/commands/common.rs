@@ -22,6 +22,19 @@ pub(crate) fn parse_option_value(args: &[String], option: &str) -> Option<String
         .map(|window| window[1].clone())
 }
 
+pub(crate) fn parse_bool_option(args: &[String], option: &str, default: bool) -> bool {
+    let Some(index) = args.iter().position(|arg| arg == option) else {
+        return default;
+    };
+    match args.get(index + 1).map(String::as_str) {
+        Some("false" | "0" | "no" | "off") => false,
+        Some("true" | "1" | "yes" | "on") => true,
+        Some(next) if next.starts_with("--") => true,
+        Some(_) => true,
+        None => true,
+    }
+}
+
 pub(crate) fn validate_option_values(args: &[String], options: &[&str]) -> Result<(), String> {
     for (index, arg) in args.iter().enumerate() {
         if options.contains(&arg.as_str())
@@ -204,9 +217,15 @@ pub(crate) fn load_resolved_config(args: &[String]) -> Result<(PathBuf, PathBuf,
                 })
         })
         .or_else(|| {
-            Some(crate::runtime::context::default_remote_workspace_folder(
-                Some(&workspace_folder),
-            ))
+            Some(
+                crate::runtime::context::derived_workspace_mount(&workspace_folder, args)
+                    .map(|derived| derived.remote_workspace_folder)
+                    .unwrap_or_else(|| {
+                        crate::runtime::context::default_remote_workspace_folder(Some(
+                            &workspace_folder,
+                        ))
+                    }),
+            )
         });
     let substituted = config::substitute_local_context(
         &parsed,

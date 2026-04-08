@@ -77,7 +77,8 @@ pub fn run_up(args: &[String]) -> Result<Value, String> {
     let compose_project_name =
         compose::load_compose_spec(&effective_resolved)?.map(|spec| spec.project_name);
     let image_name = build::runtime_image_name(&effective_resolved, args)?;
-    let remote_workspace_folder = context::remote_workspace_folder(&effective_resolved);
+    let remote_workspace_folder =
+        context::remote_workspace_folder_for_args(&effective_resolved, args);
     let up_container = container::ensure_up_container(
         &effective_resolved,
         args,

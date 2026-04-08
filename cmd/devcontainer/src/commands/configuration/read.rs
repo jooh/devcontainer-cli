@@ -41,7 +41,7 @@ pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
     if let Some(loaded) = loaded.as_ref() {
         payload.insert(
             "workspace".to_string(),
-            workspace_payload(loaded, &configuration),
+            workspace_payload(loaded, &configuration, args),
         );
     }
 
@@ -73,7 +73,7 @@ pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
 }
 
 pub(super) fn should_use_native_read_configuration(args: &[String]) -> bool {
-    const SUPPORTED_OPTIONS: [&str; 11] = [
+    const SUPPORTED_OPTIONS: [&str; 14] = [
         "--workspace-folder",
         "--config",
         "--override-config",
@@ -85,6 +85,9 @@ pub(super) fn should_use_native_read_configuration(args: &[String]) -> bool {
         "--include-features-configuration",
         "--additional-features",
         "--skip-feature-auto-mapping",
+        "--mount-workspace-git-root",
+        "--mount-git-worktree-common-dir",
+        "--workspace-mount-consistency",
     ];
     let mut index = 0;
     while index < args.len() {
@@ -95,15 +98,21 @@ pub(super) fn should_use_native_read_configuration(args: &[String]) -> bool {
         if !SUPPORTED_OPTIONS.contains(&arg.as_str()) {
             return false;
         }
-        index += if matches!(
-            arg.as_str(),
-            "--include-merged-configuration"
-                | "--include-features-configuration"
-                | "--skip-feature-auto-mapping"
-        ) {
-            1
-        } else {
-            2
+        index += match arg.as_str() {
+            "--include-merged-configuration" | "--include-features-configuration" => 1,
+            "--skip-feature-auto-mapping"
+            | "--mount-workspace-git-root"
+            | "--mount-git-worktree-common-dir" => {
+                if args
+                    .get(index + 1)
+                    .is_some_and(|next| !next.starts_with("--"))
+                {
+                    2
+                } else {
+                    1
+                }
+            }
+            _ => 2,
         };
     }
     true

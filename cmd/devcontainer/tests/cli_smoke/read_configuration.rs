@@ -1,4 +1,5 @@
 use std::fs;
+use std::process::Command;
 
 use serde_json::Value;
 
@@ -99,7 +100,7 @@ fn read_configuration_supports_upstream_subfolder_config() {
     );
     assert_eq!(
         payload["workspace"]["workspaceFolder"],
-        "/workspaces/dockerfile-without-features"
+        "/workspaces/upstream/src/test/configs/dockerfile-without-features"
     );
 }
 
@@ -245,4 +246,49 @@ fn read_configuration_supports_override_config_without_workspace_devcontainer_fi
     );
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn read_configuration_uses_git_root_mount_for_nested_workspaces() {
+    let root = unique_temp_dir("devcontainer-cli-smoke");
+    let repo_root = root.join("repo");
+    let workspace = repo_root.join("packages").join("app");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    init_git_repo(&repo_root);
+    let expected_repo_root = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.clone());
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("devcontainer.json"),
+        "{\n  \"image\": \"alpine:3.20\"\n}\n",
+    )
+    .expect("config write");
+
+    let (output, payload) = run_read_configuration(
+        &["--workspace-folder", workspace.to_string_lossy().as_ref()],
+        None,
+    );
+
+    assert!(output.status.success());
+    let workspace_mount = payload["workspace"]["workspaceMount"]
+        .as_str()
+        .expect("workspace mount");
+    assert!(workspace_mount.contains(&format!("source={}", expected_repo_root.display())));
+    assert!(workspace_mount.contains("target=/workspaces/repo"));
+    assert_eq!(
+        payload["workspace"]["workspaceFolder"],
+        "/workspaces/repo/packages/app"
+    );
+
+    let _ = fs::remove_dir_all(root);
+}
+
+fn init_git_repo(root: &std::path::Path) {
+    let status = Command::new("git")
+        .args(["init", "--quiet"])
+        .current_dir(root)
+        .status()
+        .expect("git init");
+    assert!(status.success(), "git init failed: {status:?}");
 }

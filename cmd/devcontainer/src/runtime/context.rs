@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 
 use serde_json::{Map, Value};
 
@@ -28,6 +29,12 @@ struct InspectedContainerContext {
 pub(crate) struct ExistingContainerContext {
     pub(crate) container_id: String,
     pub(crate) configuration: Value,
+    pub(crate) remote_workspace_folder: String,
+}
+
+pub(crate) struct DerivedWorkspaceMount {
+    pub(crate) host_mount_folder: PathBuf,
+    pub(crate) container_mount_folder: String,
     pub(crate) remote_workspace_folder: String,
 }
 
@@ -67,7 +74,7 @@ pub(crate) fn resolve_existing_container_context(
             return Ok(ExistingContainerContext {
                 container_id,
                 configuration: resolved.configuration.clone(),
-                remote_workspace_folder: remote_workspace_folder(resolved),
+                remote_workspace_folder: remote_workspace_folder_for_args(resolved, args),
             });
         }
     }
@@ -96,7 +103,7 @@ pub(crate) fn resolve_existing_container_context(
         .unwrap_or_else(|| Value::Object(Map::new()));
     let remote_workspace_folder = resolved
         .as_ref()
-        .map(remote_workspace_folder)
+        .map(|resolved| remote_workspace_folder_for_args(resolved, args))
         .or_else(|| {
             inspected
                 .as_ref()
@@ -149,6 +156,7 @@ pub(crate) fn combined_remote_env(
     Ok(remote_env)
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn remote_workspace_folder(resolved: &ResolvedConfig) -> String {
     resolved
         .configuration
@@ -162,9 +170,16 @@ pub(crate) fn remote_workspace_folder(resolved: &ResolvedConfig) -> String {
                 .and_then(Value::as_str)
                 .and_then(mount_option_target)
         })
-        .unwrap_or_else(|| default_remote_workspace_folder(Some(&resolved.workspace_folder)))
+        .unwrap_or_else(|| {
+            derived_workspace_mount(&resolved.workspace_folder, &[])
+                .map(|derived| derived.remote_workspace_folder)
+                .unwrap_or_else(|| {
+                    default_remote_workspace_folder(Some(&resolved.workspace_folder))
+                })
+        })
 }
 
+#[allow(dead_code)]
 pub(crate) fn workspace_mount(resolved: &ResolvedConfig, remote_workspace_folder: &str) -> String {
     resolved
         .configuration
@@ -172,10 +187,47 @@ pub(crate) fn workspace_mount(resolved: &ResolvedConfig, remote_workspace_folder
         .and_then(Value::as_str)
         .map(str::to_string)
         .unwrap_or_else(|| {
-            format!(
-                "type=bind,source={},target={remote_workspace_folder}",
-                resolved.workspace_folder.display()
-            )
+            default_workspace_mount(&resolved.workspace_folder, remote_workspace_folder, &[])
+        })
+}
+
+pub(crate) fn remote_workspace_folder_for_args(
+    resolved: &ResolvedConfig,
+    args: &[String],
+) -> String {
+    resolved
+        .configuration
+        .get("workspaceFolder")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .or_else(|| {
+            resolved
+                .configuration
+                .get("workspaceMount")
+                .and_then(Value::as_str)
+                .and_then(mount_option_target)
+        })
+        .unwrap_or_else(|| {
+            derived_workspace_mount(&resolved.workspace_folder, args)
+                .map(|derived| derived.remote_workspace_folder)
+                .unwrap_or_else(|| {
+                    default_remote_workspace_folder(Some(&resolved.workspace_folder))
+                })
+        })
+}
+
+pub(crate) fn workspace_mount_for_args(
+    resolved: &ResolvedConfig,
+    remote_workspace_folder: &str,
+    args: &[String],
+) -> String {
+    resolved
+        .configuration
+        .get("workspaceMount")
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .unwrap_or_else(|| {
+            default_workspace_mount(&resolved.workspace_folder, remote_workspace_folder, args)
         })
 }
 
@@ -185,6 +237,87 @@ pub(crate) fn default_remote_workspace_folder(workspace_folder: Option<&Path>) -
         .and_then(|value| value.to_str())
         .unwrap_or("workspace");
     format!("/workspaces/{basename}")
+}
+
+pub(crate) fn derived_workspace_mount(
+    workspace_folder: &Path,
+    args: &[String],
+) -> Option<DerivedWorkspaceMount> {
+    let host_mount_folder = if common::parse_bool_option(args, "--mount-workspace-git-root", true) {
+        find_git_root_folder(workspace_folder).unwrap_or_else(|| workspace_folder.to_path_buf())
+    } else {
+        workspace_folder.to_path_buf()
+    };
+    let container_mount_folder = format!(
+        "/workspaces/{}",
+        host_mount_folder
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("workspace")
+    );
+    let relative = workspace_folder.strip_prefix(&host_mount_folder).ok();
+    let remote_workspace_folder = relative
+        .filter(|path| !path.as_os_str().is_empty())
+        .map(|path| {
+            let suffix = path
+                .components()
+                .map(|component| component.as_os_str().to_string_lossy().into_owned())
+                .collect::<Vec<_>>()
+                .join("/");
+            format!("{container_mount_folder}/{suffix}")
+        })
+        .unwrap_or_else(|| container_mount_folder.clone());
+    Some(DerivedWorkspaceMount {
+        host_mount_folder,
+        container_mount_folder,
+        remote_workspace_folder,
+    })
+}
+
+fn default_workspace_mount(
+    workspace_folder: &Path,
+    remote_workspace_folder: &str,
+    args: &[String],
+) -> String {
+    let Some(derived) = derived_workspace_mount(workspace_folder, args) else {
+        return format!(
+            "type=bind,source={},target={remote_workspace_folder}",
+            workspace_folder.display()
+        );
+    };
+    let mut mount = format!(
+        "type=bind,source={},target={}",
+        derived.host_mount_folder.display(),
+        derived.container_mount_folder
+    );
+    if std::env::consts::OS != "linux" {
+        if let Some(consistency) = common::parse_option_value(args, "--workspace-mount-consistency")
+        {
+            mount.push_str(&format!(",consistency={consistency}"));
+        }
+    }
+    mount
+}
+
+fn find_git_root_folder(workspace_folder: &Path) -> Option<PathBuf> {
+    let git_output = Command::new("git")
+        .args(["rev-parse", "--show-cdup"])
+        .current_dir(workspace_folder)
+        .output()
+        .ok()
+        .filter(|output| output.status.success())?;
+    let cdup = String::from_utf8_lossy(&git_output.stdout)
+        .trim()
+        .to_string();
+    if cdup.is_empty() {
+        return Some(workspace_folder.to_path_buf());
+    }
+    fs::canonicalize(workspace_folder.join(&cdup))
+        .ok()
+        .or_else(|| {
+            let candidate = workspace_folder.join(&cdup);
+            candidate.exists().then_some(candidate)
+        })
 }
 
 fn inspect_container_context(
@@ -287,7 +420,10 @@ fn workspace_folder_from_args(args: &[String]) -> Result<Option<PathBuf>, String
 mod tests {
     use serde_json::json;
 
-    use super::{default_remote_workspace_folder, remote_workspace_folder, ResolvedConfig};
+    use super::{
+        default_remote_workspace_folder, derived_workspace_mount, remote_workspace_folder,
+        workspace_mount_for_args, ResolvedConfig,
+    };
 
     #[test]
     fn remote_workspace_folder_prefers_configured_workspace_folder() {
@@ -320,6 +456,46 @@ mod tests {
         assert_eq!(
             default_remote_workspace_folder(Some(std::path::Path::new("/tmp/project"))),
             "/workspaces/project"
+        );
+    }
+
+    #[test]
+    fn workspace_mount_for_args_adds_requested_consistency_on_non_linux_hosts() {
+        let resolved = ResolvedConfig {
+            workspace_folder: std::path::PathBuf::from("/tmp/example"),
+            config_file: std::path::PathBuf::from("/tmp/example/.devcontainer/devcontainer.json"),
+            configuration: json!({}),
+        };
+        let mount = workspace_mount_for_args(
+            &resolved,
+            "/workspaces/example",
+            &[
+                "--workspace-mount-consistency".to_string(),
+                "delegated".to_string(),
+            ],
+        );
+        if std::env::consts::OS == "linux" {
+            assert!(!mount.contains("consistency="));
+        } else {
+            assert!(mount.contains("consistency=delegated"));
+        }
+    }
+
+    #[test]
+    fn derived_workspace_mount_uses_workspace_folder_when_git_root_mount_is_disabled() {
+        let workspace = std::env::temp_dir().join("devcontainer-rs-no-git-root");
+        let derived = derived_workspace_mount(
+            &workspace,
+            &[
+                "--mount-workspace-git-root".to_string(),
+                "false".to_string(),
+            ],
+        )
+        .expect("derived mount");
+        assert_eq!(derived.host_mount_folder, workspace);
+        assert_eq!(
+            derived.remote_workspace_folder,
+            "/workspaces/devcontainer-rs-no-git-root"
         );
     }
 }

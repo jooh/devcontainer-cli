@@ -164,6 +164,18 @@ fn read_configuration_accepts_override_config_flag() {
 }
 
 #[test]
+fn read_configuration_accepts_workspace_mount_flags() {
+    assert!(should_use_native_read_configuration(&[
+        "--workspace-folder".to_string(),
+        "/workspace/packages/app".to_string(),
+        "--mount-workspace-git-root".to_string(),
+        "false".to_string(),
+        "--workspace-mount-consistency".to_string(),
+        "delegated".to_string(),
+    ]));
+}
+
+#[test]
 fn read_configuration_accepts_feature_resolution_flags() {
     assert!(should_use_native_read_configuration(&[
         "--workspace-folder".to_string(),

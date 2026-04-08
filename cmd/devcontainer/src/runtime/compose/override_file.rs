@@ -7,7 +7,7 @@ use serde_json::Value;
 
 use crate::commands::common;
 
-use super::super::context::{workspace_mount, ResolvedConfig};
+use super::super::context::{derived_workspace_mount, workspace_mount_for_args, ResolvedConfig};
 use super::super::metadata::{serialized_container_metadata, split_mount_options};
 
 static NEXT_OVERRIDE_FILE_ID: AtomicU64 = AtomicU64::new(0);
@@ -54,7 +54,7 @@ pub(super) fn compose_metadata_override_file(
             escape_compose_scalar(image_name)
         ));
     }
-    if let Some(volume) = compose_workspace_volume(resolved, remote_workspace_folder) {
+    if let Some(volume) = compose_workspace_volume(resolved, args, remote_workspace_folder) {
         content.push_str(&format!(
             "\n    volumes:\n      - '{}'\n",
             escape_compose_scalar(&volume)
@@ -149,9 +149,18 @@ fn escape_compose_scalar(value: &str) -> String {
 
 fn compose_workspace_volume(
     resolved: &ResolvedConfig,
+    args: &[String],
     remote_workspace_folder: &str,
 ) -> Option<String> {
-    let mount = workspace_mount(resolved, remote_workspace_folder);
+    if resolved.configuration.get("workspaceMount").is_none() {
+        return derived_workspace_mount(&resolved.workspace_folder, args).map(|derived| {
+            format!(
+                "{}:{remote_workspace_folder}",
+                derived.host_mount_folder.display()
+            )
+        });
+    }
+    let mount = workspace_mount_for_args(resolved, remote_workspace_folder, args);
     let mut mount_type = None;
     let mut source = None;
     let mut target = None;

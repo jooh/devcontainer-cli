@@ -8,7 +8,7 @@
 ## Current snapshot
 
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped Rust sources: `127/200`
+- Upstream options with a native source reference in mapped Rust sources: `136/200`
 - The parity inventory is a static source-evidence report. It is intended to identify obvious gaps and track drift, not to claim semantic parity by itself.
 
 ## Highest-Impact Gaps

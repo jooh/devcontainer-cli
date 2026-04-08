@@ -5,7 +5,7 @@ Generated from the pinned upstream CLI command matrix and static source evidence
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped files: `127/200`
+- Upstream options with a native source reference in mapped files: `136/200`
 
 This report is a static inventory, not a semantic parity proof. A referenced option can still be only partially implemented, and command-level known gaps are called out explicitly below.
 
@@ -13,11 +13,11 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 | Command | Declared | Option refs | Missing refs | Known gaps |
 | --- | --- | --- | --- | --- |
-| `up` | yes | 24/43 | 19 | 2 |
+| `up` | yes | 27/43 | 16 | 2 |
 | `set-up` | yes | 9/20 | 11 | 1 |
 | `build` | yes | 17/22 | 5 | 2 |
-| `run-user-commands` | yes | 12/27 | 15 | 1 |
-| `read-configuration` | yes | 12/18 | 6 | 2 |
+| `run-user-commands` | yes | 14/27 | 13 | 1 |
+| `read-configuration` | yes | 14/18 | 4 | 2 |
 | `outdated` | yes | 4/8 | 4 | 1 |
 | `upgrade` | yes | 7/8 | 1 | 1 |
 | `features` | yes | 0/0 | 0 | 1 |
@@ -32,14 +32,14 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 | `templates publish` | yes | 0/0 | 0 | 1 |
 | `templates metadata` | yes | 1/1 | 0 | 1 |
 | `templates generate-docs` | yes | 4/4 | 0 | 1 |
-| `exec` | yes | 9/19 | 10 | 1 |
+| `exec` | yes | 11/19 | 8 | 1 |
 
 ## `up`
 
 - Description: Create and run dev container
 - Declared natively: yes
-- Option source references: 24/43
-- Missing option references: `buildkit`, `container-data-folder`, `container-session-data-folder`, `container-system-data-folder`, `default-user-env-probe`, `dotfiles-install-command`, `dotfiles-repository`, `dotfiles-target-path`, `gpu-availability`, `log-level`, `mount-git-worktree-common-dir`, `mount-workspace-git-root`, `omit-config-remote-env-from-metadata`, `omit-syntax-directive`, `terminal-columns`, `terminal-rows`, `update-remote-user-uid-default`, `user-data-folder`, `workspace-mount-consistency`
+- Option source references: 27/43
+- Missing option references: `buildkit`, `container-data-folder`, `container-session-data-folder`, `container-system-data-folder`, `default-user-env-probe`, `dotfiles-install-command`, `dotfiles-repository`, `dotfiles-target-path`, `gpu-availability`, `log-level`, `omit-config-remote-env-from-metadata`, `omit-syntax-directive`, `terminal-columns`, `terminal-rows`, `update-remote-user-uid-default`, `user-data-folder`
 - Known gaps: Native runtime now layers Features for image, dockerfile, and Docker Compose configs. Several upstream flags remain unimplemented or are only partially honored.
 
 ## `set-up`
@@ -62,16 +62,16 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Run user commands
 - Declared natively: yes
-- Option source references: 12/27
-- Missing option references: `container-data-folder`, `container-session-data-folder`, `container-system-data-folder`, `default-user-env-probe`, `dotfiles-install-command`, `dotfiles-repository`, `dotfiles-target-path`, `log-level`, `mount-git-worktree-common-dir`, `mount-workspace-git-root`, `skip-feature-auto-mapping`, `stop-for-personalization`, `terminal-columns`, `terminal-rows`, `user-data-folder`
+- Option source references: 14/27
+- Missing option references: `container-data-folder`, `container-session-data-folder`, `container-system-data-folder`, `default-user-env-probe`, `dotfiles-install-command`, `dotfiles-repository`, `dotfiles-target-path`, `log-level`, `skip-feature-auto-mapping`, `stop-for-personalization`, `terminal-columns`, `terminal-rows`, `user-data-folder`
 - Known gaps: Lifecycle execution is native, but several upstream runtime and dotfiles flags are still missing.
 
 ## `read-configuration`
 
 - Description: Read configuration
 - Declared natively: yes
-- Option source references: 12/18
-- Missing option references: `log-level`, `mount-git-worktree-common-dir`, `mount-workspace-git-root`, `terminal-columns`, `terminal-rows`, `user-data-folder`
+- Option source references: 14/18
+- Missing option references: `log-level`, `terminal-columns`, `terminal-rows`, `user-data-folder`
 - Known gaps: `--include-features-configuration` resolves local/published Feature sets natively, but still relies on fixture/manual manifests rather than full OCI resolution. Variable substitution support is still narrower than upstream.
 
 ## `outdated`
@@ -190,6 +190,6 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Execute a command on a running dev container
 - Declared natively: yes
-- Option source references: 9/19
-- Missing option references: `container-data-folder`, `container-system-data-folder`, `default-user-env-probe`, `log-level`, `mount-git-worktree-common-dir`, `mount-workspace-git-root`, `skip-feature-auto-mapping`, `terminal-columns`, `terminal-rows`, `user-data-folder`
+- Option source references: 11/19
+- Missing option references: `container-data-folder`, `container-system-data-folder`, `default-user-env-probe`, `log-level`, `skip-feature-auto-mapping`, `terminal-columns`, `terminal-rows`, `user-data-folder`
 - Known gaps: Core exec path is native, but upstream option coverage is still narrower.

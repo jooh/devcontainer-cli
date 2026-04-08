@@ -32,13 +32,17 @@ pub(super) fn read_configuration_value(
     configuration
 }
 
-pub(super) fn workspace_payload(loaded: &LoadedConfig, configuration: &Value) -> Value {
+pub(super) fn workspace_payload(
+    loaded: &LoadedConfig,
+    configuration: &Value,
+    args: &[String],
+) -> Value {
     let resolved = runtime::context::ResolvedConfig {
         workspace_folder: loaded.workspace_folder.clone(),
         config_file: loaded.config_file.clone(),
         configuration: configuration.clone(),
     };
-    let workspace_folder = runtime::context::remote_workspace_folder(&resolved);
+    let workspace_folder = runtime::context::remote_workspace_folder_for_args(&resolved, args);
     let mut payload = Map::new();
     payload.insert(
         "workspaceFolder".to_string(),
@@ -47,9 +51,10 @@ pub(super) fn workspace_payload(loaded: &LoadedConfig, configuration: &Value) ->
     if !runtime::compose::uses_compose_config(configuration) {
         payload.insert(
             "workspaceMount".to_string(),
-            Value::String(runtime::context::workspace_mount(
+            Value::String(runtime::context::workspace_mount_for_args(
                 &resolved,
                 &workspace_folder,
+                args,
             )),
         );
     }

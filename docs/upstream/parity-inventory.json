@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 127,
-		"optionsMissing": 73
+		"optionsReferenced": 136,
+		"optionsMissing": 64
 	},
 	"commands": [
 		{
@@ -16,8 +16,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 43,
-				"referenced": 24,
-				"missing": 19
+				"referenced": 27,
+				"missing": 16
 			},
 			"options": [
 				{
@@ -194,18 +194,30 @@
 					"name": "mount",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/container.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/container.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
 				{
 					"name": "mount-git-worktree-common-dir",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "mount-workspace-git-root",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "omit-config-remote-env-from-metadata",
@@ -316,8 +328,13 @@
 				},
 				{
 					"name": "workspace-mount-consistency",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				}
 			],
 			"knownGaps": [
@@ -664,8 +681,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 27,
-				"referenced": 12,
-				"missing": 15
+				"referenced": 14,
+				"missing": 13
 			},
 			"options": [
 				{
@@ -762,13 +779,18 @@
 				},
 				{
 					"name": "mount-git-worktree-common-dir",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "mount-workspace-git-root",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "override-config",
@@ -856,8 +878,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 18,
-				"referenced": 12,
-				"missing": 6
+				"referenced": 14,
+				"missing": 4
 			},
 			"options": [
 				{
@@ -954,13 +976,21 @@
 				},
 				{
 					"name": "mount-git-worktree-common-dir",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "mount-workspace-git-root",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "override-config",
@@ -1627,8 +1657,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 19,
-				"referenced": 9,
-				"missing": 10
+				"referenced": 11,
+				"missing": 8
 			},
 			"options": [
 				{
@@ -1705,13 +1735,18 @@
 				},
 				{
 					"name": "mount-git-worktree-common-dir",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "mount-workspace-git-root",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/runtime/context.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "override-config",

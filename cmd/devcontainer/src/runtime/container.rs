@@ -3,7 +3,7 @@ use serde_json::Value;
 use crate::commands::common;
 
 use super::compose;
-use super::context::{workspace_mount, ResolvedConfig};
+use super::context::{workspace_mount_for_args, ResolvedConfig};
 use super::engine;
 use super::lifecycle::LifecycleMode;
 use super::metadata::serialized_container_metadata;
@@ -207,7 +207,7 @@ fn start_container(
             serialized_container_metadata(&resolved.configuration, remote_workspace_folder)?
         ),
         "--mount".to_string(),
-        workspace_mount(resolved, remote_workspace_folder),
+        workspace_mount_for_args(resolved, remote_workspace_folder, args),
     ];
     if resolved
         .configuration
