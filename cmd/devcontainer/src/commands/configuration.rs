@@ -537,11 +537,13 @@ fn merge_configuration(configuration: &Value, metadata_entries: &[Value]) -> Val
     insert_merged_array(
         &mut merged,
         "forwardPorts",
-        union_values(metadata_entries, "forwardPorts"),
+        merge_forward_ports(metadata_entries),
     );
     insert_last_value(&mut merged, "shutdownAction", metadata_entries);
     insert_last_value(&mut merged, "updateRemoteUserUID", metadata_entries);
-    insert_last_value(&mut merged, "hostRequirements", metadata_entries);
+    if let Some(host_requirements) = merge_host_requirements(metadata_entries) {
+        merged.insert("hostRequirements".to_string(), host_requirements);
+    }
 
     Value::Object(merged)
 }
@@ -630,21 +632,189 @@ fn merge_object_entries(entries: &[Value], key: &str) -> Value {
     Value::Object(merged)
 }
 
-fn union_values(entries: &[Value], key: &str) -> Vec<Value> {
+fn merge_forward_ports(entries: &[Value]) -> Vec<Value> {
     let mut seen = HashSet::new();
     let mut merged = Vec::new();
     for entry in entries {
-        let Some(values) = entry.get(key).and_then(Value::as_array) else {
+        let Some(values) = entry.get("forwardPorts").and_then(Value::as_array) else {
             continue;
         };
         for value in values {
-            let fingerprint = serde_json::to_string(value).unwrap_or_else(|_| String::new());
+            let Some(normalized) = normalize_forward_port(value) else {
+                continue;
+            };
+            let fingerprint = serde_json::to_string(&normalized).unwrap_or_else(|_| String::new());
             if seen.insert(fingerprint) {
-                merged.push(value.clone());
+                merged.push(normalized);
             }
         }
     }
     merged
+}
+
+fn normalize_forward_port(value: &Value) -> Option<Value> {
+    match value {
+        Value::Number(number) => number
+            .as_u64()
+            .map(|port| Value::String(format!("localhost:{port}")))
+            .and_then(|port| canonical_forward_port(&port)),
+        Value::String(_) => canonical_forward_port(value),
+        _ => None,
+    }
+}
+
+fn canonical_forward_port(value: &Value) -> Option<Value> {
+    match value {
+        Value::String(text) => {
+            if let Some(port) = text.strip_prefix("localhost:") {
+                if port.chars().all(|character| character.is_ascii_digit()) {
+                    return port
+                        .parse::<u64>()
+                        .ok()
+                        .map(|port| Value::Number(port.into()));
+                }
+            }
+            Some(Value::String(text.clone()))
+        }
+        _ => None,
+    }
+}
+
+fn merge_host_requirements(entries: &[Value]) -> Option<Value> {
+    let cpus = entries
+        .iter()
+        .filter_map(|entry| entry.get("hostRequirements"))
+        .filter_map(|requirements| requirements.get("cpus"))
+        .filter_map(Value::as_f64)
+        .fold(0.0_f64, f64::max);
+    let memory = entries
+        .iter()
+        .filter_map(|entry| entry.get("hostRequirements"))
+        .filter_map(|requirements| requirements.get("memory"))
+        .map(parse_host_requirement_bytes)
+        .fold(0_u64, u64::max);
+    let storage = entries
+        .iter()
+        .filter_map(|entry| entry.get("hostRequirements"))
+        .filter_map(|requirements| requirements.get("storage"))
+        .map(parse_host_requirement_bytes)
+        .fold(0_u64, u64::max);
+    let gpu = entries
+        .iter()
+        .filter_map(|entry| entry.get("hostRequirements"))
+        .filter_map(|requirements| requirements.get("gpu"))
+        .cloned()
+        .reduce(|left, right| merge_gpu_requirement_values(&left, &right));
+
+    if cpus == 0.0 && memory == 0 && storage == 0 && gpu.is_none() {
+        return None;
+    }
+
+    let mut merged = Map::new();
+    if cpus != 0.0 {
+        let cpu_value = serde_json::Number::from_f64(cpus)
+            .map(Value::Number)
+            .unwrap_or_else(|| Value::from(cpus as i64));
+        merged.insert("cpus".to_string(), cpu_value);
+    }
+    if memory != 0 {
+        merged.insert("memory".to_string(), Value::String(memory.to_string()));
+    }
+    if storage != 0 {
+        merged.insert("storage".to_string(), Value::String(storage.to_string()));
+    }
+    if let Some(gpu) = gpu {
+        merged.insert("gpu".to_string(), gpu);
+    }
+    Some(Value::Object(merged))
+}
+
+fn parse_host_requirement_bytes(value: &Value) -> u64 {
+    match value {
+        Value::Number(number) => number.as_u64().unwrap_or(0),
+        Value::String(text) => parse_byte_string(text),
+        _ => 0,
+    }
+}
+
+fn parse_byte_string(value: &str) -> u64 {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return 0;
+    }
+    let split_index = trimmed
+        .find(|character: char| !(character.is_ascii_digit() || character == '.'))
+        .unwrap_or(trimmed.len());
+    let (number_text, unit_text) = trimmed.split_at(split_index);
+    let Ok(number) = number_text.parse::<f64>() else {
+        return 0;
+    };
+    let unit = unit_text.trim().to_ascii_lowercase();
+    let multiplier = match unit.as_str() {
+        "" | "b" => 1_f64,
+        "k" | "kb" => 1_000_f64,
+        "m" | "mb" => 1_000_000_f64,
+        "g" | "gb" => 1_000_000_000_f64,
+        "t" | "tb" => 1_000_000_000_000_f64,
+        "ki" | "kib" => 1_024_f64,
+        "mi" | "mib" => 1_048_576_f64,
+        "gi" | "gib" => 1_073_741_824_f64,
+        "ti" | "tib" => 1_099_511_627_776_f64,
+        _ => return 0,
+    };
+    (number * multiplier) as u64
+}
+
+fn merge_gpu_requirement_values(left: &Value, right: &Value) -> Value {
+    if matches!(left, Value::Bool(false) | Value::Null) {
+        return right.clone();
+    }
+    if matches!(right, Value::Bool(false) | Value::Null) {
+        return left.clone();
+    }
+    if left == &Value::String("optional".to_string())
+        && right == &Value::String("optional".to_string())
+    {
+        return Value::String("optional".to_string());
+    }
+
+    let left_object = gpu_requirement_object(left);
+    let right_object = gpu_requirement_object(right);
+    let cores = left_object
+        .get("cores")
+        .and_then(Value::as_u64)
+        .unwrap_or(0)
+        .max(
+            right_object
+                .get("cores")
+                .and_then(Value::as_u64)
+                .unwrap_or(0),
+        );
+    let memory = parse_host_requirement_bytes(left_object.get("memory").unwrap_or(&Value::Null))
+        .max(parse_host_requirement_bytes(
+            right_object.get("memory").unwrap_or(&Value::Null),
+        ));
+    let mut merged = Map::new();
+    if cores != 0 {
+        merged.insert("cores".to_string(), Value::Number(cores.into()));
+    }
+    if memory != 0 {
+        merged.insert("memory".to_string(), Value::String(memory.to_string()));
+    }
+    if merged.is_empty() {
+        Value::Bool(true)
+    } else {
+        Value::Object(merged)
+    }
+}
+
+fn gpu_requirement_object(value: &Value) -> Map<String, Value> {
+    match value {
+        Value::Object(entries) => entries.clone(),
+        Value::Bool(true) => Map::new(),
+        Value::String(text) if text == "optional" => Map::new(),
+        _ => Map::new(),
+    }
 }
 
 fn merge_mounts(entries: &[Value]) -> Vec<Value> {
@@ -1257,9 +1427,11 @@ impl PartialOrd for ParsedVersion {
 mod tests {
     use super::{
         build_outdated_payload, build_read_configuration_payload, feature_id_without_version,
-        lockfile_path, run_upgrade_lockfile, should_use_native_read_configuration,
+        lockfile_path, merge_configuration, run_upgrade_lockfile,
+        should_use_native_read_configuration,
     };
     use crate::commands::common::resolve_read_configuration_path;
+    use serde_json::json;
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -1416,6 +1588,42 @@ mod tests {
             .expect("features object")
             .contains_key("ghcr.io/devcontainers/features/git:1"));
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn merged_configuration_normalizes_forward_ports_before_deduplication() {
+        let merged = merge_configuration(
+            &json!({ "image": "debian:bookworm" }),
+            &[
+                json!({ "forwardPorts": [3000] }),
+                json!({ "forwardPorts": ["localhost:3000", "0.0.0.0:4000"] }),
+            ],
+        );
+
+        assert_eq!(merged["forwardPorts"], json!([3000, "0.0.0.0:4000"]));
+    }
+
+    #[test]
+    fn merged_configuration_merges_host_requirements_field_by_field() {
+        let merged = merge_configuration(
+            &json!({ "image": "debian:bookworm" }),
+            &[
+                json!({ "hostRequirements": { "cpus": 2, "gpu": "optional" } }),
+                json!({ "hostRequirements": { "memory": "4gb" } }),
+                json!({ "hostRequirements": { "gpu": { "cores": 4 } } }),
+            ],
+        );
+
+        assert_eq!(
+            merged["hostRequirements"],
+            json!({
+                "cpus": 2.0,
+                "memory": "4000000000",
+                "gpu": {
+                    "cores": 4
+                }
+            })
+        );
     }
 
     #[test]
