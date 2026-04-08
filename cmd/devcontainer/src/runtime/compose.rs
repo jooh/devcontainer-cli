@@ -340,15 +340,29 @@ fn substitute_compose_env(value: &str) -> String {
             output.push_str(&remaining[start..]);
             return output;
         };
-        let variable = &after_start[..end];
-        if let Ok(replacement) = env::var(variable) {
-            output.push_str(&replacement);
-        }
+        output.push_str(&expand_compose_variable(&after_start[..end]));
         remaining = &after_start[end + 1..];
     }
 
     output.push_str(remaining);
     output
+}
+
+fn expand_compose_variable(expression: &str) -> String {
+    if let Some((name, default)) = expression.split_once(":-") {
+        return match env::var(name) {
+            Ok(value) if !value.is_empty() => value,
+            _ => substitute_compose_env(default),
+        };
+    }
+    if let Some((name, default)) = expression.split_once('-') {
+        return match env::var(name) {
+            Ok(value) => value,
+            Err(_) => substitute_compose_env(default),
+        };
+    }
+
+    env::var(expression).unwrap_or_default()
 }
 
 fn sanitize_project_name(value: &str) -> String {
@@ -367,7 +381,7 @@ fn sanitize_project_name(value: &str) -> String {
 mod tests {
     use super::{
         compose_name_from_file, compose_project_name, inspect_service_definition,
-        uses_compose_config,
+        sanitize_project_name, uses_compose_config,
     };
     use serde_json::json;
     use std::fs;
@@ -451,6 +465,48 @@ mod tests {
             .expect("top-level name");
 
         assert_eq!(project_name, "Custom-Project-Name");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn compose_name_from_file_supports_colon_dash_default_interpolation() {
+        let root = unique_temp_dir();
+        let compose_file = root.join("docker-compose.yml");
+        let variable = format!("DEVCONTAINER_COMPOSE_TEST_MISSING_{}_A", std::process::id());
+        fs::create_dir_all(&root).expect("compose dir");
+        fs::write(
+            &compose_file,
+            format!("name: ${{{variable}:-MyProj}}\nservices:\n  app:\n    image: alpine:3.20\n"),
+        )
+        .expect("compose");
+
+        let project_name = compose_name_from_file(&compose_file)
+            .expect("compose name")
+            .expect("top-level name");
+
+        assert_eq!(project_name, "MyProj");
+        assert_eq!(sanitize_project_name(&project_name), "myproj");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn compose_name_from_file_supports_dash_default_interpolation() {
+        let root = unique_temp_dir();
+        let compose_file = root.join("docker-compose.yml");
+        let variable = format!("DEVCONTAINER_COMPOSE_TEST_MISSING_{}_B", std::process::id());
+        fs::create_dir_all(&root).expect("compose dir");
+        fs::write(
+            &compose_file,
+            format!("name: ${{{variable}-MyProj}}\nservices:\n  app:\n    image: alpine:3.20\n"),
+        )
+        .expect("compose");
+
+        let project_name = compose_name_from_file(&compose_file)
+            .expect("compose name")
+            .expect("top-level name");
+
+        assert_eq!(project_name, "MyProj");
+        assert_eq!(sanitize_project_name(&project_name), "myproj");
         let _ = fs::remove_dir_all(root);
     }
 }
