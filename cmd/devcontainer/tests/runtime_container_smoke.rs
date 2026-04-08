@@ -330,6 +330,69 @@ fn up_starts_compose_services_and_exec_uses_compose_container_lookup() {
 }
 
 #[test]
+fn exec_accepts_custom_compose_binary_for_compose_workspaces() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let compose_wrapper = harness.root.join("podman-compose");
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"remoteUser\": \"vscode\"\n}\n",
+    );
+    fs::write(
+        &compose_wrapper,
+        format!(
+            "#!/bin/sh\nexec \"{}\" compose \"$@\"\n",
+            harness.fake_podman.display()
+        ),
+    )
+    .expect("compose wrapper");
+    let mut permissions = fs::metadata(&compose_wrapper)
+        .expect("compose wrapper metadata")
+        .permissions();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        permissions.set_mode(0o755);
+    }
+    fs::set_permissions(&compose_wrapper, permissions).expect("compose wrapper permissions");
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--docker-compose-path",
+            compose_wrapper.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "/bin/echo",
+            "hello-from-custom-compose",
+        ],
+        &[("FAKE_PODMAN_COMPOSE_PS_OUTPUT", "fake-compose-container-id")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-custom-compose\n"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("compose --project-name workspace_devcontainer -f "));
+    assert!(invocations.contains(" ps -q app"));
+    assert!(invocations.contains(
+        "exec --workdir /workspace --user vscode fake-compose-container-id /bin/echo hello-from-custom-compose"
+    ));
+}
+
+#[test]
 fn up_expect_existing_compose_container_fails_when_missing() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
