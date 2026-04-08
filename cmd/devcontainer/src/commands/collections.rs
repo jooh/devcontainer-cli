@@ -1270,13 +1270,16 @@ fn materialize_feature_installation(
     destination: &Path,
 ) -> Result<(), String> {
     match &installation.source {
-        FeatureInstallationSource::Local(path) => {
-            common::copy_directory_recursive(path, destination)
-        }
+        FeatureInstallationSource::Local(path) => materialize_local_feature(path, destination),
         FeatureInstallationSource::Published(feature_id) => {
             materialize_published_feature(feature_id, destination)
         }
     }
+}
+
+fn materialize_local_feature(source: &Path, destination: &Path) -> Result<(), String> {
+    common::copy_directory_recursive(source, destination)?;
+    ensure_feature_install_script(destination)
 }
 
 fn materialize_published_feature(feature_id: &str, destination: &Path) -> Result<(), String> {
@@ -1293,7 +1296,15 @@ fn materialize_published_feature(feature_id: &str, destination: &Path) -> Result
         published_feature_install_script(feature_id),
     )
     .map_err(|error| error.to_string())?;
-    Ok(())
+    ensure_feature_install_script(destination)
+}
+
+fn ensure_feature_install_script(destination: &Path) -> Result<(), String> {
+    let install_path = destination.join("install.sh");
+    if install_path.is_file() {
+        return Ok(());
+    }
+    fs::write(&install_path, "#!/bin/sh\nset -eu\n").map_err(|error| error.to_string())
 }
 
 fn unique_feature_test_name(prefix: &str) -> String {
@@ -1996,9 +2007,14 @@ mod tests {
         .expect("scenarios");
 
         let mut runtime = FakeFeatureTestRuntime::default();
-        let results =
-            execute_feature_tests_with_runtime(&[root.display().to_string()], &mut runtime)
-                .expect("test execution");
+        let results = execute_feature_tests_with_runtime(
+            &[
+                "--preserve-test-containers".to_string(),
+                root.display().to_string(),
+            ],
+            &mut runtime,
+        )
+        .expect("test execution");
 
         assert_eq!(results.len(), 2);
         assert!(results
@@ -2007,6 +2023,14 @@ mod tests {
         assert!(results
             .iter()
             .any(|result| result.name == "custom" && result.passed));
+        assert!(runtime
+            .build_calls
+            .iter()
+            .map(|(_, _, context_path)| context_path.join("feature-0-demo").join("install.sh"))
+            .any(|install_path| install_path.is_file()));
+        for (_, workspace_dir) in &runtime.start_calls {
+            let _ = fs::remove_dir_all(workspace_dir);
+        }
         let _ = fs::remove_dir_all(root);
     }
 
