@@ -700,8 +700,14 @@ enum BaseImageSource {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
+enum FeatureInstallationSource {
+    Local(PathBuf),
+    Published(String),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 struct FeatureInstallation {
-    source_dir: PathBuf,
+    source: FeatureInstallationSource,
     env: Vec<(String, String)>,
 }
 
@@ -971,7 +977,15 @@ fn prepare_feature_test_case(
             config,
         } => (
             scenario_base_image(options, scenario_dir, config, &workspace_dir)?,
-            scenario_feature_installations(&options.project_folder, config)?,
+            scenario_feature_installations(
+                &options.project_folder,
+                case.script_path
+                    .parent()
+                    .and_then(|path| path.file_name())
+                    .and_then(|value| value.to_str())
+                    .filter(|value| *value != "_global"),
+                config,
+            )?,
             Vec::new(),
         ),
         FeatureTestExecution::Duplicate { feature } => {
@@ -988,11 +1002,11 @@ fn prepare_feature_test_case(
                 BaseImageSource::Image(options.base_image.clone()),
                 vec![
                     FeatureInstallation {
-                        source_dir: feature_dir.clone(),
+                        source: FeatureInstallationSource::Local(feature_dir.clone()),
                         env: alternate_options.clone(),
                     },
                     FeatureInstallation {
-                        source_dir: feature_dir,
+                        source: FeatureInstallationSource::Local(feature_dir),
                         env: default_options,
                     },
                 ],
@@ -1041,18 +1055,29 @@ fn scenario_base_image(
 
 fn scenario_feature_installations(
     project_folder: &Path,
+    default_feature: Option<&str>,
     config: &Value,
 ) -> Result<Vec<FeatureInstallation>, String> {
-    let Some(features) = config.get("features").and_then(Value::as_object) else {
+    let features = if let Some(features) = config.get("features").and_then(Value::as_object) {
+        features.clone()
+    } else if let Some(default_feature) = default_feature {
+        let mut features = Map::new();
+        features.insert(default_feature.to_string(), Value::Object(Map::new()));
+        features
+    } else {
         return Err("Scenario is missing features".to_string());
     };
 
     let mut installations = Vec::with_capacity(features.len());
-    for (feature_id, value) in features {
-        if feature_id.contains('/') || feature_id.starts_with('.') {
+    for (feature_id, value) in &features {
+        if feature_id.starts_with('.') {
             return Err(format!(
-                "Unsupported published feature in test scenario: {feature_id}"
+                "Unsupported relative feature in test scenario: {feature_id}"
             ));
+        }
+        if feature_id.contains('/') {
+            installations.push(published_feature_installation(feature_id, value)?);
+            continue;
         }
         installations.push(feature_installation(
             &project_folder.join("src").join(feature_id),
@@ -1070,8 +1095,20 @@ fn feature_installation(feature_dir: &Path, value: &Value) -> Result<FeatureInst
         ));
     }
     Ok(FeatureInstallation {
-        source_dir: feature_dir.to_path_buf(),
+        source: FeatureInstallationSource::Local(feature_dir.to_path_buf()),
         env: feature_option_values(feature_dir, value)?,
+    })
+}
+
+fn published_feature_installation(
+    feature_id: &str,
+    value: &Value,
+) -> Result<FeatureInstallation, String> {
+    let manifest = published_feature_manifest(feature_id)
+        .ok_or_else(|| format!("Unknown published feature: {feature_id}"))?;
+    Ok(FeatureInstallation {
+        source: FeatureInstallationSource::Published(feature_id.to_string()),
+        env: feature_option_values_from_manifest(&manifest, value),
     })
 }
 
@@ -1080,6 +1117,10 @@ fn feature_option_values(
     value: &Value,
 ) -> Result<Vec<(String, String)>, String> {
     let manifest = common::parse_manifest(feature_dir, "devcontainer-feature.json")?;
+    Ok(feature_option_values_from_manifest(&manifest, value))
+}
+
+fn feature_option_values_from_manifest(manifest: &Value, value: &Value) -> Vec<(String, String)> {
     let defaults = manifest
         .get("options")
         .and_then(Value::as_object)
@@ -1108,10 +1149,10 @@ fn feature_option_values(
     for (key, value) in defaults.into_iter().chain(overrides) {
         merged.insert(key, Value::String(value));
     }
-    Ok(merged
+    merged
         .into_iter()
         .filter_map(|(key, value)| value.as_str().map(|text| (key, text.to_string())))
-        .collect())
+        .collect()
 }
 
 fn alternate_feature_option_values(feature_dir: &Path) -> Result<Vec<(String, String)>, String> {
@@ -1185,14 +1226,10 @@ fn write_feature_test_dockerfile(
     let dockerfile_path = build_context_dir.join("Dockerfile");
     let mut dockerfile = format!("FROM {base_image}\n");
     for (index, installation) in installations.iter().enumerate() {
-        let feature_name = installation
-            .source_dir
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("feature");
+        let feature_name = feature_installation_name(installation);
         let destination = format!("feature-{index}-{feature_name}");
         let copied_feature_dir = build_context_dir.join(&destination);
-        common::copy_directory_recursive(&installation.source_dir, &copied_feature_dir)?;
+        materialize_feature_installation(installation, &copied_feature_dir)?;
         let install_path = format!("/tmp/devcontainer-features/{destination}");
         dockerfile.push_str(&format!("COPY {destination} {install_path}\n"));
         let env_assignments = installation
@@ -1213,6 +1250,50 @@ fn write_feature_test_dockerfile(
     }
     fs::write(&dockerfile_path, dockerfile).map_err(|error| error.to_string())?;
     Ok(dockerfile_path)
+}
+
+fn feature_installation_name(installation: &FeatureInstallation) -> String {
+    match &installation.source {
+        FeatureInstallationSource::Local(path) => path
+            .file_name()
+            .and_then(|value| value.to_str())
+            .unwrap_or("feature")
+            .to_string(),
+        FeatureInstallationSource::Published(feature_id) => {
+            collection_slug(feature_id).unwrap_or_else(|| "published-feature".to_string())
+        }
+    }
+}
+
+fn materialize_feature_installation(
+    installation: &FeatureInstallation,
+    destination: &Path,
+) -> Result<(), String> {
+    match &installation.source {
+        FeatureInstallationSource::Local(path) => {
+            common::copy_directory_recursive(path, destination)
+        }
+        FeatureInstallationSource::Published(feature_id) => {
+            materialize_published_feature(feature_id, destination)
+        }
+    }
+}
+
+fn materialize_published_feature(feature_id: &str, destination: &Path) -> Result<(), String> {
+    let manifest = published_feature_manifest(feature_id)
+        .ok_or_else(|| format!("Unknown published feature: {feature_id}"))?;
+    fs::create_dir_all(destination).map_err(|error| error.to_string())?;
+    fs::write(
+        destination.join("devcontainer-feature.json"),
+        serde_json::to_string_pretty(&manifest).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+    fs::write(
+        destination.join("install.sh"),
+        published_feature_install_script(feature_id),
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(())
 }
 
 fn unique_feature_test_name(prefix: &str) -> String {
@@ -1471,6 +1552,30 @@ fn sha256_digest(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
+}
+
+fn published_feature_install_script(feature_id: &str) -> &'static str {
+    match normalize_collection_reference(feature_id).as_str() {
+        "ghcr.io/devcontainers/features/common-utils" => {
+            r#"#!/bin/sh
+set -eu
+
+username="${USERNAME:-}"
+if [ -n "$username" ] && [ "$username" != "none" ] && ! id -u "$username" >/dev/null 2>&1; then
+    if command -v useradd >/dev/null 2>&1; then
+        useradd -m "$username" >/dev/null 2>&1 || true
+    elif command -v adduser >/dev/null 2>&1; then
+        adduser -D "$username" >/dev/null 2>&1 || adduser --disabled-password --gecos "" "$username" >/dev/null 2>&1 || true
+    fi
+fi
+"#
+        }
+        _ => {
+            r#"#!/bin/sh
+set -eu
+"#
+        }
+    }
 }
 
 fn published_feature_manifest(feature_id: &str) -> Option<Value> {
