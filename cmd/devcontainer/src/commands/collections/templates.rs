@@ -117,7 +117,7 @@ pub(super) fn apply_catalog_template(
 
     let devcontainer = json!({
         "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("Docker from Docker".to_string())),
-        "image": "mcr.microsoft.com/devcontainers/base:ubuntu",
+        "image": "ghcr.io/devcontainers/base:ubuntu",
         "features": features,
     });
     let config_dir = workspace_root.join(".devcontainer");
@@ -165,7 +165,7 @@ fn apply_generic_published_template(
     );
     devcontainer.insert(
         "image".to_string(),
-        Value::String("mcr.microsoft.com/devcontainers/base:ubuntu".to_string()),
+        Value::String("ghcr.io/devcontainers/base:ubuntu".to_string()),
     );
 
     let mut features = Map::new();
