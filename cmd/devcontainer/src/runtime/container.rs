@@ -20,131 +20,146 @@ pub(crate) fn ensure_up_container(
     remote_workspace_folder: &str,
 ) -> Result<UpContainer, String> {
     if compose::uses_compose_config(&resolved.configuration) {
-        let running = compose::resolve_container_id(resolved, args)?;
-        match running {
-            Some(_) if common::has_flag(args, "--remove-existing-container") => {
-                compose::remove_service(resolved, args)?;
-                compose::up_service(resolved, args, remote_workspace_folder)?;
-                let container_id = compose::resolve_container_id(resolved, args)?
-                    .ok_or_else(|| "Dev container not found.".to_string())?;
-                return Ok(UpContainer {
-                    container_id,
-                    lifecycle_mode: LifecycleMode::UpCreated,
-                });
-            }
-            Some(container_id) => {
-                compose::up_service(resolved, args, remote_workspace_folder)?;
-                let updated_container_id = compose::resolve_container_id(resolved, args)?
-                    .ok_or_else(|| "Dev container not found.".to_string())?;
-                return Ok(UpContainer {
-                    lifecycle_mode: if updated_container_id == container_id {
-                        LifecycleMode::UpReused
-                    } else {
-                        LifecycleMode::UpCreated
-                    },
-                    container_id: updated_container_id,
-                });
-            }
-            None => {
-                let existing = compose::resolve_container_id_including_stopped(resolved, args)?;
-                match existing {
-                    Some(_) if common::has_flag(args, "--remove-existing-container") => {
-                        compose::remove_service(resolved, args)?;
-                        compose::up_service(resolved, args, remote_workspace_folder)?;
-                        let container_id = compose::resolve_container_id(resolved, args)?
-                            .ok_or_else(|| "Dev container not found.".to_string())?;
-                        return Ok(UpContainer {
-                            container_id,
-                            lifecycle_mode: LifecycleMode::UpCreated,
-                        });
-                    }
-                    Some(container_id) => {
-                        compose::up_service(resolved, args, remote_workspace_folder)?;
-                        let updated_container_id =
-                            compose::resolve_container_id(resolved, args)?
-                                .ok_or_else(|| "Dev container not found.".to_string())?;
-                        return Ok(UpContainer {
-                            lifecycle_mode: if updated_container_id == container_id {
-                                LifecycleMode::UpStarted
-                            } else {
-                                LifecycleMode::UpCreated
-                            },
-                            container_id: updated_container_id,
-                        });
-                    }
-                    None if common::has_flag(args, "--expect-existing-container") => {
-                        return Err("Dev container not found.".to_string());
-                    }
-                    None => {
-                        compose::up_service(resolved, args, remote_workspace_folder)?;
-                        let container_id = compose::resolve_container_id(resolved, args)?
-                            .ok_or_else(|| "Dev container not found.".to_string())?;
-                        return Ok(UpContainer {
-                            container_id,
-                            lifecycle_mode: LifecycleMode::UpCreated,
-                        });
-                    }
-                }
-            }
-        }
+        return ensure_compose_up_container(resolved, args, remote_workspace_folder);
     }
 
+    ensure_engine_up_container(resolved, args, image_name, remote_workspace_folder)
+}
+
+fn ensure_compose_up_container(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    remote_workspace_folder: &str,
+) -> Result<UpContainer, String> {
+    let remove_existing = common::has_flag(args, "--remove-existing-container");
+    if let Some(container_id) = compose::resolve_container_id(resolved, args)? {
+        if remove_existing {
+            compose::remove_service(resolved, args)?;
+            return create_compose_container(resolved, args, remote_workspace_folder);
+        }
+        return refresh_compose_container(
+            resolved,
+            args,
+            remote_workspace_folder,
+            &container_id,
+            LifecycleMode::UpReused,
+        );
+    }
+
+    if let Some(container_id) = compose::resolve_container_id_including_stopped(resolved, args)? {
+        if remove_existing {
+            compose::remove_service(resolved, args)?;
+            return create_compose_container(resolved, args, remote_workspace_folder);
+        }
+        return refresh_compose_container(
+            resolved,
+            args,
+            remote_workspace_folder,
+            &container_id,
+            LifecycleMode::UpStarted,
+        );
+    }
+
+    if common::has_flag(args, "--expect-existing-container") {
+        return Err("Dev container not found.".to_string());
+    }
+
+    create_compose_container(resolved, args, remote_workspace_folder)
+}
+
+fn ensure_engine_up_container(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    image_name: &str,
+    remote_workspace_folder: &str,
+) -> Result<UpContainer, String> {
     let running = find_target_container(
         args,
         Some(resolved.workspace_folder.as_path()),
         Some(resolved.config_file.as_path()),
         false,
     )?;
+    let remove_existing = common::has_flag(args, "--remove-existing-container");
     match running {
-        Some(container_id) if common::has_flag(args, "--remove-existing-container") => {
+        Some(container_id) if remove_existing => {
             remove_container(args, &container_id)?;
-            start_container(resolved, args, image_name, remote_workspace_folder).map(
-                |container_id| UpContainer {
-                    container_id,
-                    lifecycle_mode: LifecycleMode::UpCreated,
-                },
-            )
+            create_engine_container(resolved, args, image_name, remote_workspace_folder)
         }
         Some(container_id) => Ok(UpContainer {
             container_id,
             lifecycle_mode: LifecycleMode::UpReused,
         }),
-        None => {
-            let existing = find_target_container(
-                args,
-                Some(resolved.workspace_folder.as_path()),
-                Some(resolved.config_file.as_path()),
-                true,
-            )?;
-            match existing {
-                Some(container_id) if common::has_flag(args, "--remove-existing-container") => {
-                    remove_container(args, &container_id)?;
-                    start_container(resolved, args, image_name, remote_workspace_folder).map(
-                        |container_id| UpContainer {
-                            container_id,
-                            lifecycle_mode: LifecycleMode::UpCreated,
-                        },
-                    )
-                }
-                Some(container_id) => {
-                    start_existing_container(args, &container_id)?;
-                    Ok(UpContainer {
-                        container_id,
-                        lifecycle_mode: LifecycleMode::UpStarted,
-                    })
-                }
-                None if common::has_flag(args, "--expect-existing-container") => {
-                    Err("Dev container not found.".to_string())
-                }
-                None => start_container(resolved, args, image_name, remote_workspace_folder).map(
-                    |container_id| UpContainer {
-                        container_id,
-                        lifecycle_mode: LifecycleMode::UpCreated,
-                    },
-                ),
+        None => match find_target_container(
+            args,
+            Some(resolved.workspace_folder.as_path()),
+            Some(resolved.config_file.as_path()),
+            true,
+        )? {
+            Some(container_id) if remove_existing => {
+                remove_container(args, &container_id)?;
+                create_engine_container(resolved, args, image_name, remote_workspace_folder)
             }
-        }
+            Some(container_id) => {
+                start_existing_container(args, &container_id)?;
+                Ok(UpContainer {
+                    container_id,
+                    lifecycle_mode: LifecycleMode::UpStarted,
+                })
+            }
+            None if common::has_flag(args, "--expect-existing-container") => {
+                Err("Dev container not found.".to_string())
+            }
+            None => create_engine_container(resolved, args, image_name, remote_workspace_folder),
+        },
     }
+}
+
+fn create_compose_container(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    remote_workspace_folder: &str,
+) -> Result<UpContainer, String> {
+    compose::up_service(resolved, args, remote_workspace_folder)?;
+    let container_id = compose::resolve_container_id(resolved, args)?
+        .ok_or_else(|| "Dev container not found.".to_string())?;
+    Ok(UpContainer {
+        container_id,
+        lifecycle_mode: LifecycleMode::UpCreated,
+    })
+}
+
+fn refresh_compose_container(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    remote_workspace_folder: &str,
+    previous_container_id: &str,
+    unchanged_mode: LifecycleMode,
+) -> Result<UpContainer, String> {
+    compose::up_service(resolved, args, remote_workspace_folder)?;
+    let updated_container_id = compose::resolve_container_id(resolved, args)?
+        .ok_or_else(|| "Dev container not found.".to_string())?;
+    Ok(UpContainer {
+        lifecycle_mode: if updated_container_id == previous_container_id {
+            unchanged_mode
+        } else {
+            LifecycleMode::UpCreated
+        },
+        container_id: updated_container_id,
+    })
+}
+
+fn create_engine_container(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    image_name: &str,
+    remote_workspace_folder: &str,
+) -> Result<UpContainer, String> {
+    start_container(resolved, args, image_name, remote_workspace_folder).map(|container_id| {
+        UpContainer {
+            container_id,
+            lifecycle_mode: LifecycleMode::UpCreated,
+        }
+    })
 }
 
 pub(crate) fn resolve_target_container(

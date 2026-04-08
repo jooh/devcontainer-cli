@@ -1,0 +1,352 @@
+use std::env;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use serde_json::{json, Map, Value};
+
+use super::registry::{
+    embedded_template_source_dir, normalize_collection_reference, published_template_manifest,
+};
+use crate::commands::common;
+
+const UPSTREAM_DEFAULT_BASE_IMAGE: &str = "mcr.microsoft.com/devcontainers/base:ubuntu";
+
+pub(super) fn apply_template_target(
+    template_root: &Path,
+    workspace_root: &Path,
+) -> Result<Value, String> {
+    let manifest = common::parse_manifest(template_root, "devcontainer-template.json")?;
+    let source_root = template_root.join("src");
+    common::copy_directory_recursive(&source_root, workspace_root)?;
+    Ok(json!({
+        "outcome": "success",
+        "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "appliedTo": workspace_root,
+    }))
+}
+
+pub(super) fn build_template_metadata_payload(template_path: &str) -> Result<Value, String> {
+    let manifest = if template_path.starts_with("ghcr.io/") {
+        published_template_manifest(template_path)
+            .ok_or_else(|| format!("Unknown published template: {template_path}"))?
+    } else {
+        common::parse_manifest(Path::new(template_path), "devcontainer-template.json")?
+    };
+    Ok(json!({
+        "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "description": manifest.get("description").cloned().unwrap_or_else(|| Value::String(String::new())),
+    }))
+}
+
+pub(super) fn run_template_apply(args: &[String]) -> Result<Value, String> {
+    let template_id = common::parse_option_value(args, "--template-id");
+    if let Some(template_id) = template_id {
+        let workspace = common::parse_option_value(args, "--workspace-folder")
+            .map(PathBuf::from)
+            .or_else(|| env::current_dir().ok())
+            .ok_or_else(|| "Unable to determine workspace folder".to_string())?;
+        return apply_catalog_template(&template_id, &workspace, args);
+    }
+
+    let target = args
+        .first()
+        .ok_or_else(|| "templates apply requires <target>".to_string())?;
+    let workspace = common::parse_option_value(args, "--workspace-folder")
+        .map(PathBuf::from)
+        .or_else(|| env::current_dir().ok())
+        .ok_or_else(|| "Unable to determine workspace folder".to_string())?;
+    apply_template_target(Path::new(target), &workspace)
+}
+
+pub(super) fn apply_catalog_template(
+    template_id: &str,
+    workspace_root: &Path,
+    args: &[String],
+) -> Result<Value, String> {
+    let manifest = published_template_manifest(template_id)
+        .ok_or_else(|| format!("Unknown published template: {template_id}"))?;
+    let template_args = common::parse_option_value(args, "--template-args")
+        .map(|value| crate::config::parse_jsonc_value(&value))
+        .transpose()?
+        .unwrap_or_else(|| json!({}));
+    let extra_features = common::parse_option_value(args, "--features")
+        .map(|value| crate::config::parse_jsonc_value(&value))
+        .transpose()?
+        .unwrap_or_else(|| json!([]));
+
+    let normalized_template_id = normalize_collection_reference(template_id);
+    if normalized_template_id != "ghcr.io/devcontainers/templates/docker-from-docker" {
+        if let Some(template_root) = embedded_template_source_dir(&normalized_template_id) {
+            return apply_embedded_published_template(
+                &manifest,
+                &template_root,
+                workspace_root,
+                &template_args,
+                extra_features,
+            );
+        }
+        return apply_generic_published_template(&manifest, workspace_root, extra_features);
+    }
+
+    let mut features = Map::new();
+    features.insert(
+        "ghcr.io/devcontainers/features/common-utils:1".to_string(),
+        json!({
+            "installZsh": template_args.get("installZsh").cloned().unwrap_or_else(|| Value::String("true".to_string())),
+            "upgradePackages": template_args.get("upgradePackages").cloned().unwrap_or_else(|| Value::String("false".to_string())),
+        }),
+    );
+    features.insert(
+        "ghcr.io/devcontainers/features/docker-from-docker:1".to_string(),
+        json!({
+            "version": template_args.get("dockerVersion").cloned().unwrap_or_else(|| Value::String("latest".to_string())),
+            "moby": template_args.get("moby").cloned().unwrap_or_else(|| Value::String("true".to_string())),
+            "enableNonRootDocker": template_args.get("enableNonRootDocker").cloned().unwrap_or_else(|| Value::String("true".to_string())),
+        }),
+    );
+    if let Some(extra_features) = extra_features.as_array() {
+        for feature in extra_features {
+            let Some(id) = feature.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            features.insert(
+                id.to_string(),
+                feature.get("options").cloned().unwrap_or_else(|| json!({})),
+            );
+        }
+    }
+
+    let devcontainer = json!({
+        "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("Docker from Docker".to_string())),
+        "image": UPSTREAM_DEFAULT_BASE_IMAGE,
+        "features": features,
+    });
+    let config_dir = workspace_root.join(".devcontainer");
+    fs::create_dir_all(&config_dir).map_err(|error| error.to_string())?;
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        serde_json::to_string_pretty(&devcontainer).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(json!({
+        "files": ["./.devcontainer/devcontainer.json"],
+    }))
+}
+
+fn apply_embedded_published_template(
+    manifest: &Value,
+    template_root: &Path,
+    workspace_root: &Path,
+    template_args: &Value,
+    extra_features: Value,
+) -> Result<Value, String> {
+    let template_options = template_option_values(manifest, template_args);
+    copy_embedded_template_contents(template_root, workspace_root, &template_options)?;
+    merge_extra_features_into_template(workspace_root, extra_features)?;
+    Ok(json!({
+        "outcome": "success",
+        "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "appliedTo": workspace_root,
+    }))
+}
+
+fn apply_generic_published_template(
+    manifest: &Value,
+    workspace_root: &Path,
+    extra_features: Value,
+) -> Result<Value, String> {
+    let mut devcontainer = Map::new();
+    devcontainer.insert(
+        "name".to_string(),
+        manifest
+            .get("name")
+            .cloned()
+            .unwrap_or_else(|| Value::String("Published Template".to_string())),
+    );
+    devcontainer.insert(
+        "image".to_string(),
+        Value::String(UPSTREAM_DEFAULT_BASE_IMAGE.to_string()),
+    );
+
+    let mut features = Map::new();
+    if let Some(extra_features) = extra_features.as_array() {
+        for feature in extra_features {
+            let Some(id) = feature.get("id").and_then(Value::as_str) else {
+                continue;
+            };
+            features.insert(
+                id.to_string(),
+                feature.get("options").cloned().unwrap_or_else(|| json!({})),
+            );
+        }
+    }
+    if !features.is_empty() {
+        devcontainer.insert("features".to_string(), Value::Object(features));
+    }
+
+    let config_dir = workspace_root.join(".devcontainer");
+    fs::create_dir_all(&config_dir).map_err(|error| error.to_string())?;
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        serde_json::to_string_pretty(&Value::Object(devcontainer))
+            .map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+
+    Ok(json!({
+        "files": ["./.devcontainer/devcontainer.json"],
+    }))
+}
+
+fn template_option_values(manifest: &Value, template_args: &Value) -> Map<String, Value> {
+    let mut options = manifest
+        .get("options")
+        .and_then(Value::as_object)
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|(name, definition)| {
+                    definition
+                        .get("default")
+                        .cloned()
+                        .map(|value| (name.clone(), value))
+                })
+                .collect::<Map<String, Value>>()
+        })
+        .unwrap_or_default();
+    if let Some(template_args) = template_args.as_object() {
+        for (name, value) in template_args {
+            options.insert(name.clone(), value.clone());
+        }
+    }
+    options
+}
+
+fn copy_embedded_template_contents(
+    template_root: &Path,
+    workspace_root: &Path,
+    template_options: &Map<String, Value>,
+) -> Result<(), String> {
+    fs::create_dir_all(workspace_root).map_err(|error| error.to_string())?;
+    for entry in fs::read_dir(template_root).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        if entry.file_name() == "devcontainer-template.json" {
+            continue;
+        }
+        copy_embedded_template_entry(
+            &entry.path(),
+            &workspace_root.join(entry.file_name()),
+            template_options,
+        )?;
+    }
+    Ok(())
+}
+
+fn copy_embedded_template_entry(
+    source: &Path,
+    destination: &Path,
+    template_options: &Map<String, Value>,
+) -> Result<(), String> {
+    if source.is_dir() {
+        fs::create_dir_all(destination).map_err(|error| error.to_string())?;
+        for entry in fs::read_dir(source).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            copy_embedded_template_entry(
+                &entry.path(),
+                &destination.join(entry.file_name()),
+                template_options,
+            )?;
+        }
+        return Ok(());
+    }
+
+    let bytes = fs::read(source).map_err(|error| error.to_string())?;
+    if let Ok(text) = String::from_utf8(bytes) {
+        let substituted = substitute_template_options(&text, template_options);
+        fs::write(destination, substituted).map_err(|error| error.to_string())?;
+    } else {
+        fs::copy(source, destination).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn substitute_template_options(contents: &str, template_options: &Map<String, Value>) -> String {
+    let mut substituted = String::new();
+    let mut remaining = contents;
+    while let Some(start) = remaining.find("${templateOption:") {
+        substituted.push_str(&remaining[..start]);
+        let placeholder = &remaining[start + "${templateOption:".len()..];
+        let Some(end) = placeholder.find('}') else {
+            substituted.push_str(&remaining[start..]);
+            return substituted;
+        };
+        let name = &placeholder[..end];
+        if let Some(value) = template_options.get(name) {
+            substituted.push_str(&template_option_string(value));
+        } else {
+            substituted.push_str(&remaining[start..start + "${templateOption:".len() + end + 1]);
+        }
+        remaining = &placeholder[end + 1..];
+    }
+    substituted.push_str(remaining);
+    substituted
+}
+
+fn template_option_string(value: &Value) -> String {
+    value
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| value.to_string())
+}
+
+fn merge_extra_features_into_template(
+    workspace_root: &Path,
+    extra_features: Value,
+) -> Result<(), String> {
+    let Some(extra_features) = extra_features
+        .as_array()
+        .filter(|features| !features.is_empty())
+    else {
+        return Ok(());
+    };
+    let config_path = applied_template_config_path(workspace_root)
+        .ok_or_else(|| "Applied template is missing a dev container config".to_string())?;
+    let raw = fs::read_to_string(&config_path).map_err(|error| error.to_string())?;
+    let mut config = crate::config::parse_jsonc_value(&raw)?;
+    let config_object = config
+        .as_object_mut()
+        .ok_or_else(|| "Applied template config must be a JSON object".to_string())?;
+    let features = config_object
+        .entry("features".to_string())
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+        .ok_or_else(|| "Applied template features must be a JSON object".to_string())?;
+    for feature in extra_features {
+        let Some(id) = feature.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        features.insert(
+            id.to_string(),
+            feature.get("options").cloned().unwrap_or_else(|| json!({})),
+        );
+    }
+    fs::write(
+        config_path,
+        serde_json::to_string_pretty(&config).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn applied_template_config_path(workspace_root: &Path) -> Option<PathBuf> {
+    [
+        workspace_root
+            .join(".devcontainer")
+            .join("devcontainer.json"),
+        workspace_root.join(".devcontainer.json"),
+    ]
+    .into_iter()
+    .find(|path| path.is_file())
+}

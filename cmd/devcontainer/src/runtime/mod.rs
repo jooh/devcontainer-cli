@@ -6,6 +6,7 @@ pub(crate) mod engine;
 mod exec;
 mod lifecycle;
 pub(crate) mod metadata;
+mod paths;
 
 use serde_json::{json, Value};
 

@@ -1,0 +1,260 @@
+use std::fs;
+
+use crate::support::runtime_harness::{write_devcontainer_config, RuntimeHarness};
+
+#[test]
+fn up_starts_compose_services_and_exec_uses_compose_container_lookup() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"remoteUser\": \"vscode\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let up_output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[],
+    );
+
+    assert!(up_output.status.success(), "{up_output:?}");
+    let up_payload = harness.parse_stdout_json(&up_output);
+    assert_eq!(up_payload["containerId"], "fake-compose-container-id");
+    assert_eq!(up_payload["composeProjectName"], "workspace_devcontainer");
+    assert_eq!(up_payload["remoteWorkspaceFolder"], "/workspace");
+
+    let exec_output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "/bin/echo",
+            "hello-from-compose",
+        ],
+        &[],
+    );
+
+    assert!(exec_output.status.success(), "{exec_output:?}");
+    assert_eq!(
+        String::from_utf8(exec_output.stdout).expect("utf8 stdout"),
+        "hello-from-compose\n"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("compose --project-name workspace_devcontainer -f "));
+    assert!(invocations.contains(" up -d app"));
+    assert!(invocations.contains(" ps -q app"));
+    assert!(invocations.contains(
+        "exec --workdir /workspace --user vscode fake-compose-container-id /bin/echo hello-from-compose"
+    ));
+
+    let exec_log = harness.read_exec_log();
+    assert!(exec_log.contains("/bin/sh -lc echo ready"));
+}
+
+#[test]
+fn up_re_resolves_recreated_compose_container_ids() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"postCreateCommand\": \"echo recreated-post-create\",\n  \"postAttachCommand\": \"echo recreated-post-attach\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[
+            ("FAKE_PODMAN_COMPOSE_PS_OUTPUT_BEFORE_UP", "old-compose-id"),
+            ("FAKE_PODMAN_COMPOSE_PS_OUTPUT_AFTER_UP", "new-compose-id"),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(payload["containerId"], "new-compose-id");
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(" ps -q app"));
+    assert!(invocations.contains("exec --workdir /workspace new-compose-id"));
+
+    let exec_log = harness.read_exec_log();
+    assert!(exec_log.contains("/bin/sh -lc echo recreated-post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo recreated-post-attach"));
+}
+
+#[test]
+fn exec_accepts_custom_compose_binary_for_compose_workspaces() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let compose_wrapper = harness.root.join("podman-compose");
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"remoteUser\": \"vscode\"\n}\n",
+    );
+    fs::write(
+        &compose_wrapper,
+        format!(
+            "#!/bin/sh\nexec \"{}\" compose \"$@\"\n",
+            harness.fake_podman.display()
+        ),
+    )
+    .expect("compose wrapper");
+    let mut permissions = fs::metadata(&compose_wrapper)
+        .expect("compose wrapper metadata")
+        .permissions();
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::PermissionsExt;
+        permissions.set_mode(0o755);
+    }
+    fs::set_permissions(&compose_wrapper, permissions).expect("compose wrapper permissions");
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--docker-compose-path",
+            compose_wrapper.to_string_lossy().as_ref(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "/bin/echo",
+            "hello-from-custom-compose",
+        ],
+        &[("FAKE_PODMAN_COMPOSE_PS_OUTPUT", "fake-compose-container-id")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stdout).expect("utf8 stdout"),
+        "hello-from-custom-compose\n"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("compose --project-name workspace_devcontainer -f "));
+    assert!(invocations.contains(" ps -q app"));
+    assert!(invocations.contains(
+        "exec --workdir /workspace --user vscode fake-compose-container-id /bin/echo hello-from-custom-compose"
+    ));
+}
+
+#[test]
+fn up_expect_existing_compose_container_fails_when_missing() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--expect-existing-container",
+        ],
+        &[("FAKE_PODMAN_COMPOSE_PS_OUTPUT", "")],
+    );
+
+    assert!(!output.status.success(), "{output:?}");
+    assert_eq!(
+        String::from_utf8(output.stderr)
+            .expect("utf8 stderr")
+            .trim(),
+        "Dev container not found."
+    );
+}
+
+#[test]
+fn up_resumes_stopped_compose_services_without_rerunning_create_hooks() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"onCreateCommand\": \"echo on-create\",\n  \"updateContentCommand\": \"echo update-content\",\n  \"postCreateCommand\": \"echo post-create\",\n  \"postStartCommand\": \"echo post-start\",\n  \"postAttachCommand\": \"echo post-attach\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[
+            (
+                "FAKE_PODMAN_COMPOSE_PS_OUTPUT",
+                "stopped-compose-container-id",
+            ),
+            ("FAKE_PODMAN_COMPOSE_PS_REQUIRE_ALL", "1"),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(payload["containerId"], "stopped-compose-container-id");
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(" ps -q app"));
+    assert!(invocations.contains(" ps -q -a app"));
+    assert!(invocations.contains(" up -d app"));
+
+    let exec_log = harness.read_exec_log();
+    assert!(!exec_log.contains("/bin/sh -lc echo on-create"));
+    assert!(!exec_log.contains("/bin/sh -lc echo update-content"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-start"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-attach"));
+}

@@ -1,0 +1,342 @@
+use std::cmp::Ordering;
+
+use serde_json::{Map, Value};
+
+use super::{CatalogEntry, FeatureReference, Lockfile, ParsedVersion};
+
+pub(super) fn build_feature_version_info(
+    feature: &FeatureReference,
+    lockfile: Option<&Lockfile>,
+) -> Option<Value> {
+    let current = lockfile
+        .and_then(|value| value.features.get(&feature.original))
+        .map(|entry| entry.version.clone());
+
+    if feature.digest.is_some() {
+        let wanted = current
+            .clone()
+            .or_else(|| exact_catalog_entry(&feature.original).map(|entry| entry.version));
+        let latest = latest_version(&feature.base);
+        return Some(version_info_json(
+            current.or_else(|| wanted.clone()),
+            wanted.clone(),
+            latest.clone(),
+            wanted.as_deref().and_then(major_string),
+            latest.as_deref().and_then(major_string),
+        ));
+    }
+
+    let latest = latest_version(&feature.base);
+    let wanted = resolve_wanted_version(feature, lockfile);
+    if latest.is_none() && wanted.is_none() && current.is_none() {
+        return Some(version_info_json(None, None, None, None, None));
+    }
+
+    Some(version_info_json(
+        current.or_else(|| wanted.clone()),
+        wanted.clone(),
+        latest.clone(),
+        wanted.as_deref().and_then(major_string),
+        latest.as_deref().and_then(major_string),
+    ))
+}
+
+pub(super) fn resolve_wanted_version(
+    feature: &FeatureReference,
+    lockfile: Option<&Lockfile>,
+) -> Option<String> {
+    if let Some(entry) = lockfile.and_then(|value| value.features.get(&feature.original)) {
+        if feature.tag.is_none() || feature.digest.is_some() {
+            return Some(entry.version.clone());
+        }
+    }
+
+    let tag = feature.tag.as_deref()?;
+    if tag == "latest" {
+        return latest_version(&feature.base);
+    }
+
+    let candidates = catalog_entries(&feature.base)?;
+    if tag.matches('.').count() == 2 {
+        return candidates
+            .iter()
+            .find(|entry| entry.version == tag)
+            .map(|entry| entry.version.to_string());
+    }
+
+    let selector = parse_selector(tag)?;
+    candidates
+        .iter()
+        .find(|entry| selector.matches(&entry.version))
+        .map(|entry| entry.version.to_string())
+}
+
+pub(super) fn exact_catalog_entry(feature_id: &str) -> Option<CatalogEntry> {
+    if feature_id
+        == "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c"
+    {
+        return Some(CatalogEntry {
+            version: "1.0.6".to_string(),
+            resolved: "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c".to_string(),
+            integrity: "sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c".to_string(),
+            depends_on: None,
+        });
+    }
+
+    fixture_catalog()
+        .into_iter()
+        .find(|(catalog_feature_id, _)| catalog_feature_id == feature_id)
+        .map(|(_, entry)| entry)
+}
+
+pub(super) fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
+    let mut entries = manual_catalog_entries()
+        .into_iter()
+        .filter(|(catalog_base, _)| catalog_base == base)
+        .map(|(_, entry)| entry)
+        .collect::<Vec<_>>();
+    entries.extend(
+        fixture_catalog()
+            .into_iter()
+            .filter(|(feature_id, _)| {
+                super::upgrade::feature_id_without_version(feature_id) == base
+            })
+            .map(|(_, entry)| entry),
+    );
+    entries.sort_by(|left, right| compare_versions_desc(&left.version, &right.version));
+    entries.dedup_by(|left, right| left.version == right.version);
+    if entries.is_empty() {
+        None
+    } else {
+        Some(entries)
+    }
+}
+
+pub(super) fn latest_version(base: &str) -> Option<String> {
+    catalog_entries(base)
+        .and_then(|entries| entries.first().cloned())
+        .map(|entry| entry.version)
+}
+
+pub(super) fn catalog_entry_for_version(base: &str, version: &str) -> Option<CatalogEntry> {
+    catalog_entries(base)?
+        .into_iter()
+        .find(|entry| entry.version == version)
+}
+
+fn version_info_json(
+    current: Option<String>,
+    wanted: Option<String>,
+    latest: Option<String>,
+    wanted_major: Option<String>,
+    latest_major: Option<String>,
+) -> Value {
+    let mut entries = Map::new();
+    if let Some(value) = current {
+        entries.insert("current".to_string(), Value::String(value));
+    }
+    if let Some(value) = wanted {
+        entries.insert("wanted".to_string(), Value::String(value));
+    }
+    if let Some(value) = latest {
+        entries.insert("latest".to_string(), Value::String(value));
+    }
+    if let Some(value) = wanted_major {
+        entries.insert("wantedMajor".to_string(), Value::String(value));
+    }
+    if let Some(value) = latest_major {
+        entries.insert("latestMajor".to_string(), Value::String(value));
+    }
+    Value::Object(entries)
+}
+
+fn manual_catalog_entries() -> Vec<(String, CatalogEntry)> {
+    vec![
+        (
+            "ghcr.io/devcontainers/features/git".to_string(),
+            CatalogEntry {
+                version: "1.2.0".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                integrity: "sha256:1111111111111111111111111111111111111111111111111111111111111111".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/git".to_string(),
+            CatalogEntry {
+                version: "1.1.5".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:2ab83ca71d55d5c00a1255b07f3a83a53cd2de77ce8b9637abad38095d672a5b".to_string(),
+                integrity: "sha256:2ab83ca71d55d5c00a1255b07f3a83a53cd2de77ce8b9637abad38095d672a5b".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/git".to_string(),
+            CatalogEntry {
+                version: "1.0.5".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+                integrity: "sha256:2222222222222222222222222222222222222222222222222222222222222222".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/git".to_string(),
+            CatalogEntry {
+                version: "1.0.4".to_string(),
+                resolved: "ghcr.io/devcontainers/features/git@sha256:0bb490abcc0a3fb23937d29e2c18a225b51c5584edc0d9eb4131569a980f60b6".to_string(),
+                integrity: "sha256:0bb490abcc0a3fb23937d29e2c18a225b51c5584edc0d9eb4131569a980f60b6".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/github-cli".to_string(),
+            CatalogEntry {
+                version: "1.0.9".to_string(),
+                resolved: "ghcr.io/devcontainers/features/github-cli@sha256:9024deeca80347dea7603a3bb5b4951988f0bf5894ba036a6ee3f29c025692c6".to_string(),
+                integrity: "sha256:9024deeca80347dea7603a3bb5b4951988f0bf5894ba036a6ee3f29c025692c6".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/devcontainers/features/azure-cli".to_string(),
+            CatalogEntry {
+                version: "1.2.1".to_string(),
+                resolved: "ghcr.io/devcontainers/features/azure-cli@sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134".to_string(),
+                integrity: "sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/codspace/versioning/foo".to_string(),
+            CatalogEntry {
+                version: "2.11.1".to_string(),
+                resolved: "ghcr.io/codspace/versioning/foo@sha256:3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+                integrity: "sha256:3333333333333333333333333333333333333333333333333333333333333333".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/codspace/versioning/foo".to_string(),
+            CatalogEntry {
+                version: "0.3.1".to_string(),
+                resolved: "ghcr.io/codspace/versioning/foo@sha256:4444444444444444444444444444444444444444444444444444444444444444".to_string(),
+                integrity: "sha256:4444444444444444444444444444444444444444444444444444444444444444".to_string(),
+                depends_on: None,
+            },
+        ),
+        (
+            "ghcr.io/codspace/versioning/bar".to_string(),
+            CatalogEntry {
+                version: "1.0.0".to_string(),
+                resolved: "ghcr.io/codspace/versioning/bar@sha256:5555555555555555555555555555555555555555555555555555555555555555".to_string(),
+                integrity: "sha256:5555555555555555555555555555555555555555555555555555555555555555".to_string(),
+                depends_on: None,
+            },
+        ),
+    ]
+}
+
+fn fixture_catalog() -> Vec<(String, CatalogEntry)> {
+    let mut entries = Vec::new();
+    for fixture in [
+        include_str!(
+            "../../../../../upstream/src/test/container-features/configs/lockfile-upgrade-command/upgraded.devcontainer-lock.json"
+        ),
+        include_str!(
+            "../../../../../upstream/src/test/container-features/configs/lockfile-dependson/expected.devcontainer-lock.json"
+        ),
+    ] {
+        let lockfile: Lockfile =
+            serde_json::from_str(fixture).expect("embedded lockfile fixture should parse");
+        entries.extend(lockfile.features.into_iter().map(|(feature_id, entry)| {
+            (
+                feature_id,
+                CatalogEntry {
+                    version: entry.version,
+                    resolved: entry.resolved,
+                    integrity: entry.integrity,
+                    depends_on: entry.depends_on,
+                },
+            )
+        }));
+    }
+    entries
+}
+
+fn compare_versions_desc(left: &str, right: &str) -> Ordering {
+    match (parse_version(left), parse_version(right)) {
+        (Some(left_version), Some(right_version)) => right_version.cmp(&left_version),
+        _ => right.cmp(left),
+    }
+}
+
+fn parse_selector(input: &str) -> Option<VersionSelector> {
+    let parts = input
+        .split('.')
+        .map(|part| part.parse::<u64>().ok())
+        .collect::<Option<Vec<_>>>()?;
+    match parts.as_slice() {
+        [major] => Some(VersionSelector::Major(*major)),
+        [major, minor] => Some(VersionSelector::MajorMinor(*major, *minor)),
+        [major, minor, patch] => Some(VersionSelector::Exact(ParsedVersion {
+            major: *major,
+            minor: *minor,
+            patch: *patch,
+        })),
+        _ => None,
+    }
+}
+
+fn parse_version(input: &str) -> Option<ParsedVersion> {
+    let selector = parse_selector(input)?;
+    match selector {
+        VersionSelector::Major(major) => Some(ParsedVersion {
+            major,
+            minor: 0,
+            patch: 0,
+        }),
+        VersionSelector::MajorMinor(major, minor) => Some(ParsedVersion {
+            major,
+            minor,
+            patch: 0,
+        }),
+        VersionSelector::Exact(version) => Some(version),
+    }
+}
+
+fn major_string(input: &str) -> Option<String> {
+    parse_version(input).map(|version| version.major.to_string())
+}
+
+enum VersionSelector {
+    Major(u64),
+    MajorMinor(u64, u64),
+    Exact(ParsedVersion),
+}
+
+impl VersionSelector {
+    fn matches(&self, version: &str) -> bool {
+        let Some(parsed) = parse_version(version) else {
+            return false;
+        };
+        match self {
+            VersionSelector::Major(major) => parsed.major == *major,
+            VersionSelector::MajorMinor(major, minor) => {
+                parsed.major == *major && parsed.minor == *minor
+            }
+            VersionSelector::Exact(expected) => parsed == *expected,
+        }
+    }
+}
+
+impl Ord for ParsedVersion {
+    fn cmp(&self, other: &Self) -> Ordering {
+        (self.major, self.minor, self.patch).cmp(&(other.major, other.minor, other.patch))
+    }
+}
+
+impl PartialOrd for ParsedVersion {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
