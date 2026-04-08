@@ -262,7 +262,8 @@ fn features_test_emits_a_local_report() {
         "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
     )
     .expect("manifest");
-    fs::write(test.join("test.sh"), "#!/bin/sh\n").expect("test script");
+    fs::write(test.join("test.sh"), "#!/bin/sh\nexit 0\n").expect("test script");
+    fs::write(test.join("custom.sh"), "#!/bin/sh\nexit 0\n").expect("scenario script");
     fs::write(
         test.join("scenarios.json"),
         "{\n  \"custom\": {\n    \"image\": \"ubuntu:latest\"\n  }\n}\n",
@@ -281,6 +282,34 @@ fn features_test_emits_a_local_report() {
     assert!(stdout.contains("'custom'"));
     assert!(stdout.contains("'demo'"));
     assert!(stdout.contains("Cleaning up 2 test containers"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn features_test_fails_when_a_test_script_fails() {
+    let workspace = unique_temp_dir();
+    let src = workspace.join("src").join("demo");
+    let test = workspace.join("test").join("demo");
+    fs::create_dir_all(&src).expect("feature src");
+    fs::create_dir_all(&test).expect("feature test");
+    fs::write(
+        src.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("manifest");
+    fs::write(test.join("test.sh"), "#!/bin/sh\nexit 1\n").expect("test script");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args(["features", "test", "--project-folder"])
+        .arg(workspace.to_string_lossy().as_ref())
+        .output()
+        .expect("features test should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(stdout.contains("TEST REPORT"));
+    assert!(stdout.contains("❌ Failed:      'demo'"));
 
     let _ = fs::remove_dir_all(workspace);
 }
