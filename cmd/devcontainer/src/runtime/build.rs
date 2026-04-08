@@ -1,4 +1,4 @@
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use serde_json::{json, Value};
 
@@ -7,6 +7,7 @@ use crate::commands::common;
 use super::compose;
 use super::context::ResolvedConfig;
 use super::engine;
+use super::paths::resolve_relative;
 
 pub(crate) fn runtime_image_name(
     resolved: &ResolvedConfig,
@@ -135,13 +136,4 @@ fn has_build_definition(configuration: &Value) -> bool {
     configuration
         .get("build")
         .is_some_and(|value| value.is_object())
-}
-
-fn resolve_relative(root: &Path, value: &str) -> PathBuf {
-    let path = PathBuf::from(value);
-    if path.is_absolute() {
-        path
-    } else {
-        root.join(path)
-    }
 }
