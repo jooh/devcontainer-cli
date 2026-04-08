@@ -234,6 +234,58 @@ fn up_honors_workspace_mount_flags_for_nested_workspaces() {
     assert!(invocations.contains(&expected_mount));
 }
 
+#[test]
+fn up_mounts_git_worktree_common_dir_when_requested() {
+    let harness = RuntimeHarness::new();
+    let repo_root = harness.root.join("repo");
+    let worktree_root = harness.root.join("worktrees").join("feature");
+    let workspace = worktree_root.join("packages").join("app");
+    init_git_repo_with_commit(&repo_root);
+    add_relative_git_worktree(&repo_root, &worktree_root);
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    let expected_worktree_root = worktree_root
+        .canonicalize()
+        .unwrap_or_else(|_| worktree_root.clone());
+    let expected_repo_git_dir = repo_root
+        .join(".git")
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.join(".git"));
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--mount-git-worktree-common-dir",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(
+        payload["remoteWorkspaceFolder"],
+        "/workspaces/worktrees/feature/packages/app"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/workspaces/worktrees/feature",
+        expected_worktree_root.display()
+    )));
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/workspaces/repo/.git",
+        expected_repo_git_dir.display()
+    )));
+}
+
 fn init_git_repo(root: &std::path::Path) {
     let status = Command::new("git")
         .args(["init", "--quiet"])
@@ -241,4 +293,56 @@ fn init_git_repo(root: &std::path::Path) {
         .status()
         .expect("git init");
     assert!(status.success(), "git init failed: {status:?}");
+}
+
+fn init_git_repo_with_commit(root: &std::path::Path) {
+    fs::create_dir_all(root).expect("repo dir");
+    init_git_repo(root);
+    fs::write(root.join("README.md"), "hello\n").expect("readme");
+
+    let add_status = Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(root)
+        .status()
+        .expect("git add");
+    assert!(add_status.success(), "git add failed: {add_status:?}");
+
+    let commit_status = Command::new("git")
+        .args([
+            "-c",
+            "user.name=Devcontainer Tests",
+            "-c",
+            "user.email=devcontainer-tests@example.com",
+            "commit",
+            "--quiet",
+            "-m",
+            "init",
+        ])
+        .current_dir(root)
+        .status()
+        .expect("git commit");
+    assert!(
+        commit_status.success(),
+        "git commit failed: {commit_status:?}"
+    );
+}
+
+fn add_relative_git_worktree(repo_root: &std::path::Path, worktree_root: &std::path::Path) {
+    if let Some(parent) = worktree_root.parent() {
+        fs::create_dir_all(parent).expect("worktree parent");
+    }
+
+    let status = Command::new("git")
+        .args([
+            "worktree",
+            "add",
+            "--relative-paths",
+            worktree_root.to_string_lossy().as_ref(),
+            "-b",
+            "feature",
+        ])
+        .current_dir(repo_root)
+        .status()
+        .expect("git worktree add");
+    assert!(status.success(), "git worktree add failed: {status:?}");
 }

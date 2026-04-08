@@ -1,6 +1,7 @@
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -25,6 +26,15 @@ fn unique_temp_dir() -> PathBuf {
         "devcontainer-compose-test-{}-{suffix}-{unique_id}",
         std::process::id()
     ))
+}
+
+fn init_git_repo(root: &std::path::Path) {
+    let status = Command::new("git")
+        .args(["init", "--quiet"])
+        .current_dir(root)
+        .status()
+        .expect("git init");
+    assert!(status.success(), "git init failed: {status:?}");
 }
 
 #[test]
@@ -188,6 +198,47 @@ fn metadata_override_file_mounts_workspace_by_default() {
 }
 
 #[test]
+fn metadata_override_file_mounts_nested_workspaces_from_the_git_root() {
+    let root = unique_temp_dir();
+    let repo_root = root.join("repo");
+    let workspace = repo_root.join("packages").join("app");
+    fs::create_dir_all(&workspace).expect("workspace root");
+    init_git_repo(&repo_root);
+    let expected_repo_root = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.clone());
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: workspace,
+        config_file: expected_repo_root
+            .join("packages")
+            .join("app")
+            .join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+        }),
+    };
+
+    let override_file =
+        compose_metadata_override_file(&resolved, &[], "/workspaces/repo/packages/app", None)
+            .expect("override result")
+            .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains(&format!(
+        "- '{}:/workspaces/repo'",
+        expected_repo_root.display()
+    )));
+    assert!(!override_content.contains(&format!(
+        "{}:/workspaces/repo/packages/app",
+        expected_repo_root.display()
+    )));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn metadata_override_file_can_pin_image_and_runtime_settings() {
     let root = unique_temp_dir();
     fs::create_dir_all(&root).expect("workspace root");
@@ -209,7 +260,7 @@ fn metadata_override_file_can_pin_image_and_runtime_settings() {
                 "type": "volume",
                 "source": "feature-cache",
                 "target": "/cache"
-            }]
+            }, "type=bind,source=/tmp/feature-src,target=/tmp/feature-dst,readonly"]
         }),
     };
 
@@ -231,7 +282,16 @@ fn metadata_override_file_can_pin_image_and_runtime_settings() {
     assert!(override_content.contains("init: true"));
     assert!(override_content.contains("cap_add:"));
     assert!(override_content.contains("security_opt:"));
-    assert!(override_content.contains("type=volume,source=feature-cache,target=/cache"));
+    assert!(override_content.contains("type: 'volume'"));
+    assert!(override_content.contains("source: 'feature-cache'"));
+    assert!(override_content.contains("target: '/cache'"));
+    assert!(override_content.contains("type: 'bind'"));
+    assert!(override_content.contains("source: '/tmp/feature-src'"));
+    assert!(override_content.contains("target: '/tmp/feature-dst'"));
+    assert!(override_content.contains("read_only: true"));
+    assert!(!override_content.contains("type=volume,source=feature-cache,target=/cache"));
+    assert!(!override_content
+        .contains("type=bind,source=/tmp/feature-src,target=/tmp/feature-dst,readonly"));
 
     let _ = fs::remove_file(override_file);
     let _ = fs::remove_dir_all(root);
