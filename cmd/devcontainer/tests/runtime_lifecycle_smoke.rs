@@ -164,6 +164,71 @@ fn set_up_and_run_user_commands_target_existing_containers() {
 }
 
 #[test]
+fn compose_lifecycle_commands_honor_explicit_container_id() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"postCreateCommand\": \"echo post-create\",\n  \"postAttachCommand\": \"echo post-attach\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let set_up_output = harness.run(
+        &[
+            "set-up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--container-id",
+            "fake-compose-container-id",
+            "--include-configuration",
+        ],
+        &[("FAKE_PODMAN_COMPOSE_PS_OUTPUT", "")],
+    );
+
+    assert!(set_up_output.status.success(), "{set_up_output:?}");
+    let payload = harness.parse_stdout_json(&set_up_output);
+    assert_eq!(payload["containerId"], "fake-compose-container-id");
+    assert_eq!(payload["configuration"]["service"], "app");
+
+    let run_user_commands_output = harness.run(
+        &[
+            "run-user-commands",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--container-id",
+            "fake-compose-container-id",
+        ],
+        &[("FAKE_PODMAN_COMPOSE_PS_OUTPUT", "")],
+    );
+
+    assert!(
+        run_user_commands_output.status.success(),
+        "{run_user_commands_output:?}"
+    );
+    let invocations = harness.read_invocations();
+    assert!(!invocations.contains("compose --project-name"));
+    assert!(invocations.contains(
+        "exec --workdir /workspace fake-compose-container-id /bin/sh -lc echo post-create"
+    ));
+    assert!(invocations.contains(
+        "exec --workdir /workspace fake-compose-container-id /bin/sh -lc echo post-attach"
+    ));
+    let exec_log = harness.read_exec_log();
+    assert!(exec_log.contains("/bin/sh -lc echo post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-attach"));
+}
+
+#[test]
 fn lifecycle_array_commands_preserve_argument_boundaries() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
