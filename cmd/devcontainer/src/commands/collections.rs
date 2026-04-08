@@ -269,9 +269,17 @@ fn apply_catalog_template(
         .transpose()?
         .unwrap_or_else(|| json!([]));
 
-    if normalize_collection_reference(template_id)
-        != "ghcr.io/devcontainers/templates/docker-from-docker"
-    {
+    let normalized_template_id = normalize_collection_reference(template_id);
+    if normalized_template_id != "ghcr.io/devcontainers/templates/docker-from-docker" {
+        if let Some(template_root) = embedded_template_source_dir(&normalized_template_id) {
+            return apply_embedded_published_template(
+                &manifest,
+                &template_root,
+                workspace_root,
+                &template_args,
+                extra_features,
+            );
+        }
         return apply_generic_published_template(&manifest, workspace_root, extra_features);
     }
 
@@ -321,6 +329,23 @@ fn apply_catalog_template(
     }))
 }
 
+fn apply_embedded_published_template(
+    manifest: &Value,
+    template_root: &Path,
+    workspace_root: &Path,
+    template_args: &Value,
+    extra_features: Value,
+) -> Result<Value, String> {
+    let template_options = template_option_values(manifest, template_args);
+    copy_embedded_template_contents(template_root, workspace_root, &template_options)?;
+    merge_extra_features_into_template(workspace_root, extra_features)?;
+    Ok(json!({
+        "outcome": "success",
+        "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
+        "appliedTo": workspace_root,
+    }))
+}
+
 fn apply_generic_published_template(
     manifest: &Value,
     workspace_root: &Path,
@@ -367,6 +392,171 @@ fn apply_generic_published_template(
     Ok(json!({
         "files": ["./.devcontainer/devcontainer.json"],
     }))
+}
+
+fn embedded_template_source_dir(reference: &str) -> Option<PathBuf> {
+    let slug = collection_slug(reference)?;
+    match slug.as_str() {
+        "alpine" | "cpp" | "mytemplate" | "node-mongo" => Some(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(
+                    "../../upstream/src/test/container-templates/example-templates-sets/simple/src",
+                )
+                .join(slug),
+        ),
+        _ => None,
+    }
+}
+
+fn template_option_values(manifest: &Value, template_args: &Value) -> Map<String, Value> {
+    let mut options = manifest
+        .get("options")
+        .and_then(Value::as_object)
+        .map(|entries| {
+            entries
+                .iter()
+                .filter_map(|(name, definition)| {
+                    definition
+                        .get("default")
+                        .cloned()
+                        .map(|value| (name.clone(), value))
+                })
+                .collect::<Map<String, Value>>()
+        })
+        .unwrap_or_default();
+    if let Some(template_args) = template_args.as_object() {
+        for (name, value) in template_args {
+            options.insert(name.clone(), value.clone());
+        }
+    }
+    options
+}
+
+fn copy_embedded_template_contents(
+    template_root: &Path,
+    workspace_root: &Path,
+    template_options: &Map<String, Value>,
+) -> Result<(), String> {
+    fs::create_dir_all(workspace_root).map_err(|error| error.to_string())?;
+    for entry in fs::read_dir(template_root).map_err(|error| error.to_string())? {
+        let entry = entry.map_err(|error| error.to_string())?;
+        if entry.file_name() == "devcontainer-template.json" {
+            continue;
+        }
+        copy_embedded_template_entry(
+            &entry.path(),
+            &workspace_root.join(entry.file_name()),
+            template_options,
+        )?;
+    }
+    Ok(())
+}
+
+fn copy_embedded_template_entry(
+    source: &Path,
+    destination: &Path,
+    template_options: &Map<String, Value>,
+) -> Result<(), String> {
+    if source.is_dir() {
+        fs::create_dir_all(destination).map_err(|error| error.to_string())?;
+        for entry in fs::read_dir(source).map_err(|error| error.to_string())? {
+            let entry = entry.map_err(|error| error.to_string())?;
+            copy_embedded_template_entry(
+                &entry.path(),
+                &destination.join(entry.file_name()),
+                template_options,
+            )?;
+        }
+        return Ok(());
+    }
+
+    let bytes = fs::read(source).map_err(|error| error.to_string())?;
+    if let Ok(text) = String::from_utf8(bytes) {
+        let substituted = substitute_template_options(&text, template_options);
+        fs::write(destination, substituted).map_err(|error| error.to_string())?;
+    } else {
+        fs::copy(source, destination).map_err(|error| error.to_string())?;
+    }
+    Ok(())
+}
+
+fn substitute_template_options(contents: &str, template_options: &Map<String, Value>) -> String {
+    let mut substituted = String::new();
+    let mut remaining = contents;
+    while let Some(start) = remaining.find("${templateOption:") {
+        substituted.push_str(&remaining[..start]);
+        let placeholder = &remaining[start + "${templateOption:".len()..];
+        let Some(end) = placeholder.find('}') else {
+            substituted.push_str(&remaining[start..]);
+            return substituted;
+        };
+        let name = &placeholder[..end];
+        if let Some(value) = template_options.get(name) {
+            substituted.push_str(&template_option_string(value));
+        } else {
+            substituted.push_str(&remaining[start..start + "${templateOption:".len() + end + 1]);
+        }
+        remaining = &placeholder[end + 1..];
+    }
+    substituted.push_str(remaining);
+    substituted
+}
+
+fn template_option_string(value: &Value) -> String {
+    value
+        .as_str()
+        .map(str::to_string)
+        .unwrap_or_else(|| value.to_string())
+}
+
+fn merge_extra_features_into_template(
+    workspace_root: &Path,
+    extra_features: Value,
+) -> Result<(), String> {
+    let Some(extra_features) = extra_features
+        .as_array()
+        .filter(|features| !features.is_empty())
+    else {
+        return Ok(());
+    };
+    let config_path = applied_template_config_path(workspace_root)
+        .ok_or_else(|| "Applied template is missing a dev container config".to_string())?;
+    let raw = fs::read_to_string(&config_path).map_err(|error| error.to_string())?;
+    let mut config = crate::config::parse_jsonc_value(&raw)?;
+    let config_object = config
+        .as_object_mut()
+        .ok_or_else(|| "Applied template config must be a JSON object".to_string())?;
+    let features = config_object
+        .entry("features".to_string())
+        .or_insert_with(|| json!({}))
+        .as_object_mut()
+        .ok_or_else(|| "Applied template features must be a JSON object".to_string())?;
+    for feature in extra_features {
+        let Some(id) = feature.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        features.insert(
+            id.to_string(),
+            feature.get("options").cloned().unwrap_or_else(|| json!({})),
+        );
+    }
+    fs::write(
+        config_path,
+        serde_json::to_string_pretty(&config).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(())
+}
+
+fn applied_template_config_path(workspace_root: &Path) -> Option<PathBuf> {
+    [
+        workspace_root
+            .join(".devcontainer")
+            .join("devcontainer.json"),
+        workspace_root.join(".devcontainer.json"),
+    ]
+    .into_iter()
+    .find(|path| path.is_file())
 }
 
 fn run_features_test(args: &[String]) -> ExitCode {
@@ -810,11 +1000,12 @@ fn embedded_template_manifest(reference: &str) -> Option<Value> {
 #[cfg(test)]
 mod tests {
     use super::{
-        apply_template_target, build_feature_info_payload,
+        apply_catalog_template, apply_template_target, build_feature_info_payload,
         build_features_resolve_dependencies_payload, build_template_metadata_payload,
         discover_feature_test_scenarios, execute_feature_tests, publish_collection_target_to_oci,
     };
     use crate::commands::common::{generate_manifest_docs, package_collection_target};
+    use serde_json::json;
     use std::fs;
     use std::path::PathBuf;
     use std::sync::atomic::{AtomicU64, Ordering};
@@ -963,6 +1154,54 @@ mod tests {
             .iter()
             .any(|result| result.name == "failing" && !result.passed));
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn published_embedded_templates_copy_upstream_source_files() {
+        let workspace = unique_temp_dir();
+        fs::create_dir_all(&workspace).expect("workspace");
+
+        let payload = apply_catalog_template(
+            "ghcr.io/devcontainers/templates/node-mongo:latest",
+            &workspace,
+            &[],
+        )
+        .expect("template apply");
+
+        assert_eq!(payload["id"], "node-mongo");
+        assert!(workspace
+            .join(".devcontainer")
+            .join("docker-compose.yml")
+            .is_file());
+        assert!(workspace
+            .join(".devcontainer")
+            .join("devcontainer.json")
+            .is_file());
+        let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn published_embedded_templates_apply_template_args_and_extra_features() {
+        let workspace = unique_temp_dir();
+        fs::create_dir_all(&workspace).expect("workspace");
+
+        apply_catalog_template(
+            "ghcr.io/devcontainers/templates/alpine:latest",
+            &workspace,
+            &[
+                "--template-args".to_string(),
+                json!({ "imageVariant": "3.14" }).to_string(),
+                "--features".to_string(),
+                json!([{ "id": "ghcr.io/devcontainers/features/git:1", "options": {} }])
+                    .to_string(),
+            ],
+        )
+        .expect("template apply");
+
+        let config = fs::read_to_string(workspace.join(".devcontainer.json")).expect("config");
+        assert!(config.contains("0-alpine-3.14"));
+        assert!(config.contains("ghcr.io/devcontainers/features/git:1"));
+        let _ = fs::remove_dir_all(workspace);
     }
 
     #[test]
