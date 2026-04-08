@@ -5,7 +5,7 @@ Generated from the pinned upstream CLI command matrix and static source evidence
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped files: `105/200`
+- Upstream options with a native source reference in mapped files: `113/200`
 
 This report is a static inventory, not a semantic parity proof. A referenced option can still be only partially implemented, and command-level known gaps are called out explicitly below.
 
@@ -21,17 +21,17 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 | `outdated` | yes | 4/8 | 4 | 1 |
 | `upgrade` | yes | 7/8 | 1 | 1 |
 | `features` | yes | 0/0 | 0 | 1 |
-| `features test` | yes | 10/13 | 3 | 1 |
+| `features test` | yes | 11/13 | 2 | 1 |
 | `features package` | yes | 0/0 | 0 | 1 |
 | `features publish` | yes | 0/0 | 0 | 1 |
-| `features info` | yes | 0/2 | 2 | 1 |
-| `features resolve-dependencies` | yes | 1/2 | 1 | 1 |
-| `features generate-docs` | yes | 1/6 | 5 | 1 |
+| `features info` | yes | 2/2 | 0 | 1 |
+| `features resolve-dependencies` | yes | 2/2 | 0 | 1 |
+| `features generate-docs` | yes | 2/6 | 4 | 1 |
 | `templates` | yes | 0/0 | 0 | 1 |
-| `templates apply` | yes | 4/7 | 3 | 1 |
+| `templates apply` | yes | 5/7 | 2 | 1 |
 | `templates publish` | yes | 0/0 | 0 | 1 |
-| `templates metadata` | yes | 0/1 | 1 | 1 |
-| `templates generate-docs` | yes | 1/4 | 3 | 1 |
+| `templates metadata` | yes | 1/1 | 0 | 1 |
+| `templates generate-docs` | yes | 2/4 | 2 | 1 |
 | `exec` | yes | 8/19 | 11 | 1 |
 
 ## `up`
@@ -102,8 +102,8 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Test Features
 - Declared natively: yes
-- Option source references: 10/13
-- Missing option references: `log-level`, `permit-randomization`, `quiet`
+- Option source references: 11/13
+- Missing option references: `permit-randomization`, `quiet`
 - Known gaps: Native test runner exists, but parity with upstream feature resolution and registry-backed dependencies is incomplete.
 
 ## `features package`
@@ -126,24 +126,24 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Fetch metadata for a published Feature
 - Declared natively: yes
-- Option source references: 0/2
-- Missing option references: `log-level`, `output-format`
+- Option source references: 2/2
+- Missing option references: none
 - Known gaps: Only `manifest` mode is implemented natively; `tags`, `dependencies`, and `verbose` are missing.
 
 ## `features resolve-dependencies`
 
 - Description: Read and resolve dependency graph from a configuration
 - Declared natively: yes
-- Option source references: 1/2
-- Missing option references: `log-level`
+- Option source references: 2/2
+- Missing option references: none
 - Known gaps: Current implementation follows declared `dependsOn` edges, but still relies on local/manual manifests rather than full OCI graph resolution.
 
 ## `features generate-docs`
 
 - Description: Generate documentation
 - Declared natively: yes
-- Option source references: 1/6
-- Missing option references: `github-owner`, `github-repo`, `log-level`, `namespace`, `registry`
+- Option source references: 2/6
+- Missing option references: `github-owner`, `github-repo`, `namespace`, `registry`
 - Known gaps: Documentation generation is minimal compared with upstream.
 
 ## `templates`
@@ -158,8 +158,8 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Apply a template to the project
 - Declared natively: yes
-- Option source references: 4/7
-- Missing option references: `log-level`, `omit-paths`, `tmp-dir`
+- Option source references: 5/7
+- Missing option references: `omit-paths`, `tmp-dir`
 - Known gaps: Published template application is still based on embedded/local substitutes instead of real OCI fetches.
 
 ## `templates publish`
@@ -174,16 +174,16 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Fetch a published Template\'s metadata
 - Declared natively: yes
-- Option source references: 0/1
-- Missing option references: `log-level`
+- Option source references: 1/1
+- Missing option references: none
 - Known gaps: Published template metadata is still based on embedded/local substitutes instead of real OCI fetches.
 
 ## `templates generate-docs`
 
 - Description: Generate documentation
 - Declared natively: yes
-- Option source references: 1/4
-- Missing option references: `github-owner`, `github-repo`, `log-level`
+- Option source references: 2/4
+- Missing option references: `github-owner`, `github-repo`
 - Known gaps: Documentation generation is minimal compared with upstream.
 
 ## `exec`

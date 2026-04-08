@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 105,
-		"optionsMissing": 95
+		"optionsReferenced": 113,
+		"optionsMissing": 87
 	},
 	"commands": [
 		{
@@ -1171,8 +1171,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 13,
-				"referenced": 10,
-				"missing": 3
+				"referenced": 11,
+				"missing": 2
 			},
 			"options": [
 				{
@@ -1207,8 +1207,10 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "permit-randomization",
@@ -1306,19 +1308,23 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 2,
-				"referenced": 0,
-				"missing": 2
+				"referenced": 2,
+				"missing": 0
 			},
 			"options": [
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "output-format",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				}
 			],
 			"knownGaps": [
@@ -1332,14 +1338,16 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 2,
-				"referenced": 1,
-				"missing": 1
+				"referenced": 2,
+				"missing": 0
 			},
 			"options": [
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",
@@ -1363,8 +1371,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 6,
-				"referenced": 1,
-				"missing": 5
+				"referenced": 2,
+				"missing": 4
 			},
 			"options": [
 				{
@@ -1379,8 +1387,10 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "namespace",
@@ -1427,8 +1437,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 7,
-				"referenced": 4,
-				"missing": 3
+				"referenced": 5,
+				"missing": 2
 			},
 			"options": [
 				{
@@ -1442,8 +1452,10 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "omit-paths",
@@ -1507,14 +1519,16 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 1,
-				"referenced": 0,
-				"missing": 1
+				"referenced": 1,
+				"missing": 0
 			},
 			"options": [
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				}
 			],
 			"knownGaps": [
@@ -1528,8 +1542,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 4,
-				"referenced": 1,
-				"missing": 3
+				"referenced": 2,
+				"missing": 2
 			},
 			"options": [
 				{
@@ -1544,8 +1558,10 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/collections/mod.rs"
+					]
 				},
 				{
 					"name": "project-folder",

@@ -8,6 +8,8 @@ use std::process::ExitCode;
 
 use serde_json::Value;
 
+use crate::commands::common;
+
 pub(crate) fn run_features(args: &[String]) -> ExitCode {
     let subcommand = args.first().map(String::as_str).unwrap_or("list");
     let result = match subcommand {
@@ -20,7 +22,17 @@ pub(crate) fn run_features(args: &[String]) -> ExitCode {
             if args.len() < 3 {
                 Err("features info requires manifest <feature>".to_string())
             } else {
-                features::build_feature_info_payload(&args[1], &args[2])
+                let _ = common::parse_option_value(&args[3..], "--log-level");
+                match features::build_feature_info_payload(&args[1], &args[2]) {
+                    Ok(payload)
+                        if common::parse_option_value(&args[3..], "--output-format").as_deref()
+                            == Some("text") =>
+                    {
+                        println!("{}", render_collection_info_text(&payload));
+                        return ExitCode::SUCCESS;
+                    }
+                    result => result,
+                }
             }
         }
         "test" => return feature_tests::run_features_test(&args[1..]),
@@ -77,6 +89,10 @@ pub(crate) fn run_features(args: &[String]) -> ExitCode {
     };
 
     print_result(result)
+}
+
+fn render_collection_info_text(payload: &Value) -> String {
+    serde_json::to_string_pretty(payload).unwrap_or_else(|_| payload.to_string())
 }
 
 pub(crate) fn run_templates(args: &[String]) -> ExitCode {
