@@ -4,23 +4,9 @@ use serde_json::Value;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Output, Stdio};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::process::{Output, Stdio};
 
-static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
-
-pub fn unique_temp_dir(prefix: &str) -> PathBuf {
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos();
-    let unique_id = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "{prefix}-{}-{suffix}-{unique_id}",
-        std::process::id()
-    ))
-}
+use super::test_support::{devcontainer_command, unique_temp_dir};
 
 pub struct RuntimeHarness {
     pub root: PathBuf,
@@ -110,12 +96,9 @@ pub fn write_devcontainer_config(root: &Path, body: &str) -> PathBuf {
     config_path
 }
 
-fn command(args: &[&str], cwd: Option<&Path>) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_devcontainer"));
+fn command(args: &[&str], cwd: Option<&Path>) -> std::process::Command {
+    let mut command = devcontainer_command(cwd);
     command.args(args);
-    if let Some(cwd) = cwd {
-        command.current_dir(cwd);
-    }
     command
 }
 
@@ -376,12 +359,24 @@ ${2:-}"
     ;;
   exec)
     saw_interactive=0
+    exec_workdir=""
+    exec_env_args=""
     while [ "$#" -gt 0 ]; do
       case "${1:-}" in
         --workdir|-w)
+          exec_workdir="${2:-}"
           shift 2
           ;;
-        -e|--user|-u)
+        -e)
+          if [ -n "$exec_env_args" ]; then
+            exec_env_args="$exec_env_args
+${2:-}"
+          else
+            exec_env_args="${2:-}"
+          fi
+          shift 2
+          ;;
+        --user|-u)
           shift 2
           ;;
         -i)
@@ -392,6 +387,7 @@ ${2:-}"
           shift
           ;;
         *)
+          container_id="${1:-}"
           shift
           break
           ;;
@@ -409,12 +405,66 @@ ${2:-}"
       done
       printf '%s\n' "END"
     } >> "$LOG_DIR/exec-argv.log"
+    if [ -n "${FAKE_PODMAN_EXEC_EXIT_CODE:-}" ]; then
+      exit "${FAKE_PODMAN_EXEC_EXIT_CODE}"
+    fi
     if [ "${1:-}" = "/bin/echo" ]; then
       shift
       printf '%s\n' "$*"
     elif [ "${1:-}" = "/bin/cat" ]; then
       shift
       cat
+    elif { [ "${1:-}" = "/bin/bash" ] || [ "${1:-}" = "/bin/sh" ]; } && [ "${2:-}" = "-lc" ]; then
+      shell_program="${1:-}"
+      command_text="${3:-}"
+      host_cwd=""
+      if [ -f "$LOG_DIR/last-run-mounts" ]; then
+        while IFS= read -r mount; do
+          [ -n "$mount" ] || continue
+          source=""
+          destination=""
+          old_ifs="${IFS- }"
+          IFS=','
+          set -- $mount
+          IFS="$old_ifs"
+          for component in "$@"; do
+            case "$component" in
+              source=*|src=*)
+                source="${component#*=}"
+                ;;
+              target=*|destination=*|dst=*)
+                destination="${component#*=}"
+                ;;
+            esac
+          done
+          if [ -n "$destination" ] && [ -n "$source" ]; then
+            if [ "$destination" = "$exec_workdir" ]; then
+              host_cwd="$source"
+            fi
+            command_text="$(printf '%s' "$command_text" | sed "s|$destination|$source|g")"
+          fi
+        done < "$LOG_DIR/last-run-mounts"
+      fi
+      old_ifs="${IFS- }"
+      IFS='
+'
+      set --
+      for entry in $exec_env_args; do
+        set -- "$@" "$entry"
+      done
+      IFS="$old_ifs"
+      if [ -n "$host_cwd" ] && [ -d "$host_cwd" ]; then
+        (
+          cd "$host_cwd" || exit 1
+          env "$@" "$shell_program" -lc "$command_text"
+        )
+        exit $?
+      fi
+      if [ -n "$host_cwd" ] && [ ! -d "$host_cwd" ]; then
+        exit 0
+      fi
+      env "$@" "$shell_program" -lc "$command_text"
+      exit $?
     fi
     exit 0
     ;;

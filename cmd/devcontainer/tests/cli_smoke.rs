@@ -1,57 +1,16 @@
+mod support;
+
 use serde_json::Value;
 use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
-
-static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
-
-fn unique_temp_dir() -> std::path::PathBuf {
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos();
-    let unique_id = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "devcontainer-cli-smoke-{}-{suffix}-{unique_id}",
-        std::process::id()
-    ))
-}
-
-fn repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .canonicalize()
-        .expect("repo root")
-}
-
-fn copy_recursive(source: &Path, destination: &Path) {
-    let metadata = fs::metadata(source).expect("metadata");
-    if metadata.is_dir() {
-        fs::create_dir_all(destination).expect("create dir");
-        for entry in fs::read_dir(source).expect("read dir") {
-            let entry = entry.expect("dir entry");
-            copy_recursive(&entry.path(), &destination.join(entry.file_name()));
-        }
-    } else {
-        if let Some(parent) = destination.parent() {
-            fs::create_dir_all(parent).expect("create parent");
-        }
-        fs::copy(source, destination).expect("copy file");
-    }
-}
+use support::runtime_harness::RuntimeHarness;
+use support::test_support::{copy_recursive, devcontainer_command, repo_root, unique_temp_dir};
 
 fn run_read_configuration(
     args: &[&str],
-    current_dir: Option<&Path>,
+    current_dir: Option<&std::path::Path>,
 ) -> (std::process::Output, Value) {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_devcontainer"));
+    let mut command = devcontainer_command(current_dir);
     command.arg("read-configuration").args(args);
-    if let Some(current_dir) = current_dir {
-        command.current_dir(current_dir);
-    }
 
     let output = command.output().expect("read-configuration should run");
     let stdout = String::from_utf8(output.stdout.clone()).expect("utf8 stdout");
@@ -61,7 +20,7 @@ fn run_read_configuration(
 
 #[test]
 fn top_level_help_lists_supported_commands() {
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .arg("--help")
         .output()
         .expect("help command should run");
@@ -76,7 +35,7 @@ fn top_level_help_lists_supported_commands() {
 
 #[test]
 fn read_configuration_command_returns_configuration_payload() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-cli-smoke");
     let config_dir = root.join(".devcontainer");
     fs::create_dir_all(&config_dir).expect("config dir");
     fs::write(
@@ -85,7 +44,7 @@ fn read_configuration_command_returns_configuration_payload() {
     )
     .expect("config write");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "read-configuration",
             "--workspace-folder",
@@ -213,7 +172,7 @@ fn read_configuration_applies_upstream_style_local_substitution_defaults() {
 
 #[test]
 fn read_configuration_merged_output_uses_upstream_pluralized_fields() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-cli-smoke");
     let config_dir = root.join(".devcontainer");
     fs::create_dir_all(&config_dir).expect("config dir");
     fs::write(
@@ -252,7 +211,8 @@ fn read_configuration_merged_output_uses_upstream_pluralized_fields() {
 
 #[test]
 fn features_test_emits_a_local_report() {
-    let workspace = unique_temp_dir();
+    let harness = RuntimeHarness::new();
+    let workspace = harness.root.join("feature-project");
     let src = workspace.join("src").join("demo");
     let test = workspace.join("test").join("demo");
     fs::create_dir_all(&src).expect("feature src");
@@ -270,11 +230,18 @@ fn features_test_emits_a_local_report() {
     )
     .expect("scenarios");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
-        .args(["features", "test", "--project-folder"])
-        .arg(workspace.to_string_lossy().as_ref())
-        .output()
-        .expect("features test should run");
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "features",
+            "test",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--project-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[],
+    );
 
     assert!(output.status.success(), "{output:?}");
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
@@ -288,7 +255,8 @@ fn features_test_emits_a_local_report() {
 
 #[test]
 fn features_test_fails_when_a_test_script_fails() {
-    let workspace = unique_temp_dir();
+    let harness = RuntimeHarness::new();
+    let workspace = harness.root.join("feature-project");
     let src = workspace.join("src").join("demo");
     let test = workspace.join("test").join("demo");
     fs::create_dir_all(&src).expect("feature src");
@@ -300,11 +268,18 @@ fn features_test_fails_when_a_test_script_fails() {
     .expect("manifest");
     fs::write(test.join("test.sh"), "#!/bin/sh\nexit 1\n").expect("test script");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
-        .args(["features", "test", "--project-folder"])
-        .arg(workspace.to_string_lossy().as_ref())
-        .output()
-        .expect("features test should run");
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "features",
+            "test",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--project-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[("FAKE_PODMAN_EXEC_EXIT_CODE", "1")],
+    );
 
     assert!(!output.status.success(), "{output:?}");
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
@@ -316,10 +291,10 @@ fn features_test_fails_when_a_test_script_fails() {
 
 #[test]
 fn templates_apply_supports_published_template_ids() {
-    let workspace = unique_temp_dir();
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
     fs::create_dir_all(&workspace).expect("workspace");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "templates",
             "apply",
@@ -355,10 +330,10 @@ fn templates_apply_supports_published_template_ids() {
 
 #[test]
 fn templates_apply_uses_upstream_defaults_for_published_template_ids() {
-    let workspace = unique_temp_dir();
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
     fs::create_dir_all(&workspace).expect("workspace");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "templates",
             "apply",
@@ -381,7 +356,7 @@ fn templates_apply_uses_upstream_defaults_for_published_template_ids() {
 
 #[test]
 fn templates_metadata_supports_published_template_ids() {
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "templates",
             "metadata",
@@ -398,7 +373,7 @@ fn templates_metadata_supports_published_template_ids() {
 
 #[test]
 fn features_info_supports_additional_published_feature_ids() {
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "features",
             "info",
@@ -416,7 +391,7 @@ fn features_info_supports_additional_published_feature_ids() {
 
 #[test]
 fn templates_metadata_supports_additional_published_template_ids() {
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "templates",
             "metadata",
@@ -432,10 +407,10 @@ fn templates_metadata_supports_additional_published_template_ids() {
 
 #[test]
 fn templates_apply_supports_additional_published_template_ids() {
-    let workspace = unique_temp_dir();
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
     fs::create_dir_all(&workspace).expect("workspace");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "templates",
             "apply",
@@ -473,10 +448,10 @@ fn outdated_supports_upstream_json_output_fixture() {
         .join("container-features")
         .join("configs")
         .join("lockfile-outdated-command");
-    let workspace = unique_temp_dir();
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
     copy_recursive(&fixture, &workspace);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "outdated",
             "--workspace-folder",
@@ -523,10 +498,10 @@ fn outdated_supports_text_output_fixture() {
         .join("container-features")
         .join("configs")
         .join("lockfile-outdated-command");
-    let workspace = unique_temp_dir();
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
     copy_recursive(&fixture, &workspace);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "outdated",
             "--workspace-folder",
@@ -560,7 +535,7 @@ fn upgrade_matches_upstream_lockfile_fixture() {
         .join("container-features")
         .join("configs")
         .join("lockfile-upgrade-command");
-    let workspace = unique_temp_dir();
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
     copy_recursive(&fixture, &workspace);
     fs::copy(
         workspace.join("outdated.devcontainer-lock.json"),
@@ -568,7 +543,7 @@ fn upgrade_matches_upstream_lockfile_fixture() {
     )
     .expect("seed lockfile");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "upgrade",
             "--workspace-folder",
@@ -597,7 +572,7 @@ fn upgrade_with_feature_updates_config_and_dry_run_lockfile() {
         .join("container-features")
         .join("configs")
         .join("lockfile-upgrade-feature");
-    let workspace = unique_temp_dir();
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
     copy_recursive(&fixture, &workspace);
     fs::copy(
         workspace.join("input.devcontainer.json"),
@@ -605,7 +580,7 @@ fn upgrade_with_feature_updates_config_and_dry_run_lockfile() {
     )
     .expect("seed config");
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "upgrade",
             "--dry-run",
@@ -643,10 +618,10 @@ fn upgrade_supports_upstream_dependson_lockfile_fixture() {
         .join("container-features")
         .join("configs")
         .join("lockfile-dependson");
-    let workspace = unique_temp_dir();
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
     copy_recursive(&fixture, &workspace);
 
-    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+    let output = devcontainer_command(None)
         .args([
             "upgrade",
             "--dry-run",
