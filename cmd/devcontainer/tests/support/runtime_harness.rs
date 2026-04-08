@@ -155,6 +155,14 @@ case "$COMMAND" in
         exit 0
         ;;
       ps)
+        if [ "${FAKE_PODMAN_COMPOSE_PS_REQUIRE_ALL:-0}" = "1" ]; then
+          if [ ! -f "$LOG_DIR/compose-service-running" ]; then
+            case " $* " in
+              *" -a "*) ;;
+              *) exit 0 ;;
+            esac
+          fi
+        fi
         if [ -n "${FAKE_PODMAN_COMPOSE_PS_OUTPUT:-}" ]; then
           printf '%s\n' "${FAKE_PODMAN_COMPOSE_PS_OUTPUT}"
           exit 0

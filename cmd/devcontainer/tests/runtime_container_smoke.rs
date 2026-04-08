@@ -367,6 +367,56 @@ fn up_expect_existing_compose_container_fails_when_missing() {
 }
 
 #[test]
+fn up_resumes_stopped_compose_services_without_rerunning_create_hooks() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"onCreateCommand\": \"echo on-create\",\n  \"updateContentCommand\": \"echo update-content\",\n  \"postCreateCommand\": \"echo post-create\",\n  \"postStartCommand\": \"echo post-start\",\n  \"postAttachCommand\": \"echo post-attach\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[
+            (
+                "FAKE_PODMAN_COMPOSE_PS_OUTPUT",
+                "stopped-compose-container-id",
+            ),
+            ("FAKE_PODMAN_COMPOSE_PS_REQUIRE_ALL", "1"),
+        ],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(payload["containerId"], "stopped-compose-container-id");
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(" ps -q app"));
+    assert!(invocations.contains(" ps -q -a app"));
+    assert!(invocations.contains(" up -d app"));
+
+    let exec_log = harness.read_exec_log();
+    assert!(!exec_log.contains("/bin/sh -lc echo on-create"));
+    assert!(!exec_log.contains("/bin/sh -lc echo update-content"));
+    assert!(!exec_log.contains("/bin/sh -lc echo post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-start"));
+    assert!(exec_log.contains("/bin/sh -lc echo post-attach"));
+}
+
+#[test]
 fn up_uses_custom_compose_project_name_from_compose_file() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();

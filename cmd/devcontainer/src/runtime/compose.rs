@@ -110,9 +110,29 @@ pub(crate) fn resolve_container_id(
     resolved: &ResolvedConfig,
     args: &[String],
 ) -> Result<Option<String>, String> {
+    resolve_container_id_with_options(resolved, args, false)
+}
+
+pub(crate) fn resolve_container_id_including_stopped(
+    resolved: &ResolvedConfig,
+    args: &[String],
+) -> Result<Option<String>, String> {
+    resolve_container_id_with_options(resolved, args, true)
+}
+
+fn resolve_container_id_with_options(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    include_stopped: bool,
+) -> Result<Option<String>, String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
-    let result = engine::run_compose(args, compose_args(&spec, "ps", &["-q", &spec.service]))?;
+    let mut ps_args = vec!["-q"];
+    if include_stopped {
+        ps_args.push("-a");
+    }
+    ps_args.push(&spec.service);
+    let result = engine::run_compose(args, compose_args(&spec, "ps", &ps_args))?;
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
     }

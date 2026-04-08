@@ -20,8 +20,8 @@ pub(crate) fn ensure_up_container(
     remote_workspace_folder: &str,
 ) -> Result<UpContainer, String> {
     if compose::uses_compose_config(&resolved.configuration) {
-        let existing = compose::resolve_container_id(resolved, args)?;
-        match existing {
+        let running = compose::resolve_container_id(resolved, args)?;
+        match running {
             Some(_) if common::has_flag(args, "--remove-existing-container") => {
                 compose::remove_service(resolved, args)?;
                 compose::up_service(resolved, args)?;
@@ -39,17 +39,41 @@ pub(crate) fn ensure_up_container(
                     lifecycle_mode: LifecycleMode::UpReused,
                 });
             }
-            None if common::has_flag(args, "--expect-existing-container") => {
-                return Err("Dev container not found.".to_string());
-            }
             None => {
-                compose::up_service(resolved, args)?;
-                let container_id = compose::resolve_container_id(resolved, args)?
-                    .ok_or_else(|| "Dev container not found.".to_string())?;
-                return Ok(UpContainer {
-                    container_id,
-                    lifecycle_mode: LifecycleMode::UpCreated,
-                });
+                let existing = compose::resolve_container_id_including_stopped(resolved, args)?;
+                match existing {
+                    Some(_) if common::has_flag(args, "--remove-existing-container") => {
+                        compose::remove_service(resolved, args)?;
+                        compose::up_service(resolved, args)?;
+                        let container_id = compose::resolve_container_id(resolved, args)?
+                            .ok_or_else(|| "Dev container not found.".to_string())?;
+                        return Ok(UpContainer {
+                            container_id,
+                            lifecycle_mode: LifecycleMode::UpCreated,
+                        });
+                    }
+                    Some(_) => {
+                        compose::up_service(resolved, args)?;
+                        let container_id = compose::resolve_container_id(resolved, args)?
+                            .ok_or_else(|| "Dev container not found.".to_string())?;
+                        return Ok(UpContainer {
+                            container_id,
+                            lifecycle_mode: LifecycleMode::UpStarted,
+                        });
+                    }
+                    None if common::has_flag(args, "--expect-existing-container") => {
+                        return Err("Dev container not found.".to_string());
+                    }
+                    None => {
+                        compose::up_service(resolved, args)?;
+                        let container_id = compose::resolve_container_id(resolved, args)?
+                            .ok_or_else(|| "Dev container not found.".to_string())?;
+                        return Ok(UpContainer {
+                            container_id,
+                            lifecycle_mode: LifecycleMode::UpCreated,
+                        });
+                    }
+                }
             }
         }
     }
