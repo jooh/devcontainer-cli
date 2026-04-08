@@ -1,5 +1,7 @@
 use std::env;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 use serde_yaml::{Mapping, Value as YamlValue};
@@ -8,6 +10,9 @@ use crate::commands::common;
 
 use super::context::ResolvedConfig;
 use super::engine;
+use super::metadata::serialized_container_metadata;
+
+static NEXT_OVERRIDE_FILE_ID: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) struct ComposeSpec {
     pub(crate) files: Vec<PathBuf>,
@@ -64,7 +69,8 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
             build_args.push("--no-cache".to_string());
         }
         build_args.push(spec.service.clone());
-        let result = engine::run_compose(args, compose_args_owned(&spec, "build", build_args))?;
+        let result =
+            engine::run_compose(args, compose_args_owned(&spec, "build", None, build_args))?;
         if result.status_code != 0 {
             return Err(engine::stderr_or_stdout(&result));
         }
@@ -83,13 +89,25 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
 
     Ok(spec
         .image
-        .unwrap_or_else(|| format!("compose-service-{}", spec.service)))
+        .clone()
+        .unwrap_or_else(|| default_service_image_name(&spec, args)))
 }
 
-pub(crate) fn up_service(resolved: &ResolvedConfig, args: &[String]) -> Result<(), String> {
+pub(crate) fn up_service(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    remote_workspace_folder: &str,
+) -> Result<(), String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
-    let result = engine::run_compose(args, compose_args(&spec, "up", &["-d", &spec.service]))?;
+    let override_file = compose_metadata_override_file(resolved, args, remote_workspace_folder)?;
+    let result = engine::run_compose(
+        args,
+        compose_args_with_override(&spec, "up", &["-d", &spec.service], override_file.as_ref()),
+    )?;
+    if let Some(override_file) = override_file {
+        let _ = std::fs::remove_file(override_file);
+    }
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
     }
@@ -149,20 +167,39 @@ fn resolve_container_id_with_options(
 }
 
 fn compose_args(spec: &ComposeSpec, subcommand: &str, tail: &[&str]) -> Vec<String> {
+    compose_args_with_override(spec, subcommand, tail, None)
+}
+
+fn compose_args_with_override(
+    spec: &ComposeSpec,
+    subcommand: &str,
+    tail: &[&str],
+    override_file: Option<&PathBuf>,
+) -> Vec<String> {
     compose_args_owned(
         spec,
         subcommand,
+        override_file,
         tail.iter().map(|value| value.to_string()).collect(),
     )
 }
 
-fn compose_args_owned(spec: &ComposeSpec, subcommand: &str, tail: Vec<String>) -> Vec<String> {
+fn compose_args_owned(
+    spec: &ComposeSpec,
+    subcommand: &str,
+    override_file: Option<&PathBuf>,
+    tail: Vec<String>,
+) -> Vec<String> {
     let mut args = Vec::new();
     args.push("--project-name".to_string());
     args.push(spec.project_name.clone());
     for file in &spec.files {
         args.push("-f".to_string());
         args.push(file.display().to_string());
+    }
+    if let Some(override_file) = override_file {
+        args.push("-f".to_string());
+        args.push(override_file.display().to_string());
     }
     args.push(subcommand.to_string());
     args.extend(tail);
@@ -330,21 +367,59 @@ fn compose_name_from_file(compose_file: &Path) -> Result<Option<String>, String>
 
 fn substitute_compose_env(value: &str) -> String {
     let trimmed = value.trim_matches('"').trim_matches('\'');
+    let characters = trimmed.chars().collect::<Vec<_>>();
     let mut output = String::with_capacity(trimmed.len());
-    let mut remaining = trimmed;
+    let mut index = 0;
 
-    while let Some(start) = remaining.find("${") {
-        output.push_str(&remaining[..start]);
-        let after_start = &remaining[start + 2..];
-        let Some(end) = after_start.find('}') else {
-            output.push_str(&remaining[start..]);
-            return output;
+    while index < characters.len() {
+        if characters[index] != '$' {
+            output.push(characters[index]);
+            index += 1;
+            continue;
+        }
+
+        if characters.get(index + 1) == Some(&'$') {
+            output.push('$');
+            index += 2;
+            continue;
+        }
+
+        if characters.get(index + 1) == Some(&'{') {
+            let mut end = index + 2;
+            while end < characters.len() && characters[end] != '}' {
+                end += 1;
+            }
+            if end == characters.len() {
+                output.extend(characters[index..].iter());
+                break;
+            }
+            output.push_str(&expand_compose_variable(
+                &characters[index + 2..end].iter().collect::<String>(),
+            ));
+            index = end + 1;
+            continue;
+        }
+
+        let Some(next_character) = characters.get(index + 1).copied() else {
+            output.push('$');
+            break;
         };
-        output.push_str(&expand_compose_variable(&after_start[..end]));
-        remaining = &after_start[end + 1..];
+        if !is_compose_variable_start(next_character) {
+            output.push('$');
+            index += 1;
+            continue;
+        }
+
+        let mut end = index + 2;
+        while end < characters.len() && is_compose_variable_continue(characters[end]) {
+            end += 1;
+        }
+        output.push_str(&expand_compose_variable(
+            &characters[index + 1..end].iter().collect::<String>(),
+        ));
+        index = end;
     }
 
-    output.push_str(remaining);
     output
 }
 
@@ -377,11 +452,118 @@ fn sanitize_project_name(value: &str) -> String {
         .collect()
 }
 
+fn is_compose_variable_start(character: char) -> bool {
+    character == '_' || character.is_ascii_alphabetic()
+}
+
+fn is_compose_variable_continue(character: char) -> bool {
+    character == '_' || character.is_ascii_alphanumeric()
+}
+
+fn compose_metadata_override_file(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    remote_workspace_folder: &str,
+) -> Result<Option<PathBuf>, String> {
+    let metadata = serialized_container_metadata(&resolved.configuration, remote_workspace_folder)?;
+    let mut labels = vec![
+        format!(
+            "devcontainer.local_folder={}",
+            resolved.workspace_folder.display()
+        ),
+        format!(
+            "devcontainer.config_file={}",
+            resolved.config_file.display()
+        ),
+        format!("devcontainer.metadata={metadata}"),
+    ];
+    labels.extend(common::parse_option_values(args, "--id-label"));
+    if labels.is_empty() {
+        return Ok(None);
+    }
+
+    let mut content = String::from("services:\n");
+    content.push_str(&format!(
+        "  '{}':\n    labels:{}\n",
+        resolved
+            .configuration
+            .get("service")
+            .and_then(Value::as_str)
+            .ok_or_else(|| "Compose configuration must define service".to_string())?,
+        labels
+            .iter()
+            .map(|label| format!("\n      - '{}'", escape_compose_label(label)))
+            .collect::<String>()
+    ));
+
+    let override_file = unique_override_file_path();
+    std::fs::write(&override_file, content).map_err(|error| error.to_string())?;
+    Ok(Some(override_file))
+}
+
+fn escape_compose_label(label: &str) -> String {
+    label.replace('\'', "''").replace('$', "$$")
+}
+
+fn unique_override_file_path() -> PathBuf {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time went backwards")
+        .as_nanos();
+    let unique_id = NEXT_OVERRIDE_FILE_ID.fetch_add(1, Ordering::Relaxed);
+    env::temp_dir().join(format!(
+        "devcontainer-compose-override-{}-{suffix}-{unique_id}.yml",
+        std::process::id()
+    ))
+}
+
+fn default_service_image_name(spec: &ComposeSpec, args: &[String]) -> String {
+    format!(
+        "{}{}{}",
+        spec.project_name,
+        compose_image_name_separator(args),
+        spec.service
+    )
+}
+
+fn compose_image_name_separator(args: &[String]) -> char {
+    let Ok(result) = engine::run_compose(args, vec!["version".to_string(), "--short".to_string()])
+    else {
+        return '-';
+    };
+    if result.status_code != 0 {
+        return '-';
+    }
+
+    let Some((major, minor, patch)) = parse_semver_prefix(result.stdout.trim()) else {
+        return '-';
+    };
+    if (major, minor, patch) < (2, 8, 0) {
+        '_'
+    } else {
+        '-'
+    }
+}
+
+fn parse_semver_prefix(value: &str) -> Option<(u64, u64, u64)> {
+    let normalized = value.trim_start_matches('v');
+    let version = normalized
+        .split(|character: char| !(character.is_ascii_digit() || character == '.'))
+        .next()
+        .filter(|value| !value.is_empty())?;
+    let mut parts = version.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next().unwrap_or("0").parse().ok()?;
+    let patch = parts.next().unwrap_or("0").parse().ok()?;
+    Some((major, minor, patch))
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        compose_name_from_file, compose_project_name, inspect_service_definition,
-        sanitize_project_name, uses_compose_config,
+        compose_image_name_separator, compose_name_from_file, compose_project_name,
+        inspect_service_definition, parse_semver_prefix, sanitize_project_name,
+        substitute_compose_env, uses_compose_config,
     };
     use serde_json::json;
     use std::fs;
@@ -508,5 +690,33 @@ mod tests {
         assert_eq!(project_name, "MyProj");
         assert_eq!(sanitize_project_name(&project_name), "myproj");
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn substitute_compose_env_supports_plain_variable_interpolation() {
+        let variable = format!("DEVCONTAINER_COMPOSE_TEST_PRESENT_{}", std::process::id());
+        unsafe {
+            std::env::set_var(&variable, "MyProject");
+        }
+
+        assert_eq!(
+            substitute_compose_env(&format!("prefix-${variable}")),
+            "prefix-MyProject"
+        );
+
+        unsafe {
+            std::env::remove_var(variable);
+        }
+    }
+
+    #[test]
+    fn parse_semver_prefix_reads_plain_semver_versions() {
+        assert_eq!(parse_semver_prefix("2.24.0"), Some((2, 24, 0)));
+        assert_eq!(parse_semver_prefix("v2.8.1-desktop.1"), Some((2, 8, 1)));
+    }
+
+    #[test]
+    fn compose_image_name_separator_defaults_to_hyphen_without_runtime_args() {
+        assert_eq!(compose_image_name_separator(&[]), '-');
     }
 }

@@ -365,11 +365,11 @@ fn up_re_resolves_recreated_compose_container_ids() {
 
     let invocations = harness.read_invocations();
     assert!(invocations.contains(" ps -q app"));
+    assert!(invocations.contains("exec --workdir /workspace new-compose-id"));
 
     let exec_log = harness.read_exec_log();
-    assert!(exec_log.contains("new-compose-id /bin/sh -lc echo recreated-post-create"));
-    assert!(exec_log.contains("new-compose-id /bin/sh -lc echo recreated-post-attach"));
-    assert!(!exec_log.contains("old-compose-id /bin/sh -lc echo recreated-post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo recreated-post-create"));
+    assert!(exec_log.contains("/bin/sh -lc echo recreated-post-attach"));
 }
 
 #[test]

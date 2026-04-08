@@ -178,7 +178,7 @@ ${2:-}"
             while IFS= read -r line; do
               case "$line" in
                 *"- '"*"'"|*"- \""*"\""|*" - "*"="*)
-                  label="$(printf '%s' "$line" | sed -E "s/^[[:space:]]*-[[:space:]]*['\"]?(.*)['\"]?$/\1/")"
+                  label="$(printf '%s' "$line" | sed -E "s/^[[:space:]]*-[[:space:]]*//; s/^['\"]//; s/['\"]$//")"
                   case "$label" in
                     *=*) printf '%s\n' "$label" >> "$compose_labels_file" ;;
                   esac

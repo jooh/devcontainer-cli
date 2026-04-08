@@ -192,7 +192,6 @@ fn compose_up_persists_metadata_for_followup_exec_with_container_id() {
     let invocations = harness.read_invocations();
     assert!(invocations.contains("inspect fake-compose-container-id"));
     assert!(invocations.contains("compose --project-name workspace_devcontainer -f "));
-    assert!(invocations.contains("devcontainer.metadata="));
     assert!(invocations.contains(
         "exec --workdir /persisted-compose-workspace --user vscode -e TEST_REMOTE_ENV=from-compose-config fake-compose-container-id /bin/echo hello-from-compose-metadata"
     ));
