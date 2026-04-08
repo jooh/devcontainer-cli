@@ -325,6 +325,32 @@ fn templates_apply_supports_published_template_ids() {
 }
 
 #[test]
+fn templates_apply_uses_upstream_defaults_for_published_template_ids() {
+    let workspace = unique_temp_dir();
+    fs::create_dir_all(&workspace).expect("workspace");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "apply",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--template-id",
+            "ghcr.io/devcontainers/templates/docker-from-docker:latest",
+        ])
+        .output()
+        .expect("templates apply should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let file = fs::read_to_string(workspace.join(".devcontainer").join("devcontainer.json"))
+        .expect("devcontainer file");
+    assert!(file.contains("\"installZsh\": \"true\""));
+    assert!(file.contains("\"upgradePackages\": \"false\""));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn templates_metadata_supports_published_template_ids() {
     let output = Command::new(env!("CARGO_BIN_EXE_devcontainer"))
         .args([

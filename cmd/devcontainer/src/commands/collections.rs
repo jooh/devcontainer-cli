@@ -272,8 +272,8 @@ fn apply_catalog_template(
     features.insert(
         "ghcr.io/devcontainers/features/common-utils:1".to_string(),
         json!({
-            "installZsh": template_args.get("installZsh").cloned().unwrap_or_else(|| Value::String("false".to_string())),
-            "upgradePackages": template_args.get("upgradePackages").cloned().unwrap_or_else(|| Value::String("true".to_string())),
+            "installZsh": template_args.get("installZsh").cloned().unwrap_or_else(|| Value::String("true".to_string())),
+            "upgradePackages": template_args.get("upgradePackages").cloned().unwrap_or_else(|| Value::String("false".to_string())),
         }),
     );
     features.insert(
