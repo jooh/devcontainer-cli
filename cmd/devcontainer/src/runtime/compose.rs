@@ -56,12 +56,15 @@ pub(crate) fn load_compose_spec(resolved: &ResolvedConfig) -> Result<Option<Comp
 pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Result<String, String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
+    reject_unsupported_build_options(args)?;
 
     if spec.has_build {
-        let result = engine::run_compose(
-            args,
-            compose_args(&spec, "build", &["--pull", &spec.service]),
-        )?;
+        let mut build_args = vec!["--pull".to_string()];
+        if common::has_flag(args, "--no-cache") || common::has_flag(args, "--build-no-cache") {
+            build_args.push("--no-cache".to_string());
+        }
+        build_args.push(spec.service.clone());
+        let result = engine::run_compose(args, compose_args_owned(&spec, "build", build_args))?;
         if result.status_code != 0 {
             return Err(engine::stderr_or_stdout(&result));
         }
@@ -146,6 +149,14 @@ fn resolve_container_id_with_options(
 }
 
 fn compose_args(spec: &ComposeSpec, subcommand: &str, tail: &[&str]) -> Vec<String> {
+    compose_args_owned(
+        spec,
+        subcommand,
+        tail.iter().map(|value| value.to_string()).collect(),
+    )
+}
+
+fn compose_args_owned(spec: &ComposeSpec, subcommand: &str, tail: Vec<String>) -> Vec<String> {
     let mut args = Vec::new();
     args.push("--project-name".to_string());
     args.push(spec.project_name.clone());
@@ -154,8 +165,23 @@ fn compose_args(spec: &ComposeSpec, subcommand: &str, tail: &[&str]) -> Vec<Stri
         args.push(file.display().to_string());
     }
     args.push(subcommand.to_string());
-    args.extend(tail.iter().map(|value| value.to_string()));
+    args.extend(tail);
     args
+}
+
+fn reject_unsupported_build_options(args: &[String]) -> Result<(), String> {
+    for flag in ["--cache-from", "--cache-to", "--platform", "--label"] {
+        if compose_build_option_is_present(args, flag) {
+            return Err(format!("{flag} not supported for compose builds."));
+        }
+    }
+    Ok(())
+}
+
+fn compose_build_option_is_present(args: &[String], flag: &str) -> bool {
+    common::has_flag(args, flag)
+        || common::parse_option_value(args, flag).is_some()
+        || !common::parse_option_values(args, flag).is_empty()
 }
 
 fn compose_files(configuration: &Value, config_root: &Path) -> Result<Vec<PathBuf>, String> {
@@ -236,7 +262,7 @@ fn compose_project_name(compose_files: &[PathBuf]) -> Result<String, String> {
     {
         return Ok(sanitize_project_name(&value));
     }
-    if let Some(value) = compose_project_name_from_dotenv()? {
+    if let Some(value) = compose_project_name_from_dotenv(compose_files)? {
         return Ok(sanitize_project_name(&value));
     }
     for compose_file in compose_files.iter().rev() {
@@ -269,9 +295,12 @@ fn compose_project_name(compose_files: &[PathBuf]) -> Result<String, String> {
     Ok(sanitize_project_name(&base))
 }
 
-fn compose_project_name_from_dotenv() -> Result<Option<String>, String> {
-    let cwd = env::current_dir().map_err(|error| error.to_string())?;
-    let env_file = cwd.join(".env");
+fn compose_project_name_from_dotenv(compose_files: &[PathBuf]) -> Result<Option<String>, String> {
+    let env_file = compose_files
+        .first()
+        .and_then(|file| file.parent())
+        .ok_or_else(|| "Compose configuration must define at least one compose file".to_string())?
+        .join(".env");
     let raw = match std::fs::read_to_string(env_file) {
         Ok(raw) => raw,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
