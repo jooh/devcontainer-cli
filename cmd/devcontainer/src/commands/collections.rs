@@ -1870,6 +1870,94 @@ mod tests {
     }
 
     #[test]
+    fn features_test_defaults_per_feature_scenarios_to_enclosing_feature() {
+        let root = unique_temp_dir();
+        let src = root.join("src").join("demo");
+        let test = root.join("test").join("demo");
+        fs::create_dir_all(&src).expect("feature src");
+        fs::create_dir_all(&test).expect("feature test");
+        fs::write(
+            src.join("devcontainer-feature.json"),
+            "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+        )
+        .expect("manifest");
+        fs::write(src.join("install.sh"), "#!/bin/sh\nexit 0\n").expect("install script");
+        fs::write(test.join("test.sh"), "#!/bin/sh\nexit 0\n").expect("test script");
+        fs::write(test.join("custom.sh"), "#!/bin/sh\nexit 0\n").expect("scenario script");
+        fs::write(
+            test.join("scenarios.json"),
+            "{\n  \"custom\": {\n    \"image\": \"ubuntu:latest\"\n  }\n}\n",
+        )
+        .expect("scenarios");
+
+        let mut runtime = FakeFeatureTestRuntime::default();
+        let results =
+            execute_feature_tests_with_runtime(&[root.display().to_string()], &mut runtime)
+                .expect("test execution");
+
+        assert_eq!(results.len(), 2);
+        assert!(results
+            .iter()
+            .any(|result| result.name == "demo" && result.passed));
+        assert!(results
+            .iter()
+            .any(|result| result.name == "custom" && result.passed));
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn features_test_accepts_published_feature_dependencies_in_scenarios() {
+        let root = unique_temp_dir();
+        let src = root.join("src").join("demo");
+        let test = root.join("test").join("demo");
+        fs::create_dir_all(&src).expect("feature src");
+        fs::create_dir_all(&test).expect("feature test");
+        fs::write(
+            src.join("devcontainer-feature.json"),
+            "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+        )
+        .expect("manifest");
+        fs::write(src.join("install.sh"), "#!/bin/sh\nexit 0\n").expect("install script");
+        fs::write(test.join("test.sh"), "#!/bin/sh\nexit 0\n").expect("test script");
+        fs::write(test.join("dependency.sh"), "#!/bin/sh\nexit 0\n").expect("scenario script");
+        fs::write(
+            test.join("scenarios.json"),
+            "{\n  \"dependency\": {\n    \"image\": \"ubuntu:latest\",\n    \"features\": {\n      \"ghcr.io/devcontainers/features/common-utils:1\": {},\n      \"demo\": {}\n    }\n  }\n}\n",
+        )
+        .expect("scenarios");
+
+        let mut runtime = FakeFeatureTestRuntime::default();
+        let results = execute_feature_tests_with_runtime(
+            &[
+                "--preserve-test-containers".to_string(),
+                root.display().to_string(),
+            ],
+            &mut runtime,
+        )
+        .expect("test execution");
+
+        assert_eq!(results.len(), 2);
+        assert!(results
+            .iter()
+            .any(|result| result.name == "dependency" && result.passed));
+        let dockerfiles = runtime
+            .build_calls
+            .iter()
+            .map(|(_, dockerfile_path, _)| {
+                fs::read_to_string(dockerfile_path).expect("dockerfile contents")
+            })
+            .collect::<Vec<_>>();
+        assert!(dockerfiles
+            .iter()
+            .any(|dockerfile| dockerfile.contains("common-utils")));
+
+        for (_, workspace_dir) in &runtime.start_calls {
+            let _ = fs::remove_dir_all(workspace_dir);
+        }
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn feature_info_supports_digest_pinned_catalog_refs() {
         let payload = build_feature_info_payload(
             "manifest",
