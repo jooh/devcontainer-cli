@@ -6,7 +6,7 @@ use crate::commands::collections::feature_tests::{
     discover_feature_test_scenarios, execute_feature_tests_with_runtime, FeatureTestRuntime,
 };
 
-const UPSTREAM_DEFAULT_BASE_IMAGE: &str = "mcr.microsoft.com/devcontainers/base:ubuntu";
+const DEFAULT_FEATURE_TEST_BASE_IMAGE: &str = "docker.io/library/debian:bookworm-slim";
 
 #[derive(Default)]
 struct FakeFeatureTestRuntime {
@@ -209,7 +209,7 @@ fn features_test_defaults_per_feature_scenarios_to_enclosing_feature() {
 }
 
 #[test]
-fn features_test_uses_upstream_default_base_image_without_override() {
+fn features_test_uses_repo_default_base_image_without_override() {
     let root = unique_temp_dir();
     let src = root.join("src").join("demo");
     let test = root.join("test").join("demo");
@@ -242,7 +242,7 @@ fn features_test_uses_upstream_default_base_image_without_override() {
         .collect::<Vec<_>>();
     assert!(dockerfiles
         .iter()
-        .any(|dockerfile| dockerfile.contains(&format!("FROM {UPSTREAM_DEFAULT_BASE_IMAGE}"))));
+        .any(|dockerfile| dockerfile.contains(&format!("FROM {DEFAULT_FEATURE_TEST_BASE_IMAGE}"))));
 
     for (_, workspace_dir) in &runtime.start_calls {
         let _ = fs::remove_dir_all(workspace_dir);
