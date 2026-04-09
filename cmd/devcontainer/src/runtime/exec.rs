@@ -28,10 +28,10 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
             arg.as_str(),
             "--interactive" | "--mount-workspace-git-root" | "--mount-git-worktree-common-dir"
         ) {
-            index += if args
-                .get(index + 1)
-                .is_some_and(|next| !next.starts_with("--"))
-                && arg != "--interactive"
+            index += if arg != "--interactive"
+                && args
+                    .get(index + 1)
+                    .is_some_and(|next| is_explicit_bool_literal(next))
             {
                 2
             } else {
@@ -50,6 +50,13 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
     }
 
     Ok(args[index..].to_vec())
+}
+
+fn is_explicit_bool_literal(value: &str) -> bool {
+    matches!(
+        value,
+        "false" | "0" | "no" | "off" | "true" | "1" | "yes" | "on"
+    )
 }
 
 pub(crate) fn exec_engine_args(
@@ -150,6 +157,30 @@ mod tests {
             "false".to_string(),
             "--workspace-mount-consistency".to_string(),
             "delegated".to_string(),
+            "/bin/echo".to_string(),
+            "hello".to_string(),
+        ])
+        .expect("command args");
+
+        assert_eq!(args, vec!["/bin/echo".to_string(), "hello".to_string()]);
+    }
+
+    #[test]
+    fn exec_command_and_args_does_not_consume_command_after_bare_mount_flag() {
+        let args = exec_command_and_args(&[
+            "--mount-workspace-git-root".to_string(),
+            "/bin/bash".to_string(),
+        ])
+        .expect("command args");
+
+        assert_eq!(args, vec!["/bin/bash".to_string()]);
+    }
+
+    #[test]
+    fn exec_command_and_args_accepts_explicit_bool_for_git_worktree_flag() {
+        let args = exec_command_and_args(&[
+            "--mount-git-worktree-common-dir".to_string(),
+            "true".to_string(),
             "/bin/echo".to_string(),
             "hello".to_string(),
         ])
