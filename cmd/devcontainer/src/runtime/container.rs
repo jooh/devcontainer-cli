@@ -315,19 +315,61 @@ fn mount_argument(value: &Value) -> Option<String> {
         Value::String(mount) => Some(mount.clone()),
         Value::Object(entries) => {
             let mut options = Vec::new();
-            for key in ["type", "source", "target", "external"] {
-                if let Some(value) = entries.get(key) {
-                    let text = match value {
-                        Value::Bool(boolean) => boolean.to_string(),
-                        Value::Number(number) => number.to_string(),
-                        Value::String(text) => text.clone(),
-                        _ => continue,
-                    };
-                    options.push(format!("{key}={text}"));
+            if let Some(value) = entries.get("type").and_then(mount_option_value) {
+                options.push(format!("type={value}"));
+            }
+            if let Some(value) = entries
+                .get("source")
+                .or_else(|| entries.get("src"))
+                .and_then(mount_option_value)
+            {
+                options.push(format!("source={value}"));
+            }
+            if let Some(value) = entries
+                .get("target")
+                .or_else(|| entries.get("destination"))
+                .or_else(|| entries.get("dst"))
+                .and_then(mount_option_value)
+            {
+                options.push(format!("target={value}"));
+            }
+            if entries
+                .get("readonly")
+                .or_else(|| entries.get("readOnly"))
+                .and_then(Value::as_bool)
+                .unwrap_or(false)
+            {
+                options.push("readonly".to_string());
+            }
+            for (key, value) in entries {
+                if matches!(
+                    key.as_str(),
+                    "type"
+                        | "source"
+                        | "src"
+                        | "target"
+                        | "destination"
+                        | "dst"
+                        | "readonly"
+                        | "readOnly"
+                ) {
+                    continue;
+                }
+                if let Some(value) = mount_option_value(value) {
+                    options.push(format!("{key}={value}"));
                 }
             }
             (!options.is_empty()).then(|| options.join(","))
         }
+        _ => None,
+    }
+}
+
+fn mount_option_value(value: &Value) -> Option<String> {
+    match value {
+        Value::Bool(boolean) => Some(boolean.to_string()),
+        Value::Number(number) => Some(number.to_string()),
+        Value::String(text) => Some(text.clone()),
         _ => None,
     }
 }
@@ -408,4 +450,44 @@ fn target_container_labels(
         }
     }
     labels
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::mount_argument;
+
+    #[test]
+    fn mount_argument_preserves_read_only_and_alias_keys() {
+        let mount = mount_argument(&json!({
+            "type": "bind",
+            "src": "/cache",
+            "dst": "/workspace/cache",
+            "readOnly": true,
+        }))
+        .expect("mount argument");
+
+        assert_eq!(
+            mount,
+            "type=bind,source=/cache,target=/workspace/cache,readonly"
+        );
+    }
+
+    #[test]
+    fn mount_argument_preserves_additional_scalar_options() {
+        let mount = mount_argument(&json!({
+            "type": "volume",
+            "source": "devcontainer-cache",
+            "target": "/cache",
+            "external": true,
+            "consistency": "delegated",
+        }))
+        .expect("mount argument");
+
+        assert_eq!(
+            mount,
+            "type=volume,source=devcontainer-cache,target=/cache,consistency=delegated,external=true"
+        );
+    }
 }
