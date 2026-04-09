@@ -6,7 +6,7 @@ use super::support::unique_temp_dir;
 use crate::commands::common::resolve_read_configuration_path;
 use crate::commands::configuration::merge::merge_configuration;
 use crate::commands::configuration::{
-    build_read_configuration_payload, should_use_native_read_configuration,
+    apply_feature_metadata, build_read_configuration_payload, should_use_native_read_configuration,
 };
 
 #[test]
@@ -296,5 +296,35 @@ fn merged_configuration_merges_host_requirements_field_by_field() {
                 "cores": 4
             }
         })
+    );
+}
+
+#[test]
+fn feature_metadata_mounts_replace_existing_mounts_with_the_same_target() {
+    let merged = apply_feature_metadata(
+        &json!({
+            "image": "debian:bookworm",
+            "mounts": [{
+                "type": "bind",
+                "source": "/workspace/from-config",
+                "target": "/workspace/cache"
+            }]
+        }),
+        &[json!({
+            "mounts": [{
+                "type": "volume",
+                "source": "feature-cache",
+                "target": "/workspace/cache"
+            }]
+        })],
+    );
+
+    assert_eq!(
+        merged["mounts"],
+        json!([{
+            "type": "volume",
+            "source": "feature-cache",
+            "target": "/workspace/cache"
+        }])
     );
 }

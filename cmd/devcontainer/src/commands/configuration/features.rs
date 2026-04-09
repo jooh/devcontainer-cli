@@ -9,6 +9,7 @@ use crate::commands::collections::registry::{
     published_feature_manifest,
 };
 use crate::commands::common;
+use crate::runtime::metadata::mount_option_target;
 
 #[derive(Clone, Debug)]
 pub(crate) enum FeatureInstallationSource {
@@ -488,7 +489,7 @@ pub(crate) fn apply_feature_metadata(configuration: &Value, metadata_entries: &[
         merge_boolean_true(&mut merged, metadata, "privileged");
         merge_unique_array(&mut merged, metadata, "capAdd");
         merge_unique_array(&mut merged, metadata, "securityOpt");
-        merge_unique_array(&mut merged, metadata, "mounts");
+        merge_mounts(&mut merged, metadata);
         merge_unique_array(&mut merged, metadata, "forwardPorts");
         merge_object(&mut merged, metadata, "containerEnv");
         merge_object(&mut merged, metadata, "remoteEnv");
@@ -535,6 +536,44 @@ fn merge_unique_array(merged: &mut Map<String, Value>, metadata: &Value, key: &s
         if !target.iter().any(|existing| existing == value) {
             target.push(value.clone());
         }
+    }
+}
+
+fn merge_mounts(merged: &mut Map<String, Value>, metadata: &Value) {
+    let Some(values) = metadata.get("mounts").and_then(Value::as_array) else {
+        return;
+    };
+    let target = merged
+        .entry("mounts".to_string())
+        .or_insert_with(|| Value::Array(Vec::new()))
+        .as_array_mut()
+        .expect("array field");
+    for value in values {
+        if let Some(target_path) = mount_target(value) {
+            if let Some(index) = target.iter().position(|existing| {
+                mount_target(existing).as_deref() == Some(target_path.as_str())
+            }) {
+                target.remove(index);
+            }
+            target.push(value.clone());
+            continue;
+        }
+        if !target.iter().any(|existing| existing == value) {
+            target.push(value.clone());
+        }
+    }
+}
+
+fn mount_target(value: &Value) -> Option<String> {
+    match value {
+        Value::String(text) => mount_option_target(text),
+        Value::Object(entries) => entries
+            .get("target")
+            .or_else(|| entries.get("destination"))
+            .or_else(|| entries.get("dst"))
+            .and_then(Value::as_str)
+            .map(str::to_string),
+        _ => None,
     }
 }
 
