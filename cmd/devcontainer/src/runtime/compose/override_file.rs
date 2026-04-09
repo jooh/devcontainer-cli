@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde_json::Value;
+use serde_json::{Map, Number, Value};
 
 use crate::commands::common;
 
@@ -18,11 +18,7 @@ enum ComposeVolumeEntry {
 }
 
 struct ComposeMountDefinition {
-    mount_type: String,
-    source: Option<String>,
-    target: String,
-    read_only: bool,
-    external: Option<bool>,
+    fields: Map<String, Value>,
 }
 
 pub(super) fn compose_metadata_override_file(
@@ -163,50 +159,15 @@ fn compose_workspace_volume(
     args: &[String],
     remote_workspace_folder: &str,
 ) -> Option<ComposeVolumeEntry> {
-    if resolved.configuration.get("workspaceMount").is_none() {
-        return derived_workspace_mount(&resolved.workspace_folder, args).map(|derived| {
-            ComposeVolumeEntry::Short(format!(
-                "{}:{}",
-                derived.host_mount_folder.display(),
-                derived.container_mount_folder
-            ))
-        });
-    }
     let mount = workspace_mount_for_args(resolved, remote_workspace_folder, args);
-    let mut mount_type = None;
-    let mut source = None;
-    let mut target = None;
-    let mut read_only = false;
-    for option in split_mount_options(&mount) {
-        if option == "readonly" || option == "ro" {
-            read_only = true;
-            continue;
-        }
-        if let Some(value) = option.strip_prefix("type=") {
-            mount_type = Some(value.trim_matches('"').to_string());
-        } else if let Some(value) = option
-            .strip_prefix("source=")
-            .or_else(|| option.strip_prefix("src="))
-        {
-            source = Some(value.trim_matches('"').to_string());
-        } else if let Some(value) = option
-            .strip_prefix("target=")
-            .or_else(|| option.strip_prefix("destination="))
-            .or_else(|| option.strip_prefix("dst="))
-        {
-            target = Some(value.trim_matches('"').to_string());
-        }
-    }
-
-    if mount_type.as_deref().unwrap_or("bind") != "bind" {
+    let definition = compose_mount_definition_from_str(&mount)?;
+    if definition.mount_type().unwrap_or("bind") != "bind" {
         return None;
     }
-
-    let mut volume = format!("{}:{}", source?, target?);
-    if read_only {
-        volume.push_str(":ro");
-    }
-    Some(ComposeVolumeEntry::Short(volume))
+    definition
+        .short_syntax()
+        .map(ComposeVolumeEntry::Short)
+        .or(Some(ComposeVolumeEntry::Long(definition)))
 }
 
 fn compose_additional_volumes(
@@ -239,80 +200,124 @@ fn compose_mount_definition(value: &Value) -> Option<ComposeVolumeEntry> {
             compose_mount_definition_from_str(text).map(ComposeVolumeEntry::Long)
         }
         Value::Object(entries) => {
-            let mount_type = entries
-                .get("type")
-                .and_then(Value::as_str)
-                .unwrap_or("bind")
-                .to_string();
-            let source = entries
+            let mut fields = Map::new();
+            fields.insert(
+                "type".to_string(),
+                Value::String(
+                    entries
+                        .get("type")
+                        .and_then(Value::as_str)
+                        .unwrap_or("bind")
+                        .to_string(),
+                ),
+            );
+            if let Some(source) = entries
                 .get("source")
                 .or_else(|| entries.get("src"))
                 .and_then(Value::as_str)
-                .map(str::to_string);
+            {
+                fields.insert("source".to_string(), Value::String(source.to_string()));
+            }
             let target = entries
                 .get("target")
                 .or_else(|| entries.get("destination"))
                 .or_else(|| entries.get("dst"))
-                .and_then(Value::as_str)?
-                .to_string();
-            let read_only = entries
+                .and_then(Value::as_str)?;
+            fields.insert("target".to_string(), Value::String(target.to_string()));
+            if entries
                 .get("readonly")
                 .or_else(|| entries.get("readOnly"))
                 .and_then(Value::as_bool)
-                .unwrap_or(false);
-            let external = entries.get("external").and_then(Value::as_bool);
-            Some(ComposeVolumeEntry::Long(ComposeMountDefinition {
-                mount_type,
-                source,
-                target,
-                read_only,
-                external,
-            }))
+                .unwrap_or(false)
+            {
+                fields.insert("read_only".to_string(), Value::Bool(true));
+            }
+            if let Some(external) = entries.get("external").and_then(Value::as_bool) {
+                insert_nested_mount_value(
+                    &mut fields,
+                    &["volume"],
+                    "external",
+                    Value::Bool(external),
+                );
+            }
+            for (key, value) in entries {
+                if matches!(
+                    key.as_str(),
+                    "type"
+                        | "source"
+                        | "src"
+                        | "target"
+                        | "destination"
+                        | "dst"
+                        | "readonly"
+                        | "readOnly"
+                        | "external"
+                ) {
+                    continue;
+                }
+                fields.insert(key.clone(), value.clone());
+            }
+            Some(ComposeVolumeEntry::Long(ComposeMountDefinition { fields }))
         }
         _ => None,
     }
 }
 
 fn compose_mount_definition_from_str(mount: &str) -> Option<ComposeMountDefinition> {
-    let mut mount_type = "bind".to_string();
-    let mut source = None;
-    let mut target = None;
-    let mut read_only = false;
-    let mut external = None;
+    let mut fields = Map::new();
+    fields.insert("type".to_string(), Value::String("bind".to_string()));
     for option in split_mount_options(mount) {
         if option == "readonly" || option == "ro" {
-            read_only = true;
+            fields.insert("read_only".to_string(), Value::Bool(true));
             continue;
         }
         if let Some(value) = option.strip_prefix("type=") {
-            mount_type = value.trim_matches('"').to_string();
+            fields.insert(
+                "type".to_string(),
+                Value::String(value.trim_matches('"').to_string()),
+            );
         } else if let Some(value) = option
             .strip_prefix("source=")
             .or_else(|| option.strip_prefix("src="))
         {
-            source = Some(value.trim_matches('"').to_string());
+            fields.insert(
+                "source".to_string(),
+                Value::String(value.trim_matches('"').to_string()),
+            );
         } else if let Some(value) = option
             .strip_prefix("target=")
             .or_else(|| option.strip_prefix("destination="))
             .or_else(|| option.strip_prefix("dst="))
         {
-            target = Some(value.trim_matches('"').to_string());
+            fields.insert(
+                "target".to_string(),
+                Value::String(value.trim_matches('"').to_string()),
+            );
         } else if let Some(value) = option.strip_prefix("external=") {
-            external = match value.trim_matches('"') {
-                "true" => Some(true),
-                "false" => Some(false),
-                _ => None,
-            };
+            if let Some(external) = parse_mount_option_scalar(value).as_bool() {
+                insert_nested_mount_value(
+                    &mut fields,
+                    &["volume"],
+                    "external",
+                    Value::Bool(external),
+                );
+            }
+        } else if let Some((key, value)) = option.split_once('=') {
+            let path = mount_option_key_path(key);
+            if let Some((leaf, parents)) = path.split_last() {
+                insert_nested_mount_value(
+                    &mut fields,
+                    parents,
+                    leaf,
+                    parse_mount_option_scalar(value),
+                );
+            }
         }
     }
 
-    Some(ComposeMountDefinition {
-        mount_type,
-        source,
-        target: target?,
-        read_only,
-        external,
-    })
+    fields
+        .contains_key("target")
+        .then_some(ComposeMountDefinition { fields })
 }
 
 fn render_compose_volume_entry(entry: &ComposeVolumeEntry) -> String {
@@ -320,33 +325,169 @@ fn render_compose_volume_entry(entry: &ComposeVolumeEntry) -> String {
         ComposeVolumeEntry::Short(volume) => {
             format!("      - '{}'\n", escape_compose_scalar(volume))
         }
-        ComposeVolumeEntry::Long(definition) => {
-            let mut rendered = format!(
-                "      - type: '{}'\n",
-                escape_compose_scalar(&definition.mount_type)
-            );
-            if let Some(source) = &definition.source {
-                rendered.push_str(&format!(
-                    "        source: '{}'\n",
-                    escape_compose_scalar(source)
-                ));
-            }
-            rendered.push_str(&format!(
-                "        target: '{}'\n",
-                escape_compose_scalar(&definition.target)
-            ));
-            if definition.read_only {
-                rendered.push_str("        read_only: true\n");
-            }
-            if let Some(external) = definition.external {
-                rendered.push_str("        volume:\n");
-                rendered.push_str(&format!(
-                    "          external: {}\n",
-                    if external { "true" } else { "false" }
+        ComposeVolumeEntry::Long(definition) => render_yaml_mapping_list_entry(&definition.fields),
+    }
+}
+
+impl ComposeMountDefinition {
+    fn mount_type(&self) -> Option<&str> {
+        self.fields.get("type").and_then(Value::as_str)
+    }
+
+    fn short_syntax(&self) -> Option<String> {
+        if self.mount_type().unwrap_or("bind") != "bind" {
+            return None;
+        }
+        if self
+            .fields
+            .keys()
+            .any(|key| !matches!(key.as_str(), "type" | "source" | "target" | "read_only"))
+        {
+            return None;
+        }
+        let source = self.fields.get("source").and_then(Value::as_str)?;
+        let target = self.fields.get("target").and_then(Value::as_str)?;
+        let mut volume = format!("{source}:{target}");
+        if self
+            .fields
+            .get("read_only")
+            .and_then(Value::as_bool)
+            .unwrap_or(false)
+        {
+            volume.push_str(":ro");
+        }
+        Some(volume)
+    }
+}
+
+fn mount_option_key_path(key: &str) -> Vec<&str> {
+    match key {
+        "bind-propagation" => vec!["bind", "propagation"],
+        "volume-nocopy" => vec!["volume", "nocopy"],
+        _ => key.split('.').collect(),
+    }
+}
+
+fn parse_mount_option_scalar(value: &str) -> Value {
+    let value = value.trim_matches('"');
+    match value {
+        "true" => Value::Bool(true),
+        "false" => Value::Bool(false),
+        _ => parse_mount_option_number(value).unwrap_or_else(|| Value::String(value.to_string())),
+    }
+}
+
+fn parse_mount_option_number(value: &str) -> Option<Value> {
+    if let Ok(number) = value.parse::<i64>() {
+        return Some(Value::Number(number.into()));
+    }
+    if let Ok(number) = value.parse::<u64>() {
+        return Some(Value::Number(number.into()));
+    }
+    value
+        .parse::<f64>()
+        .ok()
+        .and_then(Number::from_f64)
+        .map(Value::Number)
+}
+
+fn insert_nested_mount_value(
+    fields: &mut Map<String, Value>,
+    parents: &[&str],
+    leaf: &str,
+    value: Value,
+) {
+    if parents.is_empty() {
+        fields.insert(leaf.to_string(), value);
+        return;
+    }
+
+    let entry = fields
+        .entry(parents[0].to_string())
+        .or_insert_with(|| Value::Object(Map::new()));
+    if !entry.is_object() {
+        *entry = Value::Object(Map::new());
+    }
+    let child = entry.as_object_mut().expect("object mount option");
+    insert_nested_mount_value(child, &parents[1..], leaf, value);
+}
+
+fn render_yaml_mapping_list_entry(entries: &Map<String, Value>) -> String {
+    let mut rendered = String::new();
+    let mut iter = entries.iter();
+    if let Some((key, value)) = iter.next() {
+        rendered.push_str(&render_yaml_key_value(key, value, 6, "- "));
+    }
+    for (key, value) in iter {
+        rendered.push_str(&render_yaml_key_value(key, value, 8, ""));
+    }
+    rendered
+}
+
+fn render_yaml_key_value(key: &str, value: &Value, indent: usize, prefix: &str) -> String {
+    let padding = " ".repeat(indent);
+    match value {
+        Value::Object(entries) => {
+            let mut rendered = format!("{padding}{prefix}{key}:\n");
+            let nested_indent = indent + prefix.len() + 2;
+            for (nested_key, nested_value) in entries {
+                rendered.push_str(&render_yaml_key_value(
+                    nested_key,
+                    nested_value,
+                    nested_indent,
+                    "",
                 ));
             }
             rendered
         }
+        Value::Array(values) => {
+            let mut rendered = format!("{padding}{prefix}{key}:\n");
+            let nested_indent = indent + prefix.len() + 2;
+            for nested_value in values {
+                rendered.push_str(&render_yaml_sequence_item(nested_value, nested_indent));
+            }
+            rendered
+        }
+        Value::String(text) => format!(
+            "{padding}{prefix}{key}: '{}'\n",
+            escape_compose_scalar(text)
+        ),
+        Value::Bool(boolean) => format!(
+            "{padding}{prefix}{key}: {}\n",
+            if *boolean { "true" } else { "false" }
+        ),
+        Value::Number(number) => format!("{padding}{prefix}{key}: {number}\n"),
+        Value::Null => format!("{padding}{prefix}{key}: null\n"),
+    }
+}
+
+fn render_yaml_sequence_item(value: &Value, indent: usize) -> String {
+    let padding = " ".repeat(indent);
+    match value {
+        Value::Object(entries) => {
+            let mut rendered = String::new();
+            let mut iter = entries.iter();
+            if let Some((key, value)) = iter.next() {
+                rendered.push_str(&render_yaml_key_value(key, value, indent, "- "));
+            }
+            for (key, value) in iter {
+                rendered.push_str(&render_yaml_key_value(key, value, indent + 2, ""));
+            }
+            rendered
+        }
+        Value::Array(values) => {
+            let mut rendered = format!("{padding}-\n");
+            for nested_value in values {
+                rendered.push_str(&render_yaml_sequence_item(nested_value, indent + 2));
+            }
+            rendered
+        }
+        Value::String(text) => format!("{padding}- '{}'\n", escape_compose_scalar(text)),
+        Value::Bool(boolean) => {
+            format!("{padding}- {}\n", if *boolean { "true" } else { "false" })
+        }
+        Value::Number(number) => format!("{padding}- {number}\n"),
+        Value::Null => format!("{padding}- null\n"),
     }
 }
 

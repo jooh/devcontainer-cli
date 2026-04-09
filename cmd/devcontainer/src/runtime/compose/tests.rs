@@ -316,6 +316,80 @@ fn metadata_override_file_can_pin_image_and_runtime_settings() {
 }
 
 #[test]
+fn metadata_override_file_preserves_workspace_mount_options() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "workspaceMount": "type=bind,source=/tmp/workspace,target=/workspaces/project,consistency=delegated"
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project", None)
+        .expect("override result")
+        .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("type: 'bind'"));
+    assert!(override_content.contains("source: '/tmp/workspace'"));
+    assert!(override_content.contains("target: '/workspaces/project'"));
+    assert!(override_content.contains("consistency: 'delegated'"));
+    assert!(!override_content.contains("/tmp/workspace:/workspaces/project"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_preserves_extended_mount_keys() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "mounts": [{
+                "type": "bind",
+                "source": "/tmp/feature-src",
+                "target": "/tmp/feature-dst",
+                "consistency": "delegated",
+                "bind": {
+                    "propagation": "rshared"
+                }
+            }, {
+                "type": "volume",
+                "source": "feature-cache",
+                "target": "/cache",
+                "external": true,
+                "volume": {
+                    "nocopy": true
+                }
+            }]
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project", None)
+        .expect("override result")
+        .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("consistency: 'delegated'"));
+    assert!(override_content.contains("bind:"));
+    assert!(override_content.contains("propagation: 'rshared'"));
+    assert!(override_content.contains("volume:"));
+    assert!(override_content.contains("nocopy: true"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn metadata_override_file_does_not_promote_remote_user_to_service_user() {
     let root = unique_temp_dir();
     fs::create_dir_all(&root).expect("workspace root");
