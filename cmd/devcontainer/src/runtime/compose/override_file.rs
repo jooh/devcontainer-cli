@@ -91,7 +91,6 @@ pub(super) fn compose_metadata_override_file(
     if let Some(user) = resolved
         .configuration
         .get("containerUser")
-        .or_else(|| resolved.configuration.get("remoteUser"))
         .and_then(Value::as_str)
     {
         content.push_str(&format!("    user: '{}'\n", escape_compose_scalar(user)));

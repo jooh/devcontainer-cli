@@ -103,6 +103,11 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
                 return Err(engine::stderr_or_stdout(&push_result));
             }
         }
+        configuration::ensure_native_lockfile(
+            args,
+            &resolved.config_file,
+            &resolved.configuration,
+        )?;
         return Ok(built_image);
     }
 
