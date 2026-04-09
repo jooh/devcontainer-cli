@@ -3,10 +3,14 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
+#[derive(Clone)]
 pub struct ConfigContext {
     pub workspace_folder: PathBuf,
     pub env: HashMap<String, String>,
+    pub container_workspace_folder: Option<String>,
+    pub id_labels: HashMap<String, String>,
 }
 
 pub fn resolve_config_path(
@@ -14,11 +18,7 @@ pub fn resolve_config_path(
     explicit_config: Option<&Path>,
 ) -> Result<PathBuf, String> {
     let config_path = if let Some(config) = explicit_config {
-        if config.is_absolute() {
-            config.to_path_buf()
-        } else {
-            workspace_folder.join(config)
-        }
+        expected_config_path(workspace_folder, Some(config))
     } else {
         let modern = workspace_folder
             .join(".devcontainer")
@@ -39,6 +39,20 @@ pub fn resolve_config_path(
     }
 
     Ok(fs::canonicalize(&config_path).unwrap_or(config_path))
+}
+
+pub fn expected_config_path(workspace_folder: &Path, explicit_config: Option<&Path>) -> PathBuf {
+    if let Some(config) = explicit_config {
+        if config.is_absolute() {
+            config.to_path_buf()
+        } else {
+            workspace_folder.join(config)
+        }
+    } else {
+        workspace_folder
+            .join(".devcontainer")
+            .join("devcontainer.json")
+    }
 }
 
 fn strip_jsonc_comments(text: &str) -> String {
@@ -187,6 +201,20 @@ fn replace_variable(
                 .map(str::to_string)
                 .unwrap_or_else(|| value.workspace_folder.to_string_lossy().into_owned())
         }),
+        "containerWorkspaceFolder" => {
+            context.and_then(|value| value.container_workspace_folder.clone())
+        }
+        "containerWorkspaceFolderBasename" => context.and_then(|value| {
+            value
+                .container_workspace_folder
+                .as_deref()
+                .and_then(|folder| Path::new(folder).file_name())
+                .and_then(|name| name.to_str())
+                .map(str::to_string)
+        }),
+        "devcontainerId" => context
+            .filter(|value| !value.id_labels.is_empty())
+            .map(|value| devcontainer_id_for_labels(&value.id_labels)),
         "env" | "localEnv" => context.and_then(|value| {
             args.first().map(|variable_name| {
                 value
@@ -244,19 +272,92 @@ fn substitute_string(
     output
 }
 
+fn devcontainer_id_for_labels(labels: &HashMap<String, String>) -> String {
+    let mut entries = labels.iter().collect::<Vec<_>>();
+    entries.sort_by(|left, right| left.0.cmp(right.0));
+    let serialized = format!(
+        "{{{}}}",
+        entries
+            .into_iter()
+            .map(|(key, value)| {
+                format!(
+                    "{}:{}",
+                    serde_json::to_string(key).unwrap_or_default(),
+                    serde_json::to_string(value).unwrap_or_default()
+                )
+            })
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    let hash = Sha256::digest(serialized.as_bytes());
+    encode_base32hex_lower(&hash)
+}
+
+fn encode_base32hex_lower(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8; 32] = b"0123456789abcdefghijklmnopqrstuv";
+
+    let mut output = String::new();
+    let mut buffer = 0_u16;
+    let mut bits = 0_u8;
+    for byte in bytes {
+        buffer = (buffer << 8) | u16::from(*byte);
+        bits += 8;
+        while bits >= 5 {
+            let index = ((buffer >> (bits - 5)) & 0x1f) as usize;
+            output.push(ALPHABET[index] as char);
+            bits -= 5;
+            if bits == 0 {
+                buffer = 0;
+            } else {
+                buffer &= (1 << bits) - 1;
+            }
+        }
+    }
+    if bits > 0 {
+        let index = ((buffer << (5 - bits)) & 0x1f) as usize;
+        output.push(ALPHABET[index] as char);
+    }
+    while output.len() < 52 {
+        output.insert(0, '0');
+    }
+    output
+}
+
 pub fn substitute_local_context(value: &Value, context: &ConfigContext) -> Value {
+    let mut resolved_context = context.clone();
+    if let Some(container_workspace_folder) = context.container_workspace_folder.as_deref() {
+        resolved_context.container_workspace_folder = Some(substitute_string(
+            container_workspace_folder,
+            Some(&ConfigContext {
+                workspace_folder: context.workspace_folder.clone(),
+                env: context.env.clone(),
+                container_workspace_folder: None,
+                id_labels: context.id_labels.clone(),
+            }),
+            None,
+        ));
+    }
+    substitute_local_context_resolved(value, &resolved_context)
+}
+
+fn substitute_local_context_resolved(value: &Value, context: &ConfigContext) -> Value {
     match value {
         Value::String(text) => Value::String(substitute_string(text, Some(context), None)),
         Value::Array(items) => Value::Array(
             items
                 .iter()
-                .map(|item| substitute_local_context(item, context))
+                .map(|item| substitute_local_context_resolved(item, context))
                 .collect(),
         ),
         Value::Object(entries) => Value::Object(
             entries
                 .iter()
-                .map(|(key, value)| (key.clone(), substitute_local_context(value, context)))
+                .map(|(key, value)| {
+                    (
+                        key.clone(),
+                        substitute_local_context_resolved(value, context),
+                    )
+                })
                 .collect(),
         ),
         _ => value.clone(),
@@ -340,11 +441,15 @@ mod tests {
         let context = ConfigContext {
             workspace_folder: PathBuf::from("/workspace/demo"),
             env,
+            container_workspace_folder: Some("/workspaces/demo".to_string()),
+            id_labels: HashMap::new(),
         };
         let value = json!({
             "containerEnv": {
                 "USER_NAME": "${localEnv:USER}",
-                "WORKSPACE": "${localWorkspaceFolder}"
+                "WORKSPACE": "${localWorkspaceFolder}",
+                "CONTAINER_WORKSPACE": "${containerWorkspaceFolder}",
+                "CONTAINER_BASENAME": "${containerWorkspaceFolderBasename}"
             }
         });
 
@@ -352,6 +457,11 @@ mod tests {
 
         assert_eq!(substituted["containerEnv"]["USER_NAME"], "johan");
         assert_eq!(substituted["containerEnv"]["WORKSPACE"], "/workspace/demo");
+        assert_eq!(
+            substituted["containerEnv"]["CONTAINER_WORKSPACE"],
+            "/workspaces/demo"
+        );
+        assert_eq!(substituted["containerEnv"]["CONTAINER_BASENAME"], "demo");
     }
 
     #[test]
@@ -359,13 +469,16 @@ mod tests {
         let context = ConfigContext {
             workspace_folder: PathBuf::from("/workspace/demo"),
             env: HashMap::new(),
+            container_workspace_folder: Some("/workspaces/${localWorkspaceFolderBasename}".into()),
+            id_labels: HashMap::new(),
         };
         let value = json!({
             "containerEnv": {
                 "BASENAME": "${localWorkspaceFolderBasename}",
                 "DEFAULTED": "${localEnv:USER:fallback}",
                 "DEFAULT_WITH_EXTRA_SEGMENTS": "${env:USER:fallback:ignored}",
-                "MISSING": "before-${localEnv:UNSET}-after"
+                "MISSING": "before-${localEnv:UNSET}-after",
+                "CONTAINER_PATH": "${containerWorkspaceFolder}"
             }
         });
 
@@ -378,6 +491,10 @@ mod tests {
             "fallback"
         );
         assert_eq!(substituted["containerEnv"]["MISSING"], "before--after");
+        assert_eq!(
+            substituted["containerEnv"]["CONTAINER_PATH"],
+            "/workspaces/demo"
+        );
     }
 
     #[test]
@@ -400,5 +517,53 @@ mod tests {
         );
         assert_eq!(substituted["remoteEnv"]["FALLBACK"], "fallback");
         assert_eq!(substituted["remoteEnv"]["LOCAL_PATH"], "${localEnv:PATH}");
+    }
+
+    #[test]
+    fn substitutes_stable_devcontainer_id_from_sorted_labels() {
+        let value = json!({
+            "mounts": [
+                {
+                    "source": "cache-${devcontainerId}",
+                    "target": "/cache",
+                    "type": "volume"
+                }
+            ]
+        });
+        let first = substitute_local_context(
+            &value,
+            &ConfigContext {
+                workspace_folder: PathBuf::from("/workspace/demo"),
+                env: HashMap::new(),
+                container_workspace_folder: None,
+                id_labels: HashMap::from([
+                    ("b".to_string(), "2".to_string()),
+                    ("a".to_string(), "1".to_string()),
+                ]),
+            },
+        );
+        let second = substitute_local_context(
+            &value,
+            &ConfigContext {
+                workspace_folder: PathBuf::from("/workspace/demo"),
+                env: HashMap::new(),
+                container_workspace_folder: None,
+                id_labels: HashMap::from([
+                    ("a".to_string(), "1".to_string()),
+                    ("b".to_string(), "2".to_string()),
+                ]),
+            },
+        );
+        let id = first["mounts"][0]["source"]
+            .as_str()
+            .expect("mount source")
+            .trim_start_matches("cache-")
+            .to_string();
+
+        assert_eq!(first, second);
+        assert_eq!(id.len(), 52);
+        assert!(id
+            .chars()
+            .all(|character| matches!(character, '0'..='9' | 'a'..='v')));
     }
 }

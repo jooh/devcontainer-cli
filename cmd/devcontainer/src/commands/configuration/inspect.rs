@@ -32,13 +32,17 @@ pub(super) fn read_configuration_value(
     configuration
 }
 
-pub(super) fn workspace_payload(loaded: &LoadedConfig, configuration: &Value) -> Value {
+pub(super) fn workspace_payload(
+    loaded: &LoadedConfig,
+    configuration: &Value,
+    args: &[String],
+) -> Value {
     let resolved = runtime::context::ResolvedConfig {
         workspace_folder: loaded.workspace_folder.clone(),
         config_file: loaded.config_file.clone(),
         configuration: configuration.clone(),
     };
-    let workspace_folder = runtime::context::remote_workspace_folder(&resolved);
+    let workspace_folder = runtime::context::remote_workspace_folder_for_args(&resolved, args);
     let mut payload = Map::new();
     payload.insert(
         "workspaceFolder".to_string(),
@@ -47,9 +51,10 @@ pub(super) fn workspace_payload(loaded: &LoadedConfig, configuration: &Value) ->
     if !runtime::compose::uses_compose_config(configuration) {
         payload.insert(
             "workspaceMount".to_string(),
-            Value::String(runtime::context::workspace_mount(
+            Value::String(runtime::context::workspace_mount_for_args(
                 &resolved,
                 &workspace_folder,
+                args,
             )),
         );
     }
@@ -110,6 +115,8 @@ pub(super) fn inspect_container(
         let context = ConfigContext {
             workspace_folder,
             env: std::env::vars().collect(),
+            container_workspace_folder: None,
+            id_labels: HashMap::new(),
         };
         metadata_entries = metadata_entries
             .into_iter()
@@ -130,10 +137,12 @@ pub(super) fn inspect_container(
 pub(super) fn merged_configuration_payload(
     configuration: &Value,
     inspected: Option<&InspectedContainer>,
+    additional_metadata_entries: &[Value],
 ) -> Value {
     let mut metadata_entries = inspected
         .map(|value| value.metadata_entries.clone())
         .unwrap_or_default();
+    metadata_entries.extend(additional_metadata_entries.iter().cloned());
     let config_metadata = pick_config_metadata(configuration);
     if config_metadata
         .as_object()

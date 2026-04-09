@@ -89,7 +89,7 @@ pub(super) fn exact_catalog_entry(feature_id: &str) -> Option<CatalogEntry> {
         .map(|(_, entry)| entry)
 }
 
-pub(super) fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
+pub(crate) fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
     let mut entries = manual_catalog_entries()
         .into_iter()
         .filter(|(catalog_base, _)| catalog_base == base)
@@ -110,6 +110,14 @@ pub(super) fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
     } else {
         Some(entries)
     }
+}
+
+pub(crate) fn catalog_versions(base: &str) -> Vec<String> {
+    catalog_entries(base)
+        .unwrap_or_default()
+        .into_iter()
+        .map(|entry| entry.version)
+        .collect()
 }
 
 pub(super) fn latest_version(base: &str) -> Option<String> {

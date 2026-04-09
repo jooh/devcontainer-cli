@@ -2,7 +2,7 @@
 
 This repository hosts a native Rust implementation of the Dev Containers CLI, with compatibility tracked against the pinned upstream TypeScript sources in `upstream/` and the pinned specification assets in `spec/`.
 
-The shipped runtime is the Rust binary in `cmd/devcontainer`. Node is kept only for lightweight compatibility tooling such as upstream/spec drift checks, the command-matrix generator, and the parity smoke harness.
+The shipped runtime is the Rust binary in `cmd/devcontainer`. Node is kept only for lightweight compatibility tooling such as upstream/spec drift checks, generated compatibility inventories, and the parity smoke harness.
 
 ## Repository layout
 
@@ -52,6 +52,12 @@ Generated command reference:
 npm run generate-cli-reference
 ```
 
+Generated parity inventory:
+
+```bash
+npm run generate-parity-inventory
+```
+
 Enable the repository-managed pre-commit hook:
 
 ```bash
@@ -71,6 +77,7 @@ git rev-parse HEAD:upstream
 npm run check-upstream-submodule
 npm run check-upstream-compatibility
 npm run check-command-matrix
+npm run check-parity-inventory
 npm run check-parity-harness
 ```
 
@@ -81,11 +88,12 @@ git rev-parse HEAD:spec
 npm run check-spec-drift
 ```
 
-If a pinned submodule revision changes, update the matching baseline files in `docs/upstream/`.
+If a pinned submodule revision changes, update the matching generated baseline files in `docs/upstream/`.
 
 ## Contributor notes
 
 - Architecture, command flow, and runtime module ownership: `docs/architecture.md`
 - Generated command reference: `docs/cli/command-reference.md`
+- Generated parity inventory: `docs/upstream/parity-inventory.md`
 - Native distribution and release notes: `docs/standalone/distribution.md`
 - Runtime and compatibility guardrails: `docs/standalone/cutover.md`

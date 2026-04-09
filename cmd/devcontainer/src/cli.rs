@@ -38,6 +38,7 @@ pub fn print_help() {
     }
     println!("\nReference:");
     println!("  - docs/cli/command-reference.md (generated from pinned upstream metadata)");
+    println!("  - docs/upstream/parity-inventory.md (measured native parity inventory)");
 }
 
 pub fn print_command_help(command: &str) {
@@ -59,10 +60,13 @@ pub fn print_command_help(command: &str) {
             println!("  - list / ls");
             println!("  - resolve-dependencies");
             println!("  - info manifest <feature>");
+            println!("  - test <project-folder>");
             println!("  - package <target>");
             println!("  - publish <target>");
             println!("  - generate-docs <target>");
-            println!("  - test is not yet implemented natively");
+            println!(
+                "  - published OCI flows remain partial; see docs/upstream/parity-inventory.md"
+            );
         }
         "templates" => {
             println!(
@@ -74,18 +78,23 @@ pub fn print_command_help(command: &str) {
             println!("  - metadata <target>");
             println!("  - publish <target>");
             println!("  - generate-docs <target>");
+            println!(
+                "  - published OCI flows remain partial; see docs/upstream/parity-inventory.md"
+            );
         }
         "build" | "up" | "exec" => {
             println!("Usage:\n  devcontainer {command} [args...]");
             println!("\nCurrent state:");
-            println!("  - build / up invoke the native container runtime directly");
-            println!("  - exec runs inside the resolved container");
+            println!("  - native runtime path is available");
+            println!("  - upstream feature integration and some option coverage remain partial");
         }
         "set-up" | "run-user-commands" | "outdated" | "upgrade" => {
             println!("Usage:\n  devcontainer {command} [args...]");
             println!("\nNative support:");
             println!("  - set-up / run-user-commands invoke lifecycle hooks in-container");
-            println!("  - outdated / upgrade are still partial relative to upstream");
+            println!(
+                "  - outdated / upgrade are native, but still rely on fixture/manual catalog data"
+            );
         }
         _ => {
             println!("Usage:\n  devcontainer {command} [args...]");
@@ -93,6 +102,7 @@ pub fn print_command_help(command: &str) {
     }
     println!("\nReference:");
     println!("  - docs/cli/command-reference.md");
+    println!("  - docs/upstream/parity-inventory.md");
 }
 
 pub fn parse_log_format(args: &[String]) -> (&str, usize) {

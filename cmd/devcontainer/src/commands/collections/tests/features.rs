@@ -50,25 +50,6 @@ fn feature_info_reads_manifest_metadata() {
 }
 
 #[test]
-fn feature_info_rejects_unsupported_modes() {
-    let root = unique_temp_dir();
-    fs::create_dir_all(&root).expect("failed to create feature root");
-    fs::write(
-        root.join("devcontainer-feature.json"),
-        "{\n  \"id\": \"demo-feature\"\n}\n",
-    )
-    .expect("failed to write feature manifest");
-
-    let result = build_feature_info_payload("tags", root.to_string_lossy().as_ref());
-
-    assert_eq!(
-        result.expect_err("expected unsupported mode"),
-        "Unsupported features info mode: tags"
-    );
-    let _ = fs::remove_dir_all(root);
-}
-
-#[test]
 fn feature_info_reads_published_catalog_metadata() {
     let payload =
         build_feature_info_payload("manifest", "ghcr.io/devcontainers/features/azure-cli:1")
@@ -98,4 +79,41 @@ fn feature_info_supports_digest_pinned_catalog_refs() {
 
     assert_eq!(payload["id"], "git-lfs");
     assert_eq!(payload["name"], "Git Lfs");
+}
+
+#[test]
+fn feature_info_reports_tags_dependencies_and_verbose_payloads() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("failed to create feature root");
+    fs::write(
+        root.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"demo-feature\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\",\n  \"dependsOn\": {\n    \"ghcr.io/devcontainers/features/common-utils:2\": {}\n  }\n}\n",
+    )
+    .expect("failed to write feature manifest");
+
+    let tags =
+        build_feature_info_payload("tags", root.to_string_lossy().as_ref()).expect("tags payload");
+    let dependencies = build_feature_info_payload("dependencies", root.to_string_lossy().as_ref())
+        .expect("dependencies payload");
+    let verbose = build_feature_info_payload("verbose", root.to_string_lossy().as_ref())
+        .expect("verbose payload");
+
+    assert_eq!(tags["tags"][0], "1.0.0");
+    assert!(dependencies["dependsOn"]
+        .as_object()
+        .expect("dependsOn object")
+        .contains_key("ghcr.io/devcontainers/features/common-utils:2"));
+    assert_eq!(verbose["manifest"]["id"], "demo-feature");
+    assert_eq!(verbose["tags"][0], "1.0.0");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn feature_info_reads_catalog_tags_for_published_features() {
+    let payload = build_feature_info_payload("tags", "ghcr.io/devcontainers/features/git:1")
+        .expect("tags payload");
+
+    let tags = payload["tags"].as_array().expect("tags array");
+    assert_eq!(tags[0], "1.2.0");
+    assert_eq!(tags[1], "1.1.5");
 }

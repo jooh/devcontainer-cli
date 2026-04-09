@@ -214,6 +214,9 @@ ${2:-}"
   build)
     exit 0
     ;;
+  push)
+    exit 0
+    ;;
   run)
     if [ -n "${FAKE_PODMAN_REQUIRE_FILE_BEFORE_RUN:-}" ] && [ ! -f "${FAKE_PODMAN_REQUIRE_FILE_BEFORE_RUN}" ]; then
       echo "missing required file before run" >&2

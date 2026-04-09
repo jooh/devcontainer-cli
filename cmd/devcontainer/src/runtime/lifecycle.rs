@@ -32,16 +32,14 @@ pub(crate) fn run_lifecycle_commands(
 ) -> Result<(), String> {
     for command_group in selected_lifecycle_commands(configuration, args, mode) {
         run_process_group(command_group, |command| {
-            engine::engine_request(
+            lifecycle_exec_args(
                 args,
-                lifecycle_exec_args(
-                    args,
-                    configuration,
-                    remote_workspace_folder,
-                    container_id,
-                    command,
-                ),
+                configuration,
+                remote_workspace_folder,
+                container_id,
+                command,
             )
+            .map(|engine_args| engine::engine_request(args, engine_args))
         })?;
     }
 
@@ -57,13 +55,13 @@ pub(crate) fn run_initialize_command(
     };
 
     run_process_group(command_group, |command| {
-        host_lifecycle_request(workspace_folder, command)
+        Ok(host_lifecycle_request(workspace_folder, command))
     })
 }
 
 fn run_process_group(
     command_group: Vec<LifecycleCommand>,
-    build_request: impl Fn(LifecycleCommand) -> ProcessRequest,
+    build_request: impl Fn(LifecycleCommand) -> Result<ProcessRequest, String>,
 ) -> Result<(), String> {
     if command_group.len() == 1 {
         let result = process_runner::run_process(&build_request(
@@ -71,7 +69,7 @@ fn run_process_group(
                 .into_iter()
                 .next()
                 .expect("single lifecycle command"),
-        ))?;
+        )?)?;
         if result.status_code != 0 {
             return Err(engine::stderr_or_stdout(&result));
         }
@@ -82,7 +80,10 @@ fn run_process_group(
         .into_iter()
         .map(|command| {
             let request = build_request(command);
-            thread::spawn(move || process_runner::run_process(&request))
+            thread::spawn(move || match request {
+                Ok(request) => process_runner::run_process(&request),
+                Err(error) => Err(error),
+            })
         })
         .collect::<Vec<_>>();
 
@@ -240,7 +241,7 @@ fn lifecycle_exec_args(
     remote_workspace_folder: &str,
     container_id: &str,
     command: LifecycleCommand,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     let mut engine_args = vec![
         "exec".to_string(),
         "--workdir".to_string(),
@@ -250,7 +251,7 @@ fn lifecycle_exec_args(
         engine_args.push("--user".to_string());
         engine_args.push(user.to_string());
     }
-    for (key, value) in combined_remote_env(args, Some(configuration)) {
+    for (key, value) in combined_remote_env(args, Some(configuration))? {
         engine_args.push("-e".to_string());
         engine_args.push(format!("{key}={value}"));
     }
@@ -263,7 +264,7 @@ fn lifecycle_exec_args(
         }
         LifecycleCommand::Exec(parts) => engine_args.extend(parts),
     }
-    engine_args
+    Ok(engine_args)
 }
 
 fn host_lifecycle_request(workspace_folder: &Path, command: LifecycleCommand) -> ProcessRequest {
@@ -343,7 +344,8 @@ mod tests {
             "/workspaces/sample",
             "container-id",
             LifecycleCommand::Shell("echo hello".to_string()),
-        );
+        )
+        .expect("lifecycle exec args");
 
         assert!(
             args.contains(&"/bin/sh".to_string()),

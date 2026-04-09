@@ -1,4 +1,5 @@
 use std::fs;
+use std::process::Command;
 
 use crate::support::runtime_harness::{write_devcontainer_config, RuntimeHarness};
 
@@ -87,4 +88,261 @@ fn up_uses_workspace_mount_target_for_remote_workdir_when_workspace_folder_is_om
     let invocations = harness.read_invocations();
     assert!(invocations
         .contains("exec --workdir /custom-target fake-container-id /bin/sh -lc echo ready"));
+}
+
+#[test]
+fn up_applies_feature_runtime_metadata_to_container_creation() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let feature_dir = workspace.join(".devcontainer").join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\",\n  \"containerEnv\": {\n    \"FEATURE_FLAG\": \"enabled\"\n  },\n  \"init\": true,\n  \"privileged\": true,\n  \"capAdd\": [\"SYS_ADMIN\"],\n  \"securityOpt\": [\"seccomp=unconfined\"],\n  \"postCreateCommand\": \"echo feature-ready\"\n}\n",
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nset -eu\n").expect("install script");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/workspace\",\n  \"features\": {\n    \"./local-feature\": {}\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--include-configuration",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(
+        payload["configuration"]["containerEnv"]["FEATURE_FLAG"],
+        "enabled"
+    );
+    assert_eq!(payload["configuration"]["init"], true);
+    assert_eq!(payload["configuration"]["privileged"], true);
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("--init"));
+    assert!(invocations.contains("--privileged"));
+    assert!(invocations.contains("--cap-add SYS_ADMIN"));
+    assert!(invocations.contains("--security-opt seccomp=unconfined"));
+    assert!(invocations.contains("-e FEATURE_FLAG=enabled"));
+
+    let exec_log = harness.read_exec_log();
+    assert!(exec_log.contains("/bin/sh -lc echo feature-ready"));
+}
+
+#[test]
+fn up_mounts_git_root_by_default_and_uses_subfolder_workdir() {
+    let harness = RuntimeHarness::new();
+    let repo_root = harness.root.join("repo");
+    let workspace = repo_root.join("packages").join("app");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    init_git_repo(&repo_root);
+    let expected_repo_root = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.clone());
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(
+        payload["remoteWorkspaceFolder"],
+        "/workspaces/repo/packages/app"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/workspaces/repo",
+        expected_repo_root.display()
+    )));
+    assert!(invocations.contains(
+        "exec --workdir /workspaces/repo/packages/app fake-container-id /bin/sh -lc echo ready"
+    ));
+}
+
+#[test]
+fn up_honors_workspace_mount_flags_for_nested_workspaces() {
+    let harness = RuntimeHarness::new();
+    let repo_root = harness.root.join("repo");
+    let workspace = repo_root.join("packages").join("app");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    init_git_repo(&repo_root);
+    let expected_workspace = workspace
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.clone());
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--mount-workspace-git-root",
+            "false",
+            "--workspace-mount-consistency",
+            "delegated",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(payload["remoteWorkspaceFolder"], "/workspaces/app");
+
+    let expected_mount = if std::env::consts::OS == "linux" {
+        format!(
+            "--mount type=bind,source={},target=/workspaces/app",
+            expected_workspace.display()
+        )
+    } else {
+        format!(
+            "--mount type=bind,source={},target=/workspaces/app,consistency=delegated",
+            expected_workspace.display()
+        )
+    };
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(&expected_mount));
+}
+
+#[test]
+fn up_mounts_git_worktree_common_dir_when_requested() {
+    let harness = RuntimeHarness::new();
+    let repo_root = harness.root.join("repo");
+    let worktree_root = harness.root.join("worktrees").join("feature");
+    let workspace = worktree_root.join("packages").join("app");
+    init_git_repo_with_commit(&repo_root);
+    add_relative_git_worktree(&repo_root, &worktree_root);
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    let expected_worktree_root = worktree_root
+        .canonicalize()
+        .unwrap_or_else(|_| worktree_root.clone());
+    let expected_repo_git_dir = repo_root
+        .join(".git")
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.join(".git"));
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--mount-git-worktree-common-dir",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(
+        payload["remoteWorkspaceFolder"],
+        "/workspaces/worktrees/feature/packages/app"
+    );
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/workspaces/worktrees/feature",
+        expected_worktree_root.display()
+    )));
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/workspaces/repo/.git",
+        expected_repo_git_dir.display()
+    )));
+}
+
+fn init_git_repo(root: &std::path::Path) {
+    let status = Command::new("git")
+        .args(["init", "--quiet"])
+        .current_dir(root)
+        .status()
+        .expect("git init");
+    assert!(status.success(), "git init failed: {status:?}");
+}
+
+fn init_git_repo_with_commit(root: &std::path::Path) {
+    fs::create_dir_all(root).expect("repo dir");
+    init_git_repo(root);
+    fs::write(root.join("README.md"), "hello\n").expect("readme");
+
+    let add_status = Command::new("git")
+        .args(["add", "README.md"])
+        .current_dir(root)
+        .status()
+        .expect("git add");
+    assert!(add_status.success(), "git add failed: {add_status:?}");
+
+    let commit_status = Command::new("git")
+        .args([
+            "-c",
+            "user.name=Devcontainer Tests",
+            "-c",
+            "user.email=devcontainer-tests@example.com",
+            "commit",
+            "--quiet",
+            "-m",
+            "init",
+        ])
+        .current_dir(root)
+        .status()
+        .expect("git commit");
+    assert!(
+        commit_status.success(),
+        "git commit failed: {commit_status:?}"
+    );
+}
+
+fn add_relative_git_worktree(repo_root: &std::path::Path, worktree_root: &std::path::Path) {
+    if let Some(parent) = worktree_root.parent() {
+        fs::create_dir_all(parent).expect("worktree parent");
+    }
+
+    let status = Command::new("git")
+        .args([
+            "worktree",
+            "add",
+            "--relative-paths",
+            worktree_root.to_string_lossy().as_ref(),
+            "-b",
+            "feature",
+        ])
+        .current_dir(repo_root)
+        .status()
+        .expect("git worktree add");
+    assert!(status.success(), "git worktree add failed: {status:?}");
 }

@@ -1,9 +1,12 @@
 use serde_json::json;
 use std::fs;
+use std::os::unix::fs::PermissionsExt;
 use std::path::PathBuf;
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::build_service;
 use super::override_file::compose_metadata_override_file;
 use super::project::{
     compose_name_from_file, compose_project_name, sanitize_project_name, substitute_compose_env,
@@ -25,6 +28,22 @@ fn unique_temp_dir() -> PathBuf {
         "devcontainer-compose-test-{}-{suffix}-{unique_id}",
         std::process::id()
     ))
+}
+
+fn init_git_repo(root: &std::path::Path) {
+    let status = Command::new("git")
+        .args(["init", "--quiet"])
+        .current_dir(root)
+        .status()
+        .expect("git init");
+    assert!(status.success(), "git init failed: {status:?}");
+}
+
+fn write_executable_script(path: &std::path::Path, content: &str) {
+    fs::write(path, content).expect("script");
+    let mut permissions = fs::metadata(path).expect("metadata").permissions();
+    permissions.set_mode(0o755);
+    fs::set_permissions(path, permissions).expect("permissions");
 }
 
 #[test]
@@ -175,14 +194,275 @@ fn metadata_override_file_mounts_workspace_by_default() {
         }),
     };
 
-    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project")
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project", None)
+        .expect("override result")
+        .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+    let expected_mount_target = format!(
+        "/workspaces/{}",
+        root.file_name().unwrap().to_string_lossy()
+    );
+
+    assert!(override_content.contains("volumes:"));
+    assert!(override_content.contains(&format!(
+        "- '{}:{}'",
+        root.display(),
+        expected_mount_target
+    )));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_mounts_nested_workspaces_from_the_git_root() {
+    let root = unique_temp_dir();
+    let repo_root = root.join("repo");
+    let workspace = repo_root.join("packages").join("app");
+    fs::create_dir_all(&workspace).expect("workspace root");
+    init_git_repo(&repo_root);
+    let expected_repo_root = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.clone());
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: workspace,
+        config_file: expected_repo_root
+            .join("packages")
+            .join("app")
+            .join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+        }),
+    };
+
+    let override_file =
+        compose_metadata_override_file(&resolved, &[], "/workspaces/repo/packages/app", None)
+            .expect("override result")
+            .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains(&format!(
+        "- '{}:/workspaces/repo'",
+        expected_repo_root.display()
+    )));
+    assert!(!override_content.contains(&format!(
+        "{}:/workspaces/repo/packages/app",
+        expected_repo_root.display()
+    )));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_can_pin_image_and_runtime_settings() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "containerEnv": {
+                "FEATURE_FLAG": "enabled"
+            },
+            "containerUser": "node",
+            "remoteUser": "vscode",
+            "privileged": true,
+            "init": true,
+            "capAdd": ["SYS_ADMIN"],
+            "securityOpt": ["seccomp=unconfined"],
+            "mounts": [{
+                "type": "volume",
+                "source": "feature-cache",
+                "target": "/cache"
+            }, "type=bind,source=/tmp/feature-src,target=/tmp/feature-dst,readonly"]
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(
+        &resolved,
+        &[],
+        "/workspaces/project",
+        Some("example/compose-featured:test"),
+    )
+    .expect("override result")
+    .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("image: 'example/compose-featured:test'"));
+    assert!(override_content.contains("environment:"));
+    assert!(override_content.contains("FEATURE_FLAG: 'enabled'"));
+    assert!(override_content.contains("user: 'node'"));
+    assert!(override_content.contains("privileged: true"));
+    assert!(override_content.contains("init: true"));
+    assert!(override_content.contains("cap_add:"));
+    assert!(override_content.contains("security_opt:"));
+    assert!(override_content.contains("type: 'volume'"));
+    assert!(override_content.contains("source: 'feature-cache'"));
+    assert!(override_content.contains("target: '/cache'"));
+    assert!(override_content.contains("type: 'bind'"));
+    assert!(override_content.contains("source: '/tmp/feature-src'"));
+    assert!(override_content.contains("target: '/tmp/feature-dst'"));
+    assert!(override_content.contains("read_only: true"));
+    assert!(!override_content.contains("type=volume,source=feature-cache,target=/cache"));
+    assert!(!override_content
+        .contains("type=bind,source=/tmp/feature-src,target=/tmp/feature-dst,readonly"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_preserves_workspace_mount_options() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "workspaceMount": "type=bind,source=/tmp/workspace,target=/workspaces/project,consistency=delegated"
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project", None)
         .expect("override result")
         .expect("override path");
     let override_content = fs::read_to_string(&override_file).expect("override content");
 
-    assert!(override_content.contains("volumes:"));
-    assert!(override_content.contains(&format!("- '{}:/workspaces/project'", root.display())));
+    assert!(override_content.contains("type: 'bind'"));
+    assert!(override_content.contains("source: '/tmp/workspace'"));
+    assert!(override_content.contains("target: '/workspaces/project'"));
+    assert!(override_content.contains("consistency: 'delegated'"));
+    assert!(!override_content.contains("/tmp/workspace:/workspaces/project"));
 
     let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_preserves_extended_mount_keys() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "mounts": [{
+                "type": "bind",
+                "source": "/tmp/feature-src",
+                "target": "/tmp/feature-dst",
+                "consistency": "delegated",
+                "bind": {
+                    "propagation": "rshared"
+                }
+            }, {
+                "type": "volume",
+                "source": "feature-cache",
+                "target": "/cache",
+                "external": true,
+                "volume": {
+                    "nocopy": true
+                }
+            }]
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project", None)
+        .expect("override result")
+        .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("consistency: 'delegated'"));
+    assert!(override_content.contains("bind:"));
+    assert!(override_content.contains("propagation: 'rshared'"));
+    assert!(override_content.contains("volume:"));
+    assert!(override_content.contains("nocopy: true"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_does_not_promote_remote_user_to_service_user() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "remoteUser": "vscode",
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspaces/project", None)
+        .expect("override result")
+        .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(!override_content.contains("user: 'vscode'"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn compose_feature_build_enforces_frozen_lockfile() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    fs::write(
+        root.join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose file");
+    let feature_dir = root.join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        r#"{
+  "id": "local-feature",
+  "version": "1.0.0",
+  "name": "Local Feature"
+}
+"#,
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nexit 0\n").expect("install script");
+    let engine_path = root.join("fake-docker.sh");
+    write_executable_script(&engine_path, "#!/bin/sh\nexit 0\n");
+
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "features": {
+                "./local-feature": {}
+            }
+        }),
+    };
+
+    let error = build_service(
+        &resolved,
+        &[
+            "--docker-path".to_string(),
+            engine_path.display().to_string(),
+            "--experimental-frozen-lockfile".to_string(),
+        ],
+    )
+    .expect_err("expected frozen lockfile enforcement");
+
+    assert!(error.contains("Lockfile at"));
+    assert!(error.contains("is out of date for the current feature configuration"));
+
     let _ = fs::remove_dir_all(root);
 }

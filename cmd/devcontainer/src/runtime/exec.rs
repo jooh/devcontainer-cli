@@ -14,15 +14,29 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
                 | "--docker-compose-path"
                 | "--workspace-folder"
                 | "--config"
+                | "--override-config"
+                | "--workspace-mount-consistency"
                 | "--remote-env"
+                | "--secrets-file"
                 | "--container-id"
                 | "--id-label"
         ) {
             index += 2;
             continue;
         }
-        if arg == "--interactive" {
-            index += 1;
+        if matches!(
+            arg.as_str(),
+            "--interactive" | "--mount-workspace-git-root" | "--mount-git-worktree-common-dir"
+        ) {
+            index += if arg != "--interactive"
+                && args
+                    .get(index + 1)
+                    .is_some_and(|next| is_explicit_bool_literal(next))
+            {
+                2
+            } else {
+                1
+            };
             continue;
         }
         if arg.starts_with("--") {
@@ -38,6 +52,13 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
     Ok(args[index..].to_vec())
 }
 
+fn is_explicit_bool_literal(value: &str) -> bool {
+    matches!(
+        value,
+        "false" | "0" | "no" | "off" | "true" | "1" | "yes" | "on"
+    )
+}
+
 pub(crate) fn exec_engine_args(
     args: &[String],
     configuration: &Value,
@@ -45,7 +66,7 @@ pub(crate) fn exec_engine_args(
     container_id: &str,
     command_args: Vec<String>,
     interactive: bool,
-) -> Vec<String> {
+) -> Result<Vec<String>, String> {
     let mut engine_args = vec!["exec".to_string()];
     if interactive {
         engine_args.push("-i".to_string());
@@ -59,13 +80,13 @@ pub(crate) fn exec_engine_args(
         engine_args.push("--user".to_string());
         engine_args.push(user.to_string());
     }
-    for (key, value) in combined_remote_env(args, Some(configuration)) {
+    for (key, value) in combined_remote_env(args, Some(configuration))? {
         engine_args.push("-e".to_string());
         engine_args.push(format!("{key}={value}"));
     }
     engine_args.push(container_id.to_string());
     engine_args.extend(command_args);
-    engine_args
+    Ok(engine_args)
 }
 
 #[cfg(test)]
@@ -100,7 +121,8 @@ mod tests {
             "container-id",
             vec!["/bin/echo".to_string(), "hello".to_string()],
             false,
-        );
+        )
+        .expect("engine args");
 
         assert_eq!(args[0], "exec");
         assert!(args.contains(&"--workdir".to_string()));
@@ -118,6 +140,47 @@ mod tests {
         let args = exec_command_and_args(&[
             "--docker-compose-path".to_string(),
             "/usr/local/bin/podman-compose".to_string(),
+            "/bin/echo".to_string(),
+            "hello".to_string(),
+        ])
+        .expect("command args");
+
+        assert_eq!(args, vec!["/bin/echo".to_string(), "hello".to_string()]);
+    }
+
+    #[test]
+    fn exec_command_and_args_accept_workspace_mount_flags() {
+        let args = exec_command_and_args(&[
+            "--workspace-folder".to_string(),
+            "/workspace/packages/app".to_string(),
+            "--mount-workspace-git-root".to_string(),
+            "false".to_string(),
+            "--workspace-mount-consistency".to_string(),
+            "delegated".to_string(),
+            "/bin/echo".to_string(),
+            "hello".to_string(),
+        ])
+        .expect("command args");
+
+        assert_eq!(args, vec!["/bin/echo".to_string(), "hello".to_string()]);
+    }
+
+    #[test]
+    fn exec_command_and_args_does_not_consume_command_after_bare_mount_flag() {
+        let args = exec_command_and_args(&[
+            "--mount-workspace-git-root".to_string(),
+            "/bin/bash".to_string(),
+        ])
+        .expect("command args");
+
+        assert_eq!(args, vec!["/bin/bash".to_string()]);
+    }
+
+    #[test]
+    fn exec_command_and_args_accepts_explicit_bool_for_git_worktree_flag() {
+        let args = exec_command_and_args(&[
+            "--mount-git-worktree-common-dir".to_string(),
+            "true".to_string(),
             "/bin/echo".to_string(),
             "hello".to_string(),
         ])

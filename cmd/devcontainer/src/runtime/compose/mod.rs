@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use serde_json::Value;
 
 use crate::commands::common;
+use crate::commands::configuration;
 
 use super::context::ResolvedConfig;
 use super::engine;
@@ -60,6 +61,12 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
     args::reject_unsupported_build_options(args)?;
+    let feature_support = configuration::resolve_feature_support(
+        args,
+        &resolved.workspace_folder,
+        &resolved.config_file,
+        &resolved.configuration,
+    )?;
 
     if spec.has_build {
         let mut build_args = vec!["--pull".to_string()];
@@ -74,6 +81,34 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
         if result.status_code != 0 {
             return Err(engine::stderr_or_stdout(&result));
         }
+    }
+
+    let compose_image = spec
+        .image
+        .clone()
+        .unwrap_or_else(|| service::default_service_image_name(&spec, args));
+    if let Some(feature_support) = feature_support {
+        let built_image = common::parse_option_value(args, "--image-name")
+            .unwrap_or_else(|| compose_image.clone());
+        super::build::build_feature_image(
+            args,
+            &built_image,
+            &compose_image,
+            &feature_support.installations,
+        )?;
+        if common::has_flag(args, "--push") {
+            let push_result =
+                engine::run_engine(args, vec!["push".to_string(), built_image.clone()])?;
+            if push_result.status_code != 0 {
+                return Err(engine::stderr_or_stdout(&push_result));
+            }
+        }
+        configuration::ensure_native_lockfile(
+            args,
+            &resolved.config_file,
+            &resolved.configuration,
+        )?;
+        return Ok(built_image);
     }
 
     if common::has_flag(args, "--push") {
@@ -97,11 +132,20 @@ pub(crate) fn up_service(
     resolved: &ResolvedConfig,
     args: &[String],
     remote_workspace_folder: &str,
+    image_name: &str,
 ) -> Result<(), String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
-    let override_file =
-        override_file::compose_metadata_override_file(resolved, args, remote_workspace_folder)?;
+    let override_file = override_file::compose_metadata_override_file(
+        resolved,
+        args,
+        remote_workspace_folder,
+        if spec.image.as_deref() != Some(image_name) || spec.has_build {
+            Some(image_name)
+        } else {
+            None
+        },
+    )?;
     let result = engine::run_compose(
         args,
         args::compose_args_with_override(

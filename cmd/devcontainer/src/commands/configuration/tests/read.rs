@@ -6,7 +6,7 @@ use super::support::unique_temp_dir;
 use crate::commands::common::resolve_read_configuration_path;
 use crate::commands::configuration::merge::merge_configuration;
 use crate::commands::configuration::{
-    build_read_configuration_payload, should_use_native_read_configuration,
+    apply_feature_metadata, build_read_configuration_payload, should_use_native_read_configuration,
 };
 
 #[test]
@@ -102,6 +102,40 @@ fn infers_workspace_root_for_nested_devcontainer_configs() {
 }
 
 #[test]
+fn override_config_can_supply_configuration_without_workspace_devcontainer_file() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    let override_config = config_dir.join("override.json");
+    fs::create_dir_all(&config_dir).expect("failed to create config dir");
+    fs::write(&override_config, "{\n  \"image\": \"alpine:3.20\"\n}\n")
+        .expect("failed to write override config");
+
+    let args = vec![
+        "--override-config".to_string(),
+        override_config.display().to_string(),
+    ];
+    let (workspace_folder, config_file) =
+        resolve_read_configuration_path(&args).expect("expected config resolution");
+    let payload = build_read_configuration_payload(&args).expect("payload");
+
+    assert_eq!(
+        workspace_folder,
+        fs::canonicalize(&root).expect("failed to canonicalize workspace")
+    );
+    let expected_config = fs::canonicalize(&root)
+        .expect("failed to canonicalize workspace")
+        .join(".devcontainer")
+        .join("devcontainer.json");
+    assert_eq!(config_file, expected_config);
+    assert_eq!(payload["configuration"]["image"], "alpine:3.20");
+    assert_eq!(
+        payload["configuration"]["configFilePath"],
+        expected_config.display().to_string()
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn read_configuration_with_additional_flags_is_supported_natively() {
     assert!(should_use_native_read_configuration(&[
         "--workspace-folder".to_string(),
@@ -117,6 +151,39 @@ fn read_configuration_accepts_docker_compose_path_flag() {
         "/workspace".to_string(),
         "--docker-compose-path".to_string(),
         "trigger-compose-v2".to_string(),
+    ]));
+}
+
+#[test]
+fn read_configuration_accepts_override_config_flag() {
+    assert!(should_use_native_read_configuration(&[
+        "--override-config".to_string(),
+        "/workspace/.devcontainer/override.json".to_string(),
+        "--include-merged-configuration".to_string(),
+    ]));
+}
+
+#[test]
+fn read_configuration_accepts_workspace_mount_flags() {
+    assert!(should_use_native_read_configuration(&[
+        "--workspace-folder".to_string(),
+        "/workspace/packages/app".to_string(),
+        "--mount-workspace-git-root".to_string(),
+        "false".to_string(),
+        "--workspace-mount-consistency".to_string(),
+        "delegated".to_string(),
+    ]));
+}
+
+#[test]
+fn read_configuration_accepts_feature_resolution_flags() {
+    assert!(should_use_native_read_configuration(&[
+        "--workspace-folder".to_string(),
+        "/workspace".to_string(),
+        "--include-features-configuration".to_string(),
+        "--additional-features".to_string(),
+        "{\"ghcr.io/devcontainers/features/git:1\":{}}".to_string(),
+        "--skip-feature-auto-mapping".to_string(),
     ]));
 }
 
@@ -141,10 +208,58 @@ fn read_configuration_payload_includes_optional_sections() {
 
     assert_eq!(payload["configuration"]["image"], "debian:bookworm");
     assert_eq!(payload["mergedConfiguration"]["image"], "debian:bookworm");
-    assert!(payload["featuresConfiguration"]["features"]
-        .as_object()
-        .expect("features object")
-        .contains_key("ghcr.io/devcontainers/features/git:1"));
+    let feature_sets = payload["featuresConfiguration"]["featureSets"]
+        .as_array()
+        .expect("feature sets");
+    assert_eq!(feature_sets.len(), 1);
+    assert_eq!(feature_sets[0]["features"][0]["id"], "git");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn read_configuration_resolves_feature_sets_and_feature_metadata() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    let local_feature_dir = config_dir.join("local-feature");
+    fs::create_dir_all(&local_feature_dir).expect("failed to create local feature directory");
+    fs::write(
+        local_feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\",\n  \"options\": {\n    \"favorite\": {\n      \"type\": \"string\",\n      \"default\": \"blue\"\n    }\n  },\n  \"containerEnv\": {\n    \"LOCAL_FEATURE_ENV\": \"enabled\"\n  },\n  \"init\": true,\n  \"customizations\": {\n    \"vscode\": {\n      \"extensions\": [\"ms-vscode.makefile-tools\"]\n    }\n  }\n}\n",
+    )
+    .expect("failed to write local feature manifest");
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"./local-feature\": {\n      \"favorite\": \"red\"\n    }\n  },\n  \"containerEnv\": {\n    \"CONFIG_ENV\": \"present\"\n  }\n}\n",
+    )
+    .expect("failed to write config");
+
+    let args = vec![
+        "--workspace-folder".to_string(),
+        root.display().to_string(),
+        "--include-merged-configuration".to_string(),
+        "--include-features-configuration".to_string(),
+        "--additional-features".to_string(),
+        "{\"ghcr.io/devcontainers/features/git:1\":{\"version\":\"latest\"}}".to_string(),
+    ];
+    let payload = build_read_configuration_payload(&args).expect("payload");
+
+    let feature_sets = payload["featuresConfiguration"]["featureSets"]
+        .as_array()
+        .expect("feature sets");
+    assert_eq!(feature_sets.len(), 2);
+    assert_eq!(feature_sets[0]["features"][0]["id"], "local-feature");
+    assert_eq!(feature_sets[0]["features"][0]["options"]["favorite"], "red");
+    assert_eq!(feature_sets[0]["sourceInformation"]["type"], "file-path");
+    assert_eq!(feature_sets[1]["features"][0]["id"], "git");
+    assert_eq!(
+        payload["mergedConfiguration"]["containerEnv"]["LOCAL_FEATURE_ENV"],
+        "enabled"
+    );
+    assert_eq!(
+        payload["mergedConfiguration"]["containerEnv"]["CONFIG_ENV"],
+        "present"
+    );
+    assert_eq!(payload["mergedConfiguration"]["init"], true);
     let _ = fs::remove_dir_all(root);
 }
 
@@ -181,5 +296,35 @@ fn merged_configuration_merges_host_requirements_field_by_field() {
                 "cores": 4
             }
         })
+    );
+}
+
+#[test]
+fn feature_metadata_mounts_replace_existing_mounts_with_the_same_target() {
+    let merged = apply_feature_metadata(
+        &json!({
+            "image": "debian:bookworm",
+            "mounts": [{
+                "type": "bind",
+                "source": "/workspace/from-config",
+                "target": "/workspace/cache"
+            }]
+        }),
+        &[json!({
+            "mounts": [{
+                "type": "volume",
+                "source": "feature-cache",
+                "target": "/workspace/cache"
+            }]
+        })],
+    );
+
+    assert_eq!(
+        merged["mounts"],
+        json!([{
+            "type": "volume",
+            "source": "feature-cache",
+            "target": "/workspace/cache"
+        }])
     );
 }

@@ -1,21 +1,34 @@
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
 use crate::commands::common;
+use crate::commands::configuration;
 
 use super::compose;
 use super::context::ResolvedConfig;
 use super::engine;
 use super::paths::resolve_relative;
 
+static NEXT_FEATURE_BUILD_ID: AtomicU64 = AtomicU64::new(0);
+
 pub(crate) fn runtime_image_name(
     resolved: &ResolvedConfig,
     args: &[String],
 ) -> Result<String, String> {
+    let has_native_features = configuration::resolve_feature_support(
+        args,
+        &resolved.workspace_folder,
+        &resolved.config_file,
+        &resolved.configuration,
+    )?
+    .is_some();
     if compose::uses_compose_config(&resolved.configuration) {
         compose::build_service(resolved, args)
-    } else if has_build_definition(&resolved.configuration) {
+    } else if has_build_definition(&resolved.configuration) || has_native_features {
         build_image(resolved, args)
     } else if let Some(image) = resolved.configuration.get("image").and_then(Value::as_str) {
         Ok(image.to_string())
@@ -32,8 +45,14 @@ pub(crate) fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<
         return compose::build_service(resolved, args);
     }
 
+    let feature_support = configuration::resolve_feature_support(
+        args,
+        &resolved.workspace_folder,
+        &resolved.config_file,
+        &resolved.configuration,
+    )?;
     if !has_build_definition(&resolved.configuration) {
-        return resolved
+        let image = resolved
             .configuration
             .get("image")
             .and_then(Value::as_str)
@@ -41,11 +60,54 @@ pub(crate) fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<
             .ok_or_else(|| {
                 "Unsupported configuration: only image and build-based configs are supported natively"
                     .to_string()
-            });
+            })?;
+        return if let Some(feature_support) = feature_support {
+            let image_name = common::parse_option_value(args, "--image-name")
+                .unwrap_or_else(|| default_image_name(&resolved.workspace_folder));
+            let built =
+                build_feature_image(args, &image_name, &image, &feature_support.installations)?;
+            maybe_push_image(args, &built)?;
+            configuration::ensure_native_lockfile(
+                args,
+                &resolved.config_file,
+                &resolved.configuration,
+            )?;
+            Ok(built)
+        } else {
+            Ok(image)
+        };
     }
 
     let image_name = common::parse_option_value(args, "--image-name")
         .unwrap_or_else(|| default_image_name(&resolved.workspace_folder));
+    if let Some(feature_support) = feature_support {
+        let base_image = format!("{image_name}-base");
+        build_base_image(resolved, args, &base_image)?;
+        let built = build_feature_image(
+            args,
+            &image_name,
+            &base_image,
+            &feature_support.installations,
+        )?;
+        maybe_push_image(args, &built)?;
+        configuration::ensure_native_lockfile(
+            args,
+            &resolved.config_file,
+            &resolved.configuration,
+        )?;
+        return Ok(built);
+    }
+
+    build_base_image(resolved, args, &image_name)?;
+    maybe_push_image(args, &image_name)?;
+    Ok(image_name)
+}
+
+fn build_base_image(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    image_name: &str,
+) -> Result<(), String> {
     let build = resolved
         .configuration
         .get("build")
@@ -63,11 +125,99 @@ pub(crate) fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<
     let context = build.get("context").and_then(Value::as_str).unwrap_or(".");
     let dockerfile_path = resolve_relative(config_root, dockerfile);
     let context_path = resolve_relative(config_root, context);
+    let mut engine_args = engine_build_args(args, image_name, &dockerfile_path);
+    if let Some(build_args) = build.get("args").and_then(Value::as_object) {
+        for (key, value) in build_args {
+            if let Some(value) = value.as_str() {
+                engine_args.push("--build-arg".to_string());
+                engine_args.push(format!("{key}={value}"));
+            }
+        }
+    }
+    engine_args.push(context_path.display().to_string());
 
+    let result = engine::run_engine(args, engine_args)?;
+    if result.status_code != 0 {
+        return Err(engine::stderr_or_stdout(&result));
+    }
+
+    Ok(())
+}
+
+pub(crate) fn build_feature_image(
+    args: &[String],
+    image_name: &str,
+    base_image: &str,
+    installations: &[configuration::FeatureInstallation],
+) -> Result<String, String> {
+    let build_context_dir = unique_feature_build_dir();
+    fs::create_dir_all(&build_context_dir).map_err(|error| error.to_string())?;
+    let dockerfile_path = write_feature_dockerfile(&build_context_dir, base_image, installations)?;
+    let mut engine_args = engine_build_args(args, image_name, &dockerfile_path);
+    engine_args.push(build_context_dir.display().to_string());
+
+    let result = engine::run_engine(args, engine_args);
+    let cleanup = fs::remove_dir_all(&build_context_dir);
+    let result = result?;
+    if result.status_code != 0 {
+        return Err(engine::stderr_or_stdout(&result));
+    }
+    cleanup.map_err(|error| error.to_string())?;
+    Ok(image_name.to_string())
+}
+
+fn maybe_push_image(args: &[String], image_name: &str) -> Result<(), String> {
+    if !common::has_flag(args, "--push") {
+        return Ok(());
+    }
+
+    let push_result = engine::run_engine(args, vec!["push".to_string(), image_name.to_string()])?;
+    if push_result.status_code != 0 {
+        return Err(engine::stderr_or_stdout(&push_result));
+    }
+
+    Ok(())
+}
+
+fn write_feature_dockerfile(
+    build_context_dir: &Path,
+    base_image: &str,
+    installations: &[configuration::FeatureInstallation],
+) -> Result<PathBuf, String> {
+    let dockerfile_path = build_context_dir.join("Dockerfile");
+    let mut dockerfile = format!("FROM {base_image}\n");
+    for (index, installation) in installations.iter().enumerate() {
+        let feature_name = configuration::feature_installation_name(installation);
+        let destination = format!("feature-{index}-{feature_name}");
+        let copied_feature_dir = build_context_dir.join(&destination);
+        configuration::materialize_feature_installation(installation, &copied_feature_dir)?;
+        let install_path = format!("/tmp/devcontainer-features/{destination}");
+        dockerfile.push_str(&format!("COPY {destination} {install_path}\n"));
+        let env_assignments = installation
+            .env
+            .iter()
+            .map(|(key, value)| format!("{key}={}", shell_single_quote(value)))
+            .collect::<Vec<_>>()
+            .join(" ");
+        let command = if env_assignments.is_empty() {
+            "chmod +x install.sh && ./install.sh".to_string()
+        } else {
+            format!("chmod +x install.sh && {env_assignments} ./install.sh")
+        };
+        dockerfile.push_str(&format!(
+            "RUN cd {install_path} && /bin/sh -lc {}\n",
+            shell_single_quote(&command)
+        ));
+    }
+    fs::write(&dockerfile_path, dockerfile).map_err(|error| error.to_string())?;
+    Ok(dockerfile_path)
+}
+
+fn engine_build_args(args: &[String], image_name: &str, dockerfile_path: &Path) -> Vec<String> {
     let mut engine_args = vec![
         "build".to_string(),
         "--tag".to_string(),
-        image_name.clone(),
+        image_name.to_string(),
         "--file".to_string(),
         dockerfile_path.display().to_string(),
     ];
@@ -86,33 +236,27 @@ pub(crate) fn build_image(resolved: &ResolvedConfig, args: &[String]) -> Result<
         engine_args.push("--label".to_string());
         engine_args.push(value);
     }
-    if let Some(build_args) = build.get("args").and_then(Value::as_object) {
-        for (key, value) in build_args {
-            if let Some(value) = value.as_str() {
-                engine_args.push("--build-arg".to_string());
-                engine_args.push(format!("{key}={value}"));
-            }
-        }
-    }
     if let Some(platform) = common::parse_option_value(args, "--platform") {
         engine_args.push("--platform".to_string());
         engine_args.push(platform);
     }
-    engine_args.push(context_path.display().to_string());
+    engine_args
+}
 
-    let result = engine::run_engine(args, engine_args)?;
-    if result.status_code != 0 {
-        return Err(engine::stderr_or_stdout(&result));
-    }
+fn unique_feature_build_dir() -> PathBuf {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time went backwards")
+        .as_nanos();
+    let unique_id = NEXT_FEATURE_BUILD_ID.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!(
+        "devcontainer-feature-build-{}-{suffix}-{unique_id}",
+        std::process::id()
+    ))
+}
 
-    if common::has_flag(args, "--push") {
-        let push_result = engine::run_engine(args, vec!["push".to_string(), image_name.clone()])?;
-        if push_result.status_code != 0 {
-            return Err(engine::stderr_or_stdout(&push_result));
-        }
-    }
-
-    Ok(image_name)
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
 }
 
 fn default_image_name(workspace_folder: &Path) -> String {

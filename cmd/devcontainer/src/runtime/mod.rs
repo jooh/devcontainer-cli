@@ -11,6 +11,7 @@ mod paths;
 use serde_json::{json, Value};
 
 use crate::commands::common;
+use crate::commands::configuration;
 use crate::process_runner::ProcessResult;
 
 pub enum ExecResult {
@@ -20,6 +21,21 @@ pub enum ExecResult {
 
 pub fn run_build(args: &[String]) -> Result<Value, String> {
     let resolved = context::load_required_config(args)?;
+    let feature_support = configuration::resolve_feature_support(
+        args,
+        &resolved.workspace_folder,
+        &resolved.config_file,
+        &resolved.configuration,
+    )?;
+    let effective_configuration = feature_support
+        .as_ref()
+        .map(|resolved_features| {
+            configuration::apply_feature_metadata(
+                &resolved.configuration,
+                &resolved_features.metadata_entries,
+            )
+        })
+        .unwrap_or_else(|| resolved.configuration.clone());
     let image_name = build::build_image(&resolved, args)?;
 
     Ok(json!({
@@ -28,22 +44,51 @@ pub fn run_build(args: &[String]) -> Result<Value, String> {
         "workspaceFolder": resolved.workspace_folder,
         "configFile": resolved.config_file,
         "imageName": image_name,
-        "configuration": resolved.configuration,
+        "configuration": effective_configuration,
     }))
 }
 
 pub fn run_up(args: &[String]) -> Result<Value, String> {
     let resolved = context::load_required_config(args)?;
-    lifecycle::run_initialize_command(&resolved.configuration, &resolved.workspace_folder)?;
-    let compose_project_name = compose::load_compose_spec(&resolved)?.map(|spec| spec.project_name);
-    let image_name = build::runtime_image_name(&resolved, args)?;
-    let remote_workspace_folder = context::remote_workspace_folder(&resolved);
-    let up_container =
-        container::ensure_up_container(&resolved, args, &image_name, &remote_workspace_folder)?;
+    let feature_support = configuration::resolve_feature_support(
+        args,
+        &resolved.workspace_folder,
+        &resolved.config_file,
+        &resolved.configuration,
+    )?;
+    let effective_configuration = feature_support
+        .as_ref()
+        .map(|resolved_features| {
+            configuration::apply_feature_metadata(
+                &resolved.configuration,
+                &resolved_features.metadata_entries,
+            )
+        })
+        .unwrap_or_else(|| resolved.configuration.clone());
+    let effective_resolved = context::ResolvedConfig {
+        workspace_folder: resolved.workspace_folder.clone(),
+        config_file: resolved.config_file.clone(),
+        configuration: effective_configuration.clone(),
+    };
+    lifecycle::run_initialize_command(
+        &effective_resolved.configuration,
+        &effective_resolved.workspace_folder,
+    )?;
+    let compose_project_name =
+        compose::load_compose_spec(&effective_resolved)?.map(|spec| spec.project_name);
+    let image_name = build::runtime_image_name(&effective_resolved, args)?;
+    let remote_workspace_folder =
+        context::remote_workspace_folder_for_args(&effective_resolved, args);
+    let up_container = container::ensure_up_container(
+        &effective_resolved,
+        args,
+        &image_name,
+        &remote_workspace_folder,
+    )?;
     lifecycle::run_lifecycle_commands(
         &up_container.container_id,
         args,
-        &resolved.configuration,
+        &effective_resolved.configuration,
         &remote_workspace_folder,
         up_container.lifecycle_mode,
     )?;
@@ -53,12 +98,12 @@ pub fn run_up(args: &[String]) -> Result<Value, String> {
         "command": "up",
         "containerId": up_container.container_id,
         "composeProjectName": compose_project_name,
-        "remoteUser": context::remote_user(&resolved.configuration),
+        "remoteUser": context::remote_user(&effective_resolved.configuration),
         "remoteWorkspaceFolder": remote_workspace_folder,
-        "configuration": if common::has_flag(args, "--include-configuration") { resolved.configuration.clone() } else { Value::Null },
-        "mergedConfiguration": if common::has_flag(args, "--include-merged-configuration") { resolved.configuration.clone() } else { Value::Null },
-        "workspaceFolder": resolved.workspace_folder,
-        "configFile": resolved.config_file,
+        "configuration": if common::has_flag(args, "--include-configuration") { effective_resolved.configuration.clone() } else { Value::Null },
+        "mergedConfiguration": if common::has_flag(args, "--include-merged-configuration") { effective_resolved.configuration.clone() } else { Value::Null },
+        "workspaceFolder": effective_resolved.workspace_folder,
+        "configFile": effective_resolved.config_file,
     }))
 }
 
@@ -111,7 +156,7 @@ pub fn run_exec(args: &[String]) -> Result<ExecResult, String> {
         &context.container_id,
         command_args,
         interactive,
-    );
+    )?;
 
     if interactive {
         engine::run_engine_streaming(args, engine_args).map(ExecResult::Streaming)

@@ -13,6 +13,7 @@
 - `node build/check-no-node-runtime.js`
 - `node build/check-parity-harness.js`
 - `node build/generate-cli-reference.js --check`
+- `node build/generate-parity-inventory.js --check`
 
 ## Current parity scope
 
@@ -20,15 +21,18 @@ The automated repo-owned parity checks currently verify:
 
 - command-matrix drift against pinned upstream CLI sources
 - generated command-reference drift against the pinned upstream CLI sources
+- generated native parity-inventory drift against the current Rust source
 - schema drift against the pinned spec submodule
 - native startup/help behavior without Node on `PATH`
 - pinned `read-configuration` parity scenarios, including upstream-style workspace output
 
 The native runtime now also has repo-owned Rust integration coverage for `build`, `up`, `set-up`, `run-user-commands`, and `exec` using a podman-compatible fake engine harness, including Docker Compose project-name and existing-container coverage for `build` and `up`.
 
-The original umbrella gaps around `read-configuration`, `outdated` / `upgrade`, deeper Docker Compose support, and OCI-oriented `features` / `templates` flows are now covered by native code paths with repo-owned tests.
+The Rust CLI now declares every pinned upstream command path, but command-depth parity is still uneven. The generated inventory in `docs/upstream/parity-inventory.md` is the current source of truth for missing option references and known command-level gaps.
 
-What remains is incremental hardening rather than missing command families:
+The highest-impact remaining gaps are still substantive:
 
-- broader parity-harness coverage beyond the current pinned scenarios
-- additional upstream edge cases where we decide the maintenance cost is worth the extra compatibility surface
+- replacing fixture/manual Feature metadata resolution with real OCI-backed fetch and dependency behavior
+- replacing fixture/manual lockfile catalogs with real registry-backed resolution
+- replacing local-layout `features` / `templates` published flows with real OCI registry behavior
+- broadening parity-harness and runtime coverage beyond the current pinned scenarios

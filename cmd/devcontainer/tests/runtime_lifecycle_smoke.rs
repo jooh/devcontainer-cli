@@ -229,6 +229,45 @@ fn compose_lifecycle_commands_honor_explicit_container_id() {
 }
 
 #[test]
+fn lifecycle_commands_receive_secrets_from_file() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let secrets_path = harness.root.join("secrets.json");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    fs::write(
+        &secrets_path,
+        "{\n  \"SECRET_TOKEN\": \"from-secret-file\"\n}\n",
+    )
+    .expect("secrets file");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"printf %s \\\"$SECRET_TOKEN\\\" > /workspaces/workspace/secret.txt\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--secrets-file",
+            secrets_path.to_string_lossy().as_ref(),
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(workspace.join("secret.txt")).expect("secret file"),
+        "from-secret-file"
+    );
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("-e SECRET_TOKEN=from-secret-file"));
+}
+
+#[test]
 fn lifecycle_array_commands_preserve_argument_boundaries() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();

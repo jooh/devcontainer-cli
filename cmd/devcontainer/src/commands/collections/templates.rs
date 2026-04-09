@@ -1,6 +1,8 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Map, Value};
 
@@ -9,15 +11,26 @@ use super::registry::{
 };
 use crate::commands::common;
 
-const UPSTREAM_DEFAULT_BASE_IMAGE: &str = "mcr.microsoft.com/devcontainers/base:ubuntu";
+const DEFAULT_PUBLISHED_TEMPLATE_BASE_IMAGE: &str = "docker.io/library/debian:bookworm-slim";
+static NEXT_TEMPLATE_TMP_ID: AtomicU64 = AtomicU64::new(0);
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn apply_template_target(
     template_root: &Path,
     workspace_root: &Path,
 ) -> Result<Value, String> {
+    apply_template_target_with_options(template_root, workspace_root, &[], None)
+}
+
+fn apply_template_target_with_options(
+    template_root: &Path,
+    workspace_root: &Path,
+    omit_paths: &[String],
+    tmp_dir: Option<&Path>,
+) -> Result<Value, String> {
     let manifest = common::parse_manifest(template_root, "devcontainer-template.json")?;
-    let source_root = template_root.join("src");
-    common::copy_directory_recursive(&source_root, workspace_root)?;
+    let source_root = prepare_template_source_root(&template_root.join("src"), tmp_dir)?;
+    copy_embedded_template_contents(&source_root, workspace_root, &Map::new(), omit_paths)?;
     Ok(json!({
         "outcome": "success",
         "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
@@ -40,13 +53,21 @@ pub(super) fn build_template_metadata_payload(template_path: &str) -> Result<Val
 }
 
 pub(super) fn run_template_apply(args: &[String]) -> Result<Value, String> {
+    let omit_paths = common::parse_json_string_array_option(args, "--omit-paths")?;
+    let tmp_dir = common::parse_option_value(args, "--tmp-dir").map(PathBuf::from);
     let template_id = common::parse_option_value(args, "--template-id");
     if let Some(template_id) = template_id {
         let workspace = common::parse_option_value(args, "--workspace-folder")
             .map(PathBuf::from)
             .or_else(|| env::current_dir().ok())
             .ok_or_else(|| "Unable to determine workspace folder".to_string())?;
-        return apply_catalog_template(&template_id, &workspace, args);
+        return apply_catalog_template_with_options(
+            &template_id,
+            &workspace,
+            args,
+            &omit_paths,
+            tmp_dir.as_deref(),
+        );
     }
 
     let target = args
@@ -56,13 +77,29 @@ pub(super) fn run_template_apply(args: &[String]) -> Result<Value, String> {
         .map(PathBuf::from)
         .or_else(|| env::current_dir().ok())
         .ok_or_else(|| "Unable to determine workspace folder".to_string())?;
-    apply_template_target(Path::new(target), &workspace)
+    apply_template_target_with_options(
+        Path::new(target),
+        &workspace,
+        &omit_paths,
+        tmp_dir.as_deref(),
+    )
 }
 
+#[cfg_attr(not(test), allow(dead_code))]
 pub(super) fn apply_catalog_template(
     template_id: &str,
     workspace_root: &Path,
     args: &[String],
+) -> Result<Value, String> {
+    apply_catalog_template_with_options(template_id, workspace_root, args, &[], None)
+}
+
+fn apply_catalog_template_with_options(
+    template_id: &str,
+    workspace_root: &Path,
+    args: &[String],
+    omit_paths: &[String],
+    tmp_dir: Option<&Path>,
 ) -> Result<Value, String> {
     let manifest = published_template_manifest(template_id)
         .ok_or_else(|| format!("Unknown published template: {template_id}"))?;
@@ -84,6 +121,8 @@ pub(super) fn apply_catalog_template(
                 workspace_root,
                 &template_args,
                 extra_features,
+                omit_paths,
+                tmp_dir,
             );
         }
         return apply_generic_published_template(&manifest, workspace_root, extra_features);
@@ -119,7 +158,7 @@ pub(super) fn apply_catalog_template(
 
     let devcontainer = json!({
         "name": manifest.get("name").cloned().unwrap_or_else(|| Value::String("Docker from Docker".to_string())),
-        "image": UPSTREAM_DEFAULT_BASE_IMAGE,
+        "image": DEFAULT_PUBLISHED_TEMPLATE_BASE_IMAGE,
         "features": features,
     });
     let config_dir = workspace_root.join(".devcontainer");
@@ -141,9 +180,12 @@ fn apply_embedded_published_template(
     workspace_root: &Path,
     template_args: &Value,
     extra_features: Value,
+    omit_paths: &[String],
+    tmp_dir: Option<&Path>,
 ) -> Result<Value, String> {
     let template_options = template_option_values(manifest, template_args);
-    copy_embedded_template_contents(template_root, workspace_root, &template_options)?;
+    let source_root = prepare_template_source_root(template_root, tmp_dir)?;
+    copy_embedded_template_contents(&source_root, workspace_root, &template_options, omit_paths)?;
     merge_extra_features_into_template(workspace_root, extra_features)?;
     Ok(json!({
         "outcome": "success",
@@ -167,7 +209,7 @@ fn apply_generic_published_template(
     );
     devcontainer.insert(
         "image".to_string(),
-        Value::String(UPSTREAM_DEFAULT_BASE_IMAGE.to_string()),
+        Value::String(DEFAULT_PUBLISHED_TEMPLATE_BASE_IMAGE.to_string()),
     );
 
     let mut features = Map::new();
@@ -228,6 +270,7 @@ fn copy_embedded_template_contents(
     template_root: &Path,
     workspace_root: &Path,
     template_options: &Map<String, Value>,
+    omit_paths: &[String],
 ) -> Result<(), String> {
     fs::create_dir_all(workspace_root).map_err(|error| error.to_string())?;
     for entry in fs::read_dir(template_root).map_err(|error| error.to_string())? {
@@ -235,10 +278,13 @@ fn copy_embedded_template_contents(
         if entry.file_name() == "devcontainer-template.json" {
             continue;
         }
+        let relative_path = PathBuf::from(entry.file_name());
         copy_embedded_template_entry(
             &entry.path(),
             &workspace_root.join(entry.file_name()),
             template_options,
+            &relative_path,
+            omit_paths,
         )?;
     }
     Ok(())
@@ -248,15 +294,23 @@ fn copy_embedded_template_entry(
     source: &Path,
     destination: &Path,
     template_options: &Map<String, Value>,
+    relative_path: &Path,
+    omit_paths: &[String],
 ) -> Result<(), String> {
+    if template_path_is_omitted(relative_path, omit_paths) {
+        return Ok(());
+    }
     if source.is_dir() {
         fs::create_dir_all(destination).map_err(|error| error.to_string())?;
         for entry in fs::read_dir(source).map_err(|error| error.to_string())? {
             let entry = entry.map_err(|error| error.to_string())?;
+            let child_relative_path = relative_path.join(entry.file_name());
             copy_embedded_template_entry(
                 &entry.path(),
                 &destination.join(entry.file_name()),
                 template_options,
+                &child_relative_path,
+                omit_paths,
             )?;
         }
         return Ok(());
@@ -270,6 +324,42 @@ fn copy_embedded_template_entry(
         fs::copy(source, destination).map_err(|error| error.to_string())?;
     }
     Ok(())
+}
+
+fn prepare_template_source_root(
+    source_root: &Path,
+    tmp_dir: Option<&Path>,
+) -> Result<PathBuf, String> {
+    let Some(tmp_dir) = tmp_dir else {
+        return Ok(source_root.to_path_buf());
+    };
+    fs::create_dir_all(tmp_dir).map_err(|error| error.to_string())?;
+    let scratch_root = tmp_dir.join(unique_template_tmp_name());
+    common::copy_directory_recursive(source_root, &scratch_root)?;
+    Ok(scratch_root)
+}
+
+fn template_path_is_omitted(relative_path: &Path, omit_paths: &[String]) -> bool {
+    let relative = relative_path.to_string_lossy().replace('\\', "/");
+    omit_paths.iter().any(|pattern| {
+        if let Some(prefix) = pattern.strip_suffix("/*") {
+            relative == prefix || relative.starts_with(&format!("{prefix}/"))
+        } else {
+            relative == *pattern
+        }
+    })
+}
+
+fn unique_template_tmp_name() -> String {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time went backwards")
+        .as_nanos();
+    let unique_id = NEXT_TEMPLATE_TMP_ID.fetch_add(1, Ordering::Relaxed);
+    format!(
+        "devcontainer-template-{}-{suffix}-{unique_id}",
+        std::process::id()
+    )
 }
 
 fn substitute_template_options(contents: &str, template_options: &Map<String, Value>) -> String {
