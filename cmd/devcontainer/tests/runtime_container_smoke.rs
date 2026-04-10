@@ -1,3 +1,5 @@
+//! Integration test entrypoint for native runtime container smoke suites.
+
 mod support;
 
 #[path = "runtime_container_smoke/basic.rs"]
