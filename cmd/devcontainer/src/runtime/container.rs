@@ -1,3 +1,9 @@
+use std::fs;
+use std::path::PathBuf;
+use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use serde_json::Value;
 
 use crate::commands::common;
@@ -11,6 +17,62 @@ use super::metadata::serialized_container_metadata;
 pub(crate) struct UpContainer {
     pub(crate) container_id: String,
     pub(crate) lifecycle_mode: LifecycleMode,
+}
+
+static NEXT_UID_UPDATE_BUILD_ID: AtomicU64 = AtomicU64::new(0);
+
+pub(crate) fn prepare_up_image(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    image_name: &str,
+) -> Result<String, String> {
+    if !should_update_remote_user_uid(
+        &resolved.configuration,
+        args,
+        is_uid_update_platform_supported(),
+    ) {
+        return Ok(image_name.to_string());
+    }
+
+    let remote_user = configured_updatable_user(&resolved.configuration)
+        .ok_or_else(|| "Expected a non-root remote user for UID update".to_string())?;
+    let image_user = resolved
+        .configuration
+        .get("containerUser")
+        .or_else(|| resolved.configuration.get("remoteUser"))
+        .and_then(Value::as_str)
+        .unwrap_or("root");
+    let (new_uid, new_gid) = host_uid_gid()?;
+    let updated_image_name = format!("{image_name}-uid");
+    let build_context = unique_uid_update_build_context();
+    fs::create_dir_all(&build_context).map_err(|error| error.to_string())?;
+    let dockerfile = uid_update_dockerfile_path();
+    let mut build_args = vec![
+        "build".to_string(),
+        "--build-arg".to_string(),
+        format!("BASE_IMAGE={image_name}"),
+        "--build-arg".to_string(),
+        format!("REMOTE_USER={remote_user}"),
+        "--build-arg".to_string(),
+        format!("NEW_UID={new_uid}"),
+        "--build-arg".to_string(),
+        format!("NEW_GID={new_gid}"),
+        "--build-arg".to_string(),
+        format!("IMAGE_USER={image_user}"),
+        "-t".to_string(),
+        updated_image_name.clone(),
+        "-f".to_string(),
+        dockerfile.display().to_string(),
+        build_context.display().to_string(),
+    ];
+
+    let result = engine::run_engine(args, std::mem::take(&mut build_args))?;
+    let _ = fs::remove_dir_all(&build_context);
+    if result.status_code != 0 {
+        return Err(engine::stderr_or_stdout(&result));
+    }
+
+    Ok(updated_image_name)
 }
 
 pub(crate) fn ensure_up_container(
@@ -204,7 +266,11 @@ fn start_container(
         "--label".to_string(),
         format!(
             "devcontainer.metadata={}",
-            serialized_container_metadata(&resolved.configuration, remote_workspace_folder)?
+            serialized_container_metadata(
+                &resolved.configuration,
+                remote_workspace_folder,
+                common::runtime_options(args).omit_config_remote_env_from_metadata,
+            )?
         ),
         "--mount".to_string(),
         workspace_mount_for_args(resolved, remote_workspace_folder, args),
@@ -292,6 +358,10 @@ fn start_container(
             engine_args.push(option.to_string());
         }
     }
+    if should_add_gpu_capability(&resolved.configuration, args)? {
+        engine_args.push("--gpus".to_string());
+        engine_args.push("all".to_string());
+    }
     engine_args.push(image_name.to_string());
     engine_args.push("/bin/sh".to_string());
     engine_args.push("-lc".to_string());
@@ -308,6 +378,117 @@ fn start_container(
     }
 
     Ok(container_id)
+}
+
+pub(crate) fn should_add_gpu_capability(
+    configuration: &Value,
+    args: &[String],
+) -> Result<bool, String> {
+    if configuration
+        .get("hostRequirements")
+        .and_then(|requirements| requirements.get("gpu"))
+        .is_none()
+    {
+        return Ok(false);
+    }
+
+    match common::runtime_options(args).gpu_availability.as_deref() {
+        Some("all") => Ok(true),
+        Some("none") => Ok(false),
+        _ => detect_gpu_support(args),
+    }
+}
+
+pub(crate) fn should_update_remote_user_uid(
+    configuration: &Value,
+    args: &[String],
+    platform_supported: bool,
+) -> bool {
+    if !platform_supported {
+        return false;
+    }
+
+    let default_value = common::runtime_options(args)
+        .update_remote_user_uid_default
+        .unwrap_or_else(|| "on".to_string());
+    if default_value == "never" {
+        return false;
+    }
+
+    let should_update = configuration
+        .get("updateRemoteUserUID")
+        .and_then(Value::as_bool)
+        .unwrap_or(default_value == "on");
+    if !should_update {
+        return false;
+    }
+
+    configured_updatable_user(configuration).is_some()
+}
+
+fn detect_gpu_support(args: &[String]) -> Result<bool, String> {
+    let result = engine::run_engine(
+        args,
+        vec![
+            "info".to_string(),
+            "-f".to_string(),
+            "{{.Runtimes.nvidia}}".to_string(),
+        ],
+    )?;
+    if result.status_code != 0 {
+        return Ok(false);
+    }
+    Ok(result.stdout.contains("nvidia-container-runtime"))
+}
+
+fn configured_updatable_user(configuration: &Value) -> Option<&str> {
+    configuration
+        .get("remoteUser")
+        .or_else(|| configuration.get("containerUser"))
+        .and_then(Value::as_str)
+        .filter(|user| *user != "root" && !user.chars().all(|character| character.is_ascii_digit()))
+}
+
+fn is_uid_update_platform_supported() -> bool {
+    cfg!(target_os = "linux")
+}
+
+fn uid_update_dockerfile_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("..")
+        .join("..")
+        .join("upstream")
+        .join("scripts")
+        .join("updateUID.Dockerfile")
+}
+
+fn unique_uid_update_build_context() -> PathBuf {
+    let suffix = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("time went backwards")
+        .as_nanos();
+    let unique_id = NEXT_UID_UPDATE_BUILD_ID.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!(
+        "devcontainer-update-uid-{}-{suffix}-{unique_id}",
+        std::process::id()
+    ))
+}
+
+fn host_uid_gid() -> Result<(String, String), String> {
+    let uid = command_stdout("id", &["-u"])?;
+    let gid = command_stdout("id", &["-g"])?;
+    Ok((uid, gid))
+}
+
+fn command_stdout(program: &str, args: &[&str]) -> Result<String, String> {
+    let output = Command::new(program)
+        .args(args)
+        .output()
+        .map_err(|error| error.to_string())?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 fn mount_argument(value: &Value) -> Option<String> {
@@ -456,7 +637,7 @@ fn target_container_labels(
 mod tests {
     use serde_json::json;
 
-    use super::mount_argument;
+    use super::{mount_argument, should_update_remote_user_uid};
 
     #[test]
     fn mount_argument_preserves_read_only_and_alias_keys() {
@@ -489,5 +670,45 @@ mod tests {
             mount,
             "type=volume,source=devcontainer-cache,target=/cache,consistency=delegated,external=true"
         );
+    }
+
+    #[test]
+    fn remote_user_uid_update_defaults_to_on_for_supported_platforms() {
+        assert!(should_update_remote_user_uid(
+            &json!({
+                "remoteUser": "vscode"
+            }),
+            &[],
+            true,
+        ));
+    }
+
+    #[test]
+    fn remote_user_uid_update_respects_option_and_config_overrides() {
+        assert!(!should_update_remote_user_uid(
+            &json!({
+                "remoteUser": "vscode"
+            }),
+            &[
+                "--update-remote-user-uid-default".to_string(),
+                "off".to_string(),
+            ],
+            true,
+        ));
+        assert!(!should_update_remote_user_uid(
+            &json!({
+                "remoteUser": "vscode",
+                "updateRemoteUserUID": false
+            }),
+            &[],
+            true,
+        ));
+        assert!(!should_update_remote_user_uid(
+            &json!({
+                "remoteUser": "vscode"
+            }),
+            &[],
+            false,
+        ));
     }
 }

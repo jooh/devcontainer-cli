@@ -14,10 +14,13 @@ pub(crate) struct RuntimeOptions {
     pub(crate) terminal_columns: Option<String>,
     pub(crate) terminal_rows: Option<String>,
     pub(crate) buildkit: Option<String>,
+    pub(crate) gpu_availability: Option<String>,
     pub(crate) omit_syntax_directive: bool,
+    pub(crate) omit_config_remote_env_from_metadata: bool,
     pub(crate) skip_persisting_customizations_from_features: bool,
     pub(crate) skip_feature_auto_mapping: bool,
     pub(crate) stop_for_personalization: bool,
+    pub(crate) update_remote_user_uid_default: Option<String>,
     pub(crate) dotfiles_repository: Option<String>,
     pub(crate) dotfiles_install_command: Option<String>,
     pub(crate) dotfiles_target_path: Option<String>,
@@ -52,13 +55,22 @@ pub(crate) fn runtime_options(args: &[String]) -> RuntimeOptions {
         terminal_columns: parse_option_value(args, "--terminal-columns"),
         terminal_rows: parse_option_value(args, "--terminal-rows"),
         buildkit: parse_option_value(args, "--buildkit"),
+        gpu_availability: parse_option_value(args, "--gpu-availability"),
         omit_syntax_directive: has_flag(args, "--omit-syntax-directive"),
+        omit_config_remote_env_from_metadata: has_flag(
+            args,
+            "--omit-config-remote-env-from-metadata",
+        ),
         skip_persisting_customizations_from_features: has_flag(
             args,
             "--skip-persisting-customizations-from-features",
         ),
         skip_feature_auto_mapping: parse_bool_option(args, "--skip-feature-auto-mapping", false),
         stop_for_personalization: parse_bool_option(args, "--stop-for-personalization", false),
+        update_remote_user_uid_default: parse_option_value(
+            args,
+            "--update-remote-user-uid-default",
+        ),
         dotfiles_repository: parse_option_value(args, "--dotfiles-repository"),
         dotfiles_install_command: parse_option_value(args, "--dotfiles-install-command"),
         dotfiles_target_path: parse_option_value(args, "--dotfiles-target-path"),
@@ -472,7 +484,10 @@ mod tests {
             "40".to_string(),
             "--buildkit".to_string(),
             "never".to_string(),
+            "--gpu-availability".to_string(),
+            "all".to_string(),
             "--omit-syntax-directive".to_string(),
+            "--omit-config-remote-env-from-metadata".to_string(),
             "--skip-persisting-customizations-from-features".to_string(),
             "--skip-feature-auto-mapping".to_string(),
             "--stop-for-personalization".to_string(),
@@ -492,13 +507,17 @@ mod tests {
             "/tmp/session-data".to_string(),
             "--default-user-env-probe".to_string(),
             "loginShell".to_string(),
+            "--update-remote-user-uid-default".to_string(),
+            "off".to_string(),
         ]);
 
         assert_eq!(options.log_level, ProcessLogLevel::Trace);
         assert_eq!(options.terminal_columns.as_deref(), Some("120"));
         assert_eq!(options.terminal_rows.as_deref(), Some("40"));
         assert_eq!(options.buildkit.as_deref(), Some("never"));
+        assert_eq!(options.gpu_availability.as_deref(), Some("all"));
         assert!(options.omit_syntax_directive);
+        assert!(options.omit_config_remote_env_from_metadata);
         assert!(options.skip_persisting_customizations_from_features);
         assert!(options.skip_feature_auto_mapping);
         assert!(options.stop_for_personalization);
@@ -527,6 +546,10 @@ mod tests {
         assert_eq!(
             options.default_user_env_probe.as_deref(),
             Some("loginShell")
+        );
+        assert_eq!(
+            options.update_remote_user_uid_default.as_deref(),
+            Some("off")
         );
     }
 

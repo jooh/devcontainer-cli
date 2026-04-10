@@ -415,6 +415,39 @@ fn metadata_override_file_does_not_promote_remote_user_to_service_user() {
 }
 
 #[test]
+fn metadata_override_file_adds_gpu_resources_when_requested() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "hostRequirements": {
+                "gpu": "required"
+            }
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(
+        &resolved,
+        &["--gpu-availability".to_string(), "all".to_string()],
+        "/workspaces/project",
+        None,
+    )
+    .expect("override result")
+    .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("deploy:"));
+    assert!(override_content.contains("capabilities: [gpu]"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn compose_feature_build_enforces_frozen_lockfile() {
     let root = unique_temp_dir();
     fs::create_dir_all(&root).expect("workspace root");

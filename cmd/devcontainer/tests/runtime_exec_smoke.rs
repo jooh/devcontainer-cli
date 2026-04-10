@@ -198,6 +198,57 @@ fn compose_up_persists_metadata_for_followup_exec_with_container_id() {
 }
 
 #[test]
+fn up_can_omit_config_remote_env_from_persisted_metadata() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceMount\": \"type=bind,source=/host/project,target=/persisted-workspace\",\n  \"remoteUser\": \"vscode\",\n  \"remoteEnv\": {\n    \"TEST_REMOTE_ENV\": \"from-config\"\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let up_output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--omit-config-remote-env-from-metadata",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(up_output.status.success(), "{up_output:?}");
+    let exec_output = harness.run(
+        &[
+            "exec",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--container-id",
+            "fake-container-id",
+            "/bin/sh",
+            "-lc",
+            "printf %s \"${TEST_REMOTE_ENV-}\"",
+        ],
+        &[],
+    );
+
+    assert!(exec_output.status.success(), "{exec_output:?}");
+    assert_eq!(
+        String::from_utf8(exec_output.stdout).expect("utf8 stdout"),
+        ""
+    );
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("--label devcontainer.metadata="));
+    assert!(!invocations.contains("TEST_REMOTE_ENV=from-config"));
+    assert!(invocations.contains(
+        "exec --workdir /persisted-workspace --user vscode fake-container-id /bin/sh -lc printf %s \"${TEST_REMOTE_ENV-}\""
+    ));
+}
+
+#[test]
 fn exec_injects_secrets_file_environment() {
     let harness = RuntimeHarness::new();
     let inspect_path = harness.root.join("inspect.json");
