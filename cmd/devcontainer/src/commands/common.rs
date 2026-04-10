@@ -6,7 +6,19 @@ use std::path::{Path, PathBuf};
 use serde_json::{Map, Value};
 
 use crate::config::{self, ConfigContext};
-use crate::process_runner::{self, ProcessRequest};
+use crate::process_runner::{self, ProcessLogLevel, ProcessRequest};
+
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(crate) struct RuntimeOptions {
+    pub(crate) log_level: ProcessLogLevel,
+    pub(crate) terminal_columns: Option<String>,
+    pub(crate) terminal_rows: Option<String>,
+    pub(crate) user_data_folder: Option<String>,
+    pub(crate) container_data_folder: Option<String>,
+    pub(crate) container_system_data_folder: Option<String>,
+    pub(crate) container_session_data_folder: Option<String>,
+    pub(crate) default_user_env_probe: Option<String>,
+}
 
 #[derive(Default)]
 pub(crate) struct ManifestDocOptions {
@@ -20,6 +32,48 @@ pub(crate) fn parse_option_value(args: &[String], option: &str) -> Option<String
     args.windows(2)
         .find(|window| window[0] == option)
         .map(|window| window[1].clone())
+}
+
+pub(crate) fn runtime_options(args: &[String]) -> RuntimeOptions {
+    RuntimeOptions {
+        log_level: match parse_option_value(args, "--log-level").as_deref() {
+            Some("debug") => ProcessLogLevel::Debug,
+            Some("trace") => ProcessLogLevel::Trace,
+            _ => ProcessLogLevel::Info,
+        },
+        terminal_columns: parse_option_value(args, "--terminal-columns"),
+        terminal_rows: parse_option_value(args, "--terminal-rows"),
+        user_data_folder: parse_option_value(args, "--user-data-folder"),
+        container_data_folder: parse_option_value(args, "--container-data-folder"),
+        container_system_data_folder: parse_option_value(args, "--container-system-data-folder"),
+        container_session_data_folder: parse_option_value(args, "--container-session-data-folder"),
+        default_user_env_probe: parse_option_value(args, "--default-user-env-probe"),
+    }
+}
+
+pub(crate) fn runtime_process_request(
+    args: &[String],
+    program: String,
+    request_args: Vec<String>,
+    cwd: Option<PathBuf>,
+) -> ProcessRequest {
+    let options = runtime_options(args);
+    let mut env = HashMap::new();
+    if let (Some(columns), Some(rows)) = (
+        options.terminal_columns.clone(),
+        options.terminal_rows.clone(),
+    ) {
+        env.insert("COLUMNS".to_string(), columns);
+        env.insert("LINES".to_string(), rows);
+    }
+
+    ProcessRequest {
+        program,
+        args: request_args,
+        cwd,
+        env,
+        log_level: options.log_level,
+    }
 }
 
 pub(crate) fn parse_bool_option(args: &[String], option: &str, default: bool) -> bool {
@@ -319,6 +373,7 @@ pub(crate) fn package_collection_target(
         ],
         cwd: None,
         env: HashMap::new(),
+        log_level: ProcessLogLevel::Info,
     })?;
 
     if result.status_code != 0 {
@@ -379,4 +434,54 @@ pub(crate) fn copy_directory_recursive(source: &Path, destination: &Path) -> Res
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::process_runner::ProcessLogLevel;
+
+    use super::runtime_options;
+
+    #[test]
+    fn runtime_options_collect_shared_runtime_flags() {
+        let options = runtime_options(&[
+            "--log-level".to_string(),
+            "trace".to_string(),
+            "--terminal-columns".to_string(),
+            "120".to_string(),
+            "--terminal-rows".to_string(),
+            "40".to_string(),
+            "--user-data-folder".to_string(),
+            "/tmp/user-data".to_string(),
+            "--container-data-folder".to_string(),
+            "/tmp/container-data".to_string(),
+            "--container-system-data-folder".to_string(),
+            "/var/devcontainer".to_string(),
+            "--container-session-data-folder".to_string(),
+            "/tmp/session-data".to_string(),
+            "--default-user-env-probe".to_string(),
+            "loginShell".to_string(),
+        ]);
+
+        assert_eq!(options.log_level, ProcessLogLevel::Trace);
+        assert_eq!(options.terminal_columns.as_deref(), Some("120"));
+        assert_eq!(options.terminal_rows.as_deref(), Some("40"));
+        assert_eq!(options.user_data_folder.as_deref(), Some("/tmp/user-data"));
+        assert_eq!(
+            options.container_data_folder.as_deref(),
+            Some("/tmp/container-data")
+        );
+        assert_eq!(
+            options.container_system_data_folder.as_deref(),
+            Some("/var/devcontainer")
+        );
+        assert_eq!(
+            options.container_session_data_folder.as_deref(),
+            Some("/tmp/session-data")
+        );
+        assert_eq!(
+            options.default_user_env_probe.as_deref(),
+            Some("loginShell")
+        );
+    }
 }

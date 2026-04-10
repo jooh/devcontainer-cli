@@ -47,6 +47,7 @@ pub(crate) fn run_lifecycle_commands(
 }
 
 pub(crate) fn run_initialize_command(
+    args: &[String],
     configuration: &Value,
     workspace_folder: &Path,
 ) -> Result<(), String> {
@@ -55,7 +56,7 @@ pub(crate) fn run_initialize_command(
     };
 
     run_process_group(command_group, |command| {
-        Ok(host_lifecycle_request(workspace_folder, command))
+        Ok(host_lifecycle_request(args, workspace_folder, command))
     })
 }
 
@@ -267,22 +268,26 @@ fn lifecycle_exec_args(
     Ok(engine_args)
 }
 
-fn host_lifecycle_request(workspace_folder: &Path, command: LifecycleCommand) -> ProcessRequest {
+fn host_lifecycle_request(
+    args: &[String],
+    workspace_folder: &Path,
+    command: LifecycleCommand,
+) -> ProcessRequest {
     match command {
-        LifecycleCommand::Shell(command) => ProcessRequest {
-            program: "/bin/sh".to_string(),
-            args: vec!["-c".to_string(), command],
-            cwd: Some(workspace_folder.to_path_buf()),
-            env: std::collections::HashMap::new(),
-        },
+        LifecycleCommand::Shell(command) => common::runtime_process_request(
+            args,
+            "/bin/sh".to_string(),
+            vec!["-c".to_string(), command],
+            Some(workspace_folder.to_path_buf()),
+        ),
         LifecycleCommand::Exec(parts) => {
             let mut parts = parts.into_iter();
-            ProcessRequest {
-                program: parts.next().unwrap_or_default(),
-                args: parts.collect(),
-                cwd: Some(workspace_folder.to_path_buf()),
-                env: std::collections::HashMap::new(),
-            }
+            common::runtime_process_request(
+                args,
+                parts.next().unwrap_or_default(),
+                parts.collect(),
+                Some(workspace_folder.to_path_buf()),
+            )
         }
     }
 }

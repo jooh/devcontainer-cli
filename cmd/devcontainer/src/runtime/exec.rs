@@ -20,6 +20,14 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
                 | "--secrets-file"
                 | "--container-id"
                 | "--id-label"
+                | "--log-level"
+                | "--user-data-folder"
+                | "--container-data-folder"
+                | "--container-system-data-folder"
+                | "--container-session-data-folder"
+                | "--default-user-env-probe"
+                | "--terminal-columns"
+                | "--terminal-rows"
         ) {
             index += 2;
             continue;
@@ -181,6 +189,33 @@ mod tests {
         let args = exec_command_and_args(&[
             "--mount-git-worktree-common-dir".to_string(),
             "true".to_string(),
+            "/bin/echo".to_string(),
+            "hello".to_string(),
+        ])
+        .expect("command args");
+
+        assert_eq!(args, vec!["/bin/echo".to_string(), "hello".to_string()]);
+    }
+
+    #[test]
+    fn exec_command_and_args_accept_shared_runtime_options() {
+        let args = exec_command_and_args(&[
+            "--log-level".to_string(),
+            "debug".to_string(),
+            "--user-data-folder".to_string(),
+            "/tmp/devcontainer".to_string(),
+            "--container-data-folder".to_string(),
+            "/tmp/container".to_string(),
+            "--container-system-data-folder".to_string(),
+            "/var/devcontainer".to_string(),
+            "--container-session-data-folder".to_string(),
+            "/tmp/session".to_string(),
+            "--default-user-env-probe".to_string(),
+            "loginShell".to_string(),
+            "--terminal-columns".to_string(),
+            "120".to_string(),
+            "--terminal-rows".to_string(),
+            "40".to_string(),
             "/bin/echo".to_string(),
             "hello".to_string(),
         ])

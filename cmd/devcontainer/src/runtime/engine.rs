@@ -1,15 +1,8 @@
-use std::collections::HashMap;
-
 use crate::commands::common;
 use crate::process_runner::{self, ProcessRequest, ProcessResult};
 
 pub(crate) fn engine_request(args: &[String], engine_args: Vec<String>) -> ProcessRequest {
-    ProcessRequest {
-        program: engine_program(args),
-        args: engine_args,
-        cwd: None,
-        env: HashMap::new(),
-    }
+    common::runtime_process_request(args, engine_program(args), engine_args, None)
 }
 
 pub(crate) fn run_engine(
@@ -28,21 +21,11 @@ pub(crate) fn run_engine_streaming(
 
 pub(crate) fn compose_request(args: &[String], compose_args: Vec<String>) -> ProcessRequest {
     if let Some(compose_program) = common::parse_option_value(args, "--docker-compose-path") {
-        ProcessRequest {
-            program: compose_program,
-            args: compose_args,
-            cwd: None,
-            env: HashMap::new(),
-        }
+        common::runtime_process_request(args, compose_program, compose_args, None)
     } else {
         let mut args_with_subcommand = vec!["compose".to_string()];
         args_with_subcommand.extend(compose_args);
-        ProcessRequest {
-            program: engine_program(args),
-            args: args_with_subcommand,
-            cwd: None,
-            env: HashMap::new(),
-        }
+        common::runtime_process_request(args, engine_program(args), args_with_subcommand, None)
     }
 }
 
@@ -63,4 +46,30 @@ pub(crate) fn stderr_or_stdout(result: &ProcessResult) -> String {
 
 fn engine_program(args: &[String]) -> String {
     common::parse_option_value(args, "--docker-path").unwrap_or_else(|| "docker".to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::process_runner::ProcessLogLevel;
+
+    use super::engine_request;
+
+    #[test]
+    fn engine_request_applies_terminal_env_and_log_level() {
+        let request = engine_request(
+            &[
+                "--log-level".to_string(),
+                "debug".to_string(),
+                "--terminal-columns".to_string(),
+                "160".to_string(),
+                "--terminal-rows".to_string(),
+                "48".to_string(),
+            ],
+            vec!["ps".to_string()],
+        );
+
+        assert_eq!(request.log_level, ProcessLogLevel::Debug);
+        assert_eq!(request.env.get("COLUMNS").map(String::as_str), Some("160"));
+        assert_eq!(request.env.get("LINES").map(String::as_str), Some("48"));
+    }
 }

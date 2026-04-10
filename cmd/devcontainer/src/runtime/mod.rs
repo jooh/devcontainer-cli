@@ -71,6 +71,7 @@ pub fn run_up(args: &[String]) -> Result<Value, String> {
         configuration: effective_configuration.clone(),
     };
     lifecycle::run_initialize_command(
+        args,
         &effective_resolved.configuration,
         &effective_resolved.workspace_folder,
     )?;
