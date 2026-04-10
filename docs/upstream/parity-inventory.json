@@ -106,6 +106,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -136,7 +137,8 @@
 					"name": "experimental-frozen-lockfile",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs"
 					]
 				},
 				{
@@ -206,6 +208,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -396,6 +399,7 @@
 					"name": "docker-path",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -552,6 +556,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -560,7 +565,8 @@
 					"name": "experimental-frozen-lockfile",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs"
 					]
 				},
 				{
@@ -736,6 +742,7 @@
 					"name": "docker-path",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -781,6 +788,7 @@
 					"name": "mount-git-worktree-common-dir",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -930,6 +938,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -979,6 +988,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1707,6 +1717,7 @@
 					"name": "docker-path",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1737,6 +1748,7 @@
 					"name": "mount-git-worktree-common-dir",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
