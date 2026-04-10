@@ -41,6 +41,7 @@ pub(crate) fn metadata_entries(metadata_label: Option<&str>) -> Vec<Value> {
 pub(crate) fn serialized_container_metadata(
     configuration: &Value,
     remote_workspace_folder: &str,
+    omit_config_remote_env_from_metadata: bool,
 ) -> Result<String, String> {
     let mut metadata = Map::new();
     for key in [
@@ -57,6 +58,9 @@ pub(crate) fn serialized_container_metadata(
         "postStartCommand",
         "postAttachCommand",
     ] {
+        if omit_config_remote_env_from_metadata && key == "remoteEnv" {
+            continue;
+        }
         if let Some(value) = configuration.get(key) {
             metadata.insert(key.to_string(), value.clone());
         }
@@ -161,9 +165,12 @@ pub(crate) fn split_mount_options(mount: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{json, Value};
 
-    use super::{merged_container_metadata, metadata_entries, mount_option_target};
+    use super::{
+        merged_container_metadata, metadata_entries, mount_option_target,
+        serialized_container_metadata,
+    };
 
     #[test]
     fn merged_container_metadata_prefers_last_scalar_and_merges_objects() {
@@ -226,5 +233,24 @@ mod tests {
 
         assert_eq!(entries.len(), 1);
         assert_eq!(entries[0]["postCreateCommand"], "echo ready");
+    }
+
+    #[test]
+    fn serialized_container_metadata_omits_remote_env_when_requested() {
+        let metadata = serialized_container_metadata(
+            &json!({
+                "remoteEnv": {
+                    "A": "1"
+                },
+                "remoteUser": "vscode"
+            }),
+            "/workspace",
+            true,
+        )
+        .expect("metadata");
+        let parsed: Value = serde_json::from_str(&metadata).expect("metadata json");
+
+        assert_eq!(parsed["remoteUser"], "vscode");
+        assert!(parsed.get("remoteEnv").is_none(), "{parsed}");
     }
 }

@@ -7,6 +7,7 @@ use serde_json::{Map, Number, Value};
 
 use crate::commands::common;
 
+use super::super::container;
 use super::super::context::{derived_workspace_mount, workspace_mount_for_args, ResolvedConfig};
 use super::super::metadata::{serialized_container_metadata, split_mount_options};
 
@@ -27,7 +28,11 @@ pub(super) fn compose_metadata_override_file(
     remote_workspace_folder: &str,
     image_name: Option<&str>,
 ) -> Result<Option<PathBuf>, String> {
-    let metadata = serialized_container_metadata(&resolved.configuration, remote_workspace_folder)?;
+    let metadata = serialized_container_metadata(
+        &resolved.configuration,
+        remote_workspace_folder,
+        common::runtime_options(args).omit_config_remote_env_from_metadata,
+    )?;
     let mut labels = vec![
         format!(
             "devcontainer.local_folder={}",
@@ -139,6 +144,11 @@ pub(super) fn compose_metadata_override_file(
             "    entrypoint: '{}'\n",
             escape_compose_scalar(entrypoint)
         ));
+    }
+    if container::should_add_gpu_capability(&resolved.configuration, args)? {
+        content.push_str(
+            "    deploy:\n      resources:\n        reservations:\n          devices:\n            - capabilities: [gpu]\n",
+        );
     }
 
     let override_file = unique_override_file_path();

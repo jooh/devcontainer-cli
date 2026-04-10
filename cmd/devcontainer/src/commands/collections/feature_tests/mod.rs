@@ -106,6 +106,8 @@ pub(super) struct FeatureTestOptions {
     pub(super) base_image: String,
     pub(super) remote_user: Option<String>,
     pub(super) preserve_test_containers: bool,
+    pub(super) permit_randomization: bool,
+    pub(super) quiet: bool,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -144,17 +146,19 @@ pub(super) struct PreparedFeatureTestCase {
 pub(super) fn run_features_test(args: &[String]) -> std::process::ExitCode {
     match execute_feature_tests(args) {
         Ok(results) => {
-            println!("  ================== TEST REPORT ==================");
-            for result in &results {
-                let status = if result.passed {
-                    "✅ Passed"
-                } else {
-                    "❌ Failed"
-                };
-                println!("{status}:      '{}'", result.name);
-            }
-            if !common::has_flag(args, "--preserve-test-containers") {
-                println!("Cleaning up {} test containers", results.len());
+            if !common::has_flag(args, "--quiet") && !common::has_flag(args, "-q") {
+                println!("  ================== TEST REPORT ==================");
+                for result in &results {
+                    let status = if result.passed {
+                        "✅ Passed"
+                    } else {
+                        "❌ Failed"
+                    };
+                    println!("{status}:      '{}'", result.name);
+                }
+                if !common::has_flag(args, "--preserve-test-containers") {
+                    println!("Cleaning up {} test containers", results.len());
+                }
             }
             if results.iter().all(|result| result.passed) {
                 std::process::ExitCode::SUCCESS
@@ -201,10 +205,14 @@ fn parse_feature_test_options(args: &[String]) -> Result<FeatureTestOptions, Str
         .unwrap_or_else(|| DEFAULT_FEATURE_TEST_BASE_IMAGE.to_string());
     let remote_user = common::parse_option_value(args, "--remote-user");
     let preserve_test_containers = common::has_flag(args, "--preserve-test-containers");
+    let permit_randomization = common::has_flag(args, "--permit-randomization");
+    let quiet = common::has_flag(args, "--quiet") || common::has_flag(args, "-q");
     Ok(FeatureTestOptions {
         project_folder,
         base_image,
         remote_user,
         preserve_test_containers,
+        permit_randomization,
+        quiet,
     })
 }

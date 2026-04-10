@@ -141,6 +141,35 @@ fn up_applies_feature_runtime_metadata_to_container_creation() {
 }
 
 #[test]
+fn up_adds_gpu_flags_when_required_and_gpu_availability_is_all() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"hostRequirements\": {\n    \"gpu\": \"required\"\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--gpu-availability",
+            "all",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains("--gpus all"));
+}
+
+#[test]
 fn up_mounts_git_root_by_default_and_uses_subfolder_workdir() {
     let harness = RuntimeHarness::new();
     let repo_root = harness.root.join("repo");

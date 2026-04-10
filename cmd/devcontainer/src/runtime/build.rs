@@ -152,7 +152,8 @@ pub(crate) fn build_feature_image(
 ) -> Result<String, String> {
     let build_context_dir = unique_feature_build_dir();
     fs::create_dir_all(&build_context_dir).map_err(|error| error.to_string())?;
-    let dockerfile_path = write_feature_dockerfile(&build_context_dir, base_image, installations)?;
+    let dockerfile_path =
+        write_feature_dockerfile(args, &build_context_dir, base_image, installations)?;
     let mut engine_args = engine_build_args(args, image_name, &dockerfile_path);
     engine_args.push(build_context_dir.display().to_string());
 
@@ -180,12 +181,13 @@ fn maybe_push_image(args: &[String], image_name: &str) -> Result<(), String> {
 }
 
 fn write_feature_dockerfile(
+    args: &[String],
     build_context_dir: &Path,
     base_image: &str,
     installations: &[configuration::FeatureInstallation],
 ) -> Result<PathBuf, String> {
     let dockerfile_path = build_context_dir.join("Dockerfile");
-    let mut dockerfile = format!("FROM {base_image}\n");
+    let mut dockerfile = format!("{}FROM {base_image}\n", dockerfile_prefix(args));
     for (index, installation) in installations.iter().enumerate() {
         let feature_name = configuration::feature_installation_name(installation);
         let destination = format!("feature-{index}-{feature_name}");
@@ -211,6 +213,14 @@ fn write_feature_dockerfile(
     }
     fs::write(&dockerfile_path, dockerfile).map_err(|error| error.to_string())?;
     Ok(dockerfile_path)
+}
+
+fn dockerfile_prefix(args: &[String]) -> &'static str {
+    if common::runtime_options(args).omit_syntax_directive {
+        ""
+    } else {
+        "# syntax=docker/dockerfile:1.4\n"
+    }
 }
 
 fn engine_build_args(args: &[String], image_name: &str, dockerfile_path: &Path) -> Vec<String> {

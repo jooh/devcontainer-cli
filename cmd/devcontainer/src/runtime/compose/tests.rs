@@ -68,11 +68,15 @@ fn inspects_service_image_and_build_presence() {
     )
     .expect("compose file");
 
-    let (image, has_build) =
+    let definition =
         inspect_service_definition(&[compose_file], "app").expect("service definition");
 
-    assert_eq!(image.as_deref(), Some("example/native-compose:test"));
-    assert!(has_build);
+    assert_eq!(
+        definition.image.as_deref(),
+        Some("example/native-compose:test")
+    );
+    assert!(definition.has_build);
+    assert_eq!(definition.user, None);
     let _ = fs::remove_dir_all(root);
 }
 
@@ -409,6 +413,39 @@ fn metadata_override_file_does_not_promote_remote_user_to_service_user() {
     let override_content = fs::read_to_string(&override_file).expect("override content");
 
     assert!(!override_content.contains("user: 'vscode'"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_adds_gpu_resources_when_requested() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "hostRequirements": {
+                "gpu": "required"
+            }
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(
+        &resolved,
+        &["--gpu-availability".to_string(), "all".to_string()],
+        "/workspaces/project",
+        None,
+    )
+    .expect("override result")
+    .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("deploy:"));
+    assert!(override_content.contains("capabilities: [gpu]"));
 
     let _ = fs::remove_file(override_file);
     let _ = fs::remove_dir_all(root);

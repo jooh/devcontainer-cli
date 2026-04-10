@@ -169,7 +169,8 @@ pub(super) fn prepare_feature_test_case(
         FeatureTestExecution::Duplicate { feature } => {
             let feature_dir = options.project_folder.join("src").join(feature);
             let default_options = feature_option_values(&feature_dir, &Value::Object(Map::new()))?;
-            let alternate_options = alternate_feature_option_values(&feature_dir)?;
+            let alternate_options =
+                alternate_feature_option_values(&feature_dir, options.permit_randomization)?;
             let mut exec_env = alternate_options.clone();
             exec_env.extend(
                 default_options

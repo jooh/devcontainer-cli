@@ -27,12 +27,15 @@ pub fn run_build(args: &[String]) -> Result<Value, String> {
         &resolved.config_file,
         &resolved.configuration,
     )?;
+    let skip_feature_customizations =
+        common::runtime_options(args).skip_persisting_customizations_from_features;
     let effective_configuration = feature_support
         .as_ref()
         .map(|resolved_features| {
-            configuration::apply_feature_metadata(
+            configuration::apply_feature_metadata_with_options(
                 &resolved.configuration,
                 &resolved_features.metadata_entries,
+                skip_feature_customizations,
             )
         })
         .unwrap_or_else(|| resolved.configuration.clone());
@@ -71,12 +74,14 @@ pub fn run_up(args: &[String]) -> Result<Value, String> {
         configuration: effective_configuration.clone(),
     };
     lifecycle::run_initialize_command(
+        args,
         &effective_resolved.configuration,
         &effective_resolved.workspace_folder,
     )?;
     let compose_project_name =
         compose::load_compose_spec(&effective_resolved)?.map(|spec| spec.project_name);
     let image_name = build::runtime_image_name(&effective_resolved, args)?;
+    let image_name = container::prepare_up_image(&effective_resolved, args, &image_name)?;
     let remote_workspace_folder =
         context::remote_workspace_folder_for_args(&effective_resolved, args);
     let up_container = container::ensure_up_container(

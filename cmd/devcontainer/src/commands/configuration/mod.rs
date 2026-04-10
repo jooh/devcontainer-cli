@@ -93,7 +93,15 @@ pub(crate) fn feature_installation_name(installation: &features::FeatureInstalla
 }
 
 pub(crate) fn apply_feature_metadata(configuration: &Value, metadata_entries: &[Value]) -> Value {
-    features::apply_feature_metadata(configuration, metadata_entries)
+    features::apply_feature_metadata(configuration, metadata_entries, false)
+}
+
+pub(crate) fn apply_feature_metadata_with_options(
+    configuration: &Value,
+    metadata_entries: &[Value],
+    skip_feature_customizations: bool,
+) -> Value {
+    features::apply_feature_metadata(configuration, metadata_entries, skip_feature_customizations)
 }
 
 pub(crate) fn ensure_native_lockfile(
