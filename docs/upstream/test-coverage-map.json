@@ -105,7 +105,7 @@
 			"nativeTests": [
 				"cmd/devcontainer/src/commands/collections/tests/publish.rs"
 			],
-			"notes": "Native publish tests only validate local OCI layout output, not authenticated registry push behavior."
+			"notes": "Native publish tests now cover local OCI layout output plus semantic tag updates across repeated publishes, but authenticated registry push behavior is still missing."
 		},
 		{
 			"upstreamTest": "upstream/src/test/container-features/containerFeaturesOrder.test.ts",
