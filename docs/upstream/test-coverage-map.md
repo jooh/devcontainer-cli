@@ -1,0 +1,48 @@
+# Upstream Test Coverage Map
+
+Machine-readable upstream test coverage inventory for the native Rust CLI.
+
+- Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
+- Upstream tests inventoried: `34`
+- Covered: `3`
+- Partial: `24`
+- Missing: `7`
+
+## Summary
+
+| Upstream test | Status | Native tests | Notes |
+| --- | --- | --- | --- |
+| `upstream/src/test/cli.build.test.ts` | partial | `cmd/devcontainer/tests/runtime_build_smoke.rs`<br>`cmd/devcontainer/tests/runtime_build_smoke/compose.rs`<br>`cmd/devcontainer/tests/runtime_build_smoke/dockerfile.rs`<br>`cmd/devcontainer/tests/runtime_build_smoke/features.rs` | Native build coverage is broad, but the upstream CLI build matrix is still larger. |
+| `upstream/src/test/cli.exec.buildKit.1.test.ts` | partial | `cmd/devcontainer/tests/runtime_exec_smoke.rs`<br>`cmd/devcontainer/tests/runtime_context_smoke.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs` | Exec coverage exists, but not in the same buildkit matrix shape as upstream. |
+| `upstream/src/test/cli.exec.buildKit.2.test.ts` | partial | `cmd/devcontainer/tests/runtime_exec_smoke.rs`<br>`cmd/devcontainer/tests/runtime_context_smoke.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs` | Exec semantics are covered, but not with upstream's full buildkit CLI matrix. |
+| `upstream/src/test/cli.exec.nonBuildKit.1.test.ts` | partial | `cmd/devcontainer/tests/runtime_exec_smoke.rs`<br>`cmd/devcontainer/tests/runtime_context_smoke.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs` | Non-buildkit exec behavior is exercised indirectly, not with direct upstream-equivalent scenarios. |
+| `upstream/src/test/cli.exec.nonBuildKit.2.test.ts` | partial | `cmd/devcontainer/tests/runtime_exec_smoke.rs`<br>`cmd/devcontainer/tests/runtime_context_smoke.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs` | Non-buildkit exec behavior is only partially mirrored natively. |
+| `upstream/src/test/cli.podman.test.ts` | partial | `cmd/devcontainer/tests/runtime_build_smoke/dockerfile.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs`<br>`cmd/devcontainer/tests/runtime_lifecycle_smoke/commands.rs` | Native tests use a fake podman engine heavily, but upstream podman integration coverage is broader. |
+| `upstream/src/test/cli.set-up.test.ts` | partial | `cmd/devcontainer/tests/runtime_lifecycle_smoke.rs`<br>`cmd/devcontainer/tests/runtime_lifecycle_smoke/commands.rs`<br>`cmd/devcontainer/tests/runtime_exec_smoke.rs` | Set-up flows are exercised through lifecycle smoke tests, but not with upstream's full fixture matrix. |
+| `upstream/src/test/cli.test.ts` | partial | `cmd/devcontainer/tests/cli_smoke.rs`<br>`cmd/devcontainer/src/cli.rs` | Top-level CLI behavior is covered, but native help and dispatch coverage is narrower than upstream's CLI suite. |
+| `upstream/src/test/cli.up.test.ts` | partial | `cmd/devcontainer/tests/runtime_container_smoke.rs`<br>`cmd/devcontainer/tests/runtime_build_smoke.rs`<br>`cmd/devcontainer/tests/runtime_lifecycle_smoke.rs` | Native up coverage is strong, but still does not match the upstream CLI scenario matrix. |
+| `upstream/src/test/container-features/containerFeaturesOCI.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/features.rs` | Published Feature identifiers and metadata are tested, but real OCI fetch semantics are still stubbed. |
+| `upstream/src/test/container-features/containerFeaturesOCIPush.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/publish.rs` | Native publish tests only validate local OCI layout output, not authenticated registry push behavior. |
+| `upstream/src/test/container-features/containerFeaturesOrder.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/features.rs`<br>`cmd/devcontainer/src/commands/configuration/tests/read.rs` | Dependency ordering is covered, but not with the full upstream OCI-backed graph cases. |
+| `upstream/src/test/container-features/e2e.test.ts` | partial | `cmd/devcontainer/tests/runtime_build_smoke/features.rs`<br>`cmd/devcontainer/tests/cli_smoke/collections.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs` | Feature end-to-end flows exist natively, but rely on repo-owned substitutes for published content. |
+| `upstream/src/test/container-features/featureAdvisories.test.ts` | missing | none | No native advisory fetch or range-matching tests exist yet. |
+| `upstream/src/test/container-features/featureHelpers.test.ts` | partial | `cmd/devcontainer/src/commands/collections/feature_tests/materialize.rs`<br>`cmd/devcontainer/src/commands/collections/tests/feature_tests.rs` | Native helper coverage focuses on test materialization, not the full upstream helper surface. |
+| `upstream/src/test/container-features/featuresCLICommands.test.ts` | partial | `cmd/devcontainer/tests/cli_smoke/collections.rs`<br>`cmd/devcontainer/src/commands/collections/tests/features.rs`<br>`cmd/devcontainer/src/commands/collections/tests/feature_tests.rs`<br>`cmd/devcontainer/src/commands/collections/tests/publish.rs` | CLI coverage exists for Features commands, but published flows remain substitute-based. |
+| `upstream/src/test/container-features/generateFeaturesConfig.test.ts` | partial | `cmd/devcontainer/src/commands/configuration/tests/read.rs`<br>`cmd/devcontainer/tests/runtime_build_smoke/features.rs` | Generated feature configuration is exercised indirectly through read/build paths. |
+| `upstream/src/test/container-features/lifecycleHooks.test.ts` | partial | `cmd/devcontainer/tests/runtime_lifecycle_smoke.rs`<br>`cmd/devcontainer/tests/runtime_lifecycle_smoke/commands.rs`<br>`cmd/devcontainer/tests/runtime_lifecycle_smoke/selection.rs` | Lifecycle behavior is tested natively, but not specifically as upstream Feature-contributed hook cases. |
+| `upstream/src/test/container-features/lockfile.test.ts` | covered | `cmd/devcontainer/tests/cli_smoke/lockfile.rs`<br>`cmd/devcontainer/src/commands/configuration/tests/upgrade.rs` | Native lockfile coverage includes outdated, upgrade, dry-run, and root-relative path handling. |
+| `upstream/src/test/container-features/registryCompatibilityOCI.test.ts` | missing | none | No native registry-auth compatibility suite exists for anonymous or authenticated OCI pulls. |
+| `upstream/src/test/container-templates/containerTemplatesOCI.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/templates.rs` | Published template identifiers are covered, but real OCI template fetch behavior is not. |
+| `upstream/src/test/container-templates/templatesCLICommands.test.ts` | partial | `cmd/devcontainer/tests/cli_smoke/collections.rs`<br>`cmd/devcontainer/src/commands/collections/tests/templates.rs`<br>`cmd/devcontainer/src/commands/collections/tests/publish.rs` | Template CLI commands are covered locally, but published-template flows remain partial. |
+| `upstream/src/test/disallowedFeatures.test.ts` | missing | none | No native control-manifest enforcement tests for disallowed Features exist yet. |
+| `upstream/src/test/dockerComposeUtils.test.ts` | partial | `cmd/devcontainer/src/runtime/compose/tests.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/compose_project.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/compose_flow.rs` | Compose project naming and mount behavior are covered, but not every upstream utility case. |
+| `upstream/src/test/dockerfileUtils.test.ts` | partial | `cmd/devcontainer/tests/runtime_build_smoke/dockerfile.rs` | Dockerfile build behavior is tested natively, but utility-level edge cases are not fully mirrored. |
+| `upstream/src/test/dockerUtils.test.ts` | missing | none | No direct native equivalent for upstream docker utility unit tests is tracked yet. |
+| `upstream/src/test/dotfiles.test.ts` | covered | `cmd/devcontainer/tests/runtime_lifecycle_smoke/dotfiles.rs` | Native dotfiles coverage includes ordering, reinstall markers, and personalization stop behavior. |
+| `upstream/src/test/getEntPasswd.test.ts` | missing | none | No native passwd-entry parsing or lookup tests exist. |
+| `upstream/src/test/getHomeFolder.test.ts` | missing | none | No native home-folder resolution test suite exists. |
+| `upstream/src/test/imageMetadata.test.ts` | partial | `cmd/devcontainer/tests/runtime_exec_smoke.rs`<br>`cmd/devcontainer/tests/runtime_configuration_smoke.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs`<br>`cmd/devcontainer/tests/runtime_build_smoke/features.rs`<br>`cmd/devcontainer/src/runtime/metadata.rs` | Metadata persistence and merge behavior are covered, but upstream image metadata matrices are broader. |
+| `upstream/src/test/updateUID.test.ts` | covered | `cmd/devcontainer/src/runtime/container/uid_update/tests.rs` | Native UID-update coverage includes image inspection, platform preservation, local tags, and podman behavior. |
+| `upstream/src/test/utils.test.ts` | missing | none | No single native utility suite maps to upstream spec utility coverage. |
+| `upstream/src/test/variableSubstitution.test.ts` | partial | `cmd/devcontainer/src/config.rs`<br>`cmd/devcontainer/tests/cli_smoke/read_configuration.rs` | Native substitution coverage exists, but the supported substitution surface is still narrower than upstream. |
+| `upstream/src/test/workspaceConfiguration.test.ts` | partial | `cmd/devcontainer/src/runtime/context.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/compose_project.rs` | Workspace mount behavior is covered, but upstream cross-platform path cases are broader. |

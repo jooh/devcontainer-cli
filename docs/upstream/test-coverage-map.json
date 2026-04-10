@@ -1,0 +1,303 @@
+{
+	"upstreamCommit": "39685cf1aa58b5b11e90085bd32562fad61f4103",
+	"suites": [
+		{
+			"upstreamTest": "upstream/src/test/cli.build.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_build_smoke.rs",
+				"cmd/devcontainer/tests/runtime_build_smoke/compose.rs",
+				"cmd/devcontainer/tests/runtime_build_smoke/dockerfile.rs",
+				"cmd/devcontainer/tests/runtime_build_smoke/features.rs"
+			],
+			"notes": "Native build coverage is broad, but the upstream CLI build matrix is still larger."
+		},
+		{
+			"upstreamTest": "upstream/src/test/cli.exec.buildKit.1.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_exec_smoke.rs",
+				"cmd/devcontainer/tests/runtime_context_smoke.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs"
+			],
+			"notes": "Exec coverage exists, but not in the same buildkit matrix shape as upstream."
+		},
+		{
+			"upstreamTest": "upstream/src/test/cli.exec.buildKit.2.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_exec_smoke.rs",
+				"cmd/devcontainer/tests/runtime_context_smoke.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs"
+			],
+			"notes": "Exec semantics are covered, but not with upstream's full buildkit CLI matrix."
+		},
+		{
+			"upstreamTest": "upstream/src/test/cli.exec.nonBuildKit.1.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_exec_smoke.rs",
+				"cmd/devcontainer/tests/runtime_context_smoke.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs"
+			],
+			"notes": "Non-buildkit exec behavior is exercised indirectly, not with direct upstream-equivalent scenarios."
+		},
+		{
+			"upstreamTest": "upstream/src/test/cli.exec.nonBuildKit.2.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_exec_smoke.rs",
+				"cmd/devcontainer/tests/runtime_context_smoke.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs"
+			],
+			"notes": "Non-buildkit exec behavior is only partially mirrored natively."
+		},
+		{
+			"upstreamTest": "upstream/src/test/cli.podman.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_build_smoke/dockerfile.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs",
+				"cmd/devcontainer/tests/runtime_lifecycle_smoke/commands.rs"
+			],
+			"notes": "Native tests use a fake podman engine heavily, but upstream podman integration coverage is broader."
+		},
+		{
+			"upstreamTest": "upstream/src/test/cli.set-up.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_lifecycle_smoke.rs",
+				"cmd/devcontainer/tests/runtime_lifecycle_smoke/commands.rs",
+				"cmd/devcontainer/tests/runtime_exec_smoke.rs"
+			],
+			"notes": "Set-up flows are exercised through lifecycle smoke tests, but not with upstream's full fixture matrix."
+		},
+		{
+			"upstreamTest": "upstream/src/test/cli.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/cli_smoke.rs",
+				"cmd/devcontainer/src/cli.rs"
+			],
+			"notes": "Top-level CLI behavior is covered, but native help and dispatch coverage is narrower than upstream's CLI suite."
+		},
+		{
+			"upstreamTest": "upstream/src/test/cli.up.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_container_smoke.rs",
+				"cmd/devcontainer/tests/runtime_build_smoke.rs",
+				"cmd/devcontainer/tests/runtime_lifecycle_smoke.rs"
+			],
+			"notes": "Native up coverage is strong, but still does not match the upstream CLI scenario matrix."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/containerFeaturesOCI.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/commands/collections/tests/features.rs"
+			],
+			"notes": "Published Feature identifiers and metadata are tested, but real OCI fetch semantics are still stubbed."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/containerFeaturesOCIPush.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/commands/collections/tests/publish.rs"
+			],
+			"notes": "Native publish tests only validate local OCI layout output, not authenticated registry push behavior."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/containerFeaturesOrder.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/commands/collections/tests/features.rs",
+				"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+			],
+			"notes": "Dependency ordering is covered, but not with the full upstream OCI-backed graph cases."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/e2e.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_build_smoke/features.rs",
+				"cmd/devcontainer/tests/cli_smoke/collections.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs"
+			],
+			"notes": "Feature end-to-end flows exist natively, but rely on repo-owned substitutes for published content."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/featureAdvisories.test.ts",
+			"status": "missing",
+			"nativeTests": [],
+			"notes": "No native advisory fetch or range-matching tests exist yet."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/featureHelpers.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/commands/collections/feature_tests/materialize.rs",
+				"cmd/devcontainer/src/commands/collections/tests/feature_tests.rs"
+			],
+			"notes": "Native helper coverage focuses on test materialization, not the full upstream helper surface."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/featuresCLICommands.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/cli_smoke/collections.rs",
+				"cmd/devcontainer/src/commands/collections/tests/features.rs",
+				"cmd/devcontainer/src/commands/collections/tests/feature_tests.rs",
+				"cmd/devcontainer/src/commands/collections/tests/publish.rs"
+			],
+			"notes": "CLI coverage exists for Features commands, but published flows remain substitute-based."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/generateFeaturesConfig.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+				"cmd/devcontainer/tests/runtime_build_smoke/features.rs"
+			],
+			"notes": "Generated feature configuration is exercised indirectly through read/build paths."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/lifecycleHooks.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_lifecycle_smoke.rs",
+				"cmd/devcontainer/tests/runtime_lifecycle_smoke/commands.rs",
+				"cmd/devcontainer/tests/runtime_lifecycle_smoke/selection.rs"
+			],
+			"notes": "Lifecycle behavior is tested natively, but not specifically as upstream Feature-contributed hook cases."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/lockfile.test.ts",
+			"status": "covered",
+			"nativeTests": [
+				"cmd/devcontainer/tests/cli_smoke/lockfile.rs",
+				"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs"
+			],
+			"notes": "Native lockfile coverage includes outdated, upgrade, dry-run, and root-relative path handling."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-features/registryCompatibilityOCI.test.ts",
+			"status": "missing",
+			"nativeTests": [],
+			"notes": "No native registry-auth compatibility suite exists for anonymous or authenticated OCI pulls."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-templates/containerTemplatesOCI.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+			],
+			"notes": "Published template identifiers are covered, but real OCI template fetch behavior is not."
+		},
+		{
+			"upstreamTest": "upstream/src/test/container-templates/templatesCLICommands.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/cli_smoke/collections.rs",
+				"cmd/devcontainer/src/commands/collections/tests/templates.rs",
+				"cmd/devcontainer/src/commands/collections/tests/publish.rs"
+			],
+			"notes": "Template CLI commands are covered locally, but published-template flows remain partial."
+		},
+		{
+			"upstreamTest": "upstream/src/test/disallowedFeatures.test.ts",
+			"status": "missing",
+			"nativeTests": [],
+			"notes": "No native control-manifest enforcement tests for disallowed Features exist yet."
+		},
+		{
+			"upstreamTest": "upstream/src/test/dockerComposeUtils.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/runtime/compose/tests.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/compose_project.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/compose_flow.rs"
+			],
+			"notes": "Compose project naming and mount behavior are covered, but not every upstream utility case."
+		},
+		{
+			"upstreamTest": "upstream/src/test/dockerUtils.test.ts",
+			"status": "missing",
+			"nativeTests": [],
+			"notes": "No direct native equivalent for upstream docker utility unit tests is tracked yet."
+		},
+		{
+			"upstreamTest": "upstream/src/test/dockerfileUtils.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_build_smoke/dockerfile.rs"
+			],
+			"notes": "Dockerfile build behavior is tested natively, but utility-level edge cases are not fully mirrored."
+		},
+		{
+			"upstreamTest": "upstream/src/test/dotfiles.test.ts",
+			"status": "covered",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_lifecycle_smoke/dotfiles.rs"
+			],
+			"notes": "Native dotfiles coverage includes ordering, reinstall markers, and personalization stop behavior."
+		},
+		{
+			"upstreamTest": "upstream/src/test/getEntPasswd.test.ts",
+			"status": "missing",
+			"nativeTests": [],
+			"notes": "No native passwd-entry parsing or lookup tests exist."
+		},
+		{
+			"upstreamTest": "upstream/src/test/getHomeFolder.test.ts",
+			"status": "missing",
+			"nativeTests": [],
+			"notes": "No native home-folder resolution test suite exists."
+		},
+		{
+			"upstreamTest": "upstream/src/test/imageMetadata.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/tests/runtime_exec_smoke.rs",
+				"cmd/devcontainer/tests/runtime_configuration_smoke.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs",
+				"cmd/devcontainer/tests/runtime_build_smoke/features.rs",
+				"cmd/devcontainer/src/runtime/metadata.rs"
+			],
+			"notes": "Metadata persistence and merge behavior are covered, but upstream image metadata matrices are broader."
+		},
+		{
+			"upstreamTest": "upstream/src/test/updateUID.test.ts",
+			"status": "covered",
+			"nativeTests": [
+				"cmd/devcontainer/src/runtime/container/uid_update/tests.rs"
+			],
+			"notes": "Native UID-update coverage includes image inspection, platform preservation, local tags, and podman behavior."
+		},
+		{
+			"upstreamTest": "upstream/src/test/utils.test.ts",
+			"status": "missing",
+			"nativeTests": [],
+			"notes": "No single native utility suite maps to upstream spec utility coverage."
+		},
+		{
+			"upstreamTest": "upstream/src/test/variableSubstitution.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/config.rs",
+				"cmd/devcontainer/tests/cli_smoke/read_configuration.rs"
+			],
+			"notes": "Native substitution coverage exists, but the supported substitution surface is still narrower than upstream."
+		},
+		{
+			"upstreamTest": "upstream/src/test/workspaceConfiguration.test.ts",
+			"status": "partial",
+			"nativeTests": [
+				"cmd/devcontainer/src/runtime/context.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs",
+				"cmd/devcontainer/tests/runtime_container_smoke/compose_project.rs"
+			],
+			"notes": "Workspace mount behavior is covered, but upstream cross-platform path cases are broader."
+		}
+	]
+}
