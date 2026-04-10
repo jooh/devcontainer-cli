@@ -88,6 +88,43 @@ fn features_test_fails_when_a_test_script_fails() {
 }
 
 #[test]
+fn features_test_quiet_suppresses_local_report_output() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.root.join("feature-project");
+    let src = workspace.join("src").join("demo");
+    let test = workspace.join("test").join("demo");
+    fs::create_dir_all(&src).expect("feature src");
+    fs::create_dir_all(&test).expect("feature test");
+    fs::write(
+        src.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("manifest");
+    fs::write(test.join("test.sh"), "#!/bin/sh\nexit 0\n").expect("test script");
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "features",
+            "test",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--project-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--quiet",
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(!stdout.contains("TEST REPORT"));
+    assert!(!stdout.contains("Cleaning up"));
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn templates_apply_supports_published_template_ids() {
     let workspace = unique_temp_dir("devcontainer-cli-smoke");
     fs::create_dir_all(&workspace).expect("workspace");

@@ -301,3 +301,49 @@ fn features_test_accepts_published_feature_dependencies_in_scenarios() {
     }
     let _ = fs::remove_dir_all(root);
 }
+
+#[test]
+fn features_test_duplicate_cases_accept_permit_randomization() {
+    let root = unique_temp_dir();
+    let src = root.join("src").join("demo");
+    let test = root.join("test").join("demo");
+    fs::create_dir_all(&src).expect("feature src");
+    fs::create_dir_all(&test).expect("feature test");
+    fs::write(
+        src.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"demo\",\n  \"name\": \"Demo Feature\",\n  \"version\": \"1.0.0\",\n  \"options\": {\n    \"color\": {\n      \"type\": \"string\",\n      \"enum\": [\"blue\", \"green\", \"red\"],\n      \"default\": \"blue\"\n    }\n  }\n}\n",
+    )
+    .expect("manifest");
+    fs::write(src.join("install.sh"), "#!/bin/sh\nexit 0\n").expect("install script");
+    fs::write(test.join("duplicate.sh"), "#!/bin/sh\nexit 0\n").expect("duplicate script");
+
+    let mut runtime = FakeFeatureTestRuntime::default();
+    let results = execute_feature_tests_with_runtime(
+        &[
+            "--preserve-test-containers".to_string(),
+            "--permit-randomization".to_string(),
+            root.display().to_string(),
+        ],
+        &mut runtime,
+    )
+    .expect("test execution");
+
+    assert_eq!(results.len(), 1);
+    let duplicate_exec = runtime
+        .exec_calls
+        .iter()
+        .find(|call| call.4 == "duplicate.sh")
+        .expect("duplicate exec call");
+    let color = duplicate_exec
+        .3
+        .iter()
+        .find(|(key, _)| key == "COLOR")
+        .map(|(_, value)| value.as_str())
+        .expect("duplicate env");
+    assert_ne!(color, "blue");
+
+    for (_, workspace_dir) in &runtime.start_calls {
+        let _ = fs::remove_dir_all(workspace_dir);
+    }
+    let _ = fs::remove_dir_all(root);
+}

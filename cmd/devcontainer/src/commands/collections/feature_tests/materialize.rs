@@ -144,6 +144,7 @@ fn feature_option_values_from_manifest(manifest: &Value, value: &Value) -> Vec<(
 
 pub(super) fn alternate_feature_option_values(
     feature_dir: &Path,
+    permit_randomization: bool,
 ) -> Result<Vec<(String, String)>, String> {
     let manifest = common::parse_manifest(feature_dir, "devcontainer-feature.json")?;
     let Some(options) = manifest.get("options").and_then(Value::as_object) else {
@@ -166,12 +167,13 @@ pub(super) fn alternate_feature_option_values(
                     .and_then(Value::as_array)
                 {
                     let default = default.map(json_value_to_env);
-                    candidates
-                        .iter()
-                        .map(json_value_to_env)
-                        .find(|candidate| Some(candidate.clone()) != default)
-                        .or(default)
-                        .unwrap_or_default()
+                    choose_alternate_string_candidate(
+                        candidates,
+                        default.as_deref(),
+                        permit_randomization,
+                    )
+                    .or(default)
+                    .unwrap_or_default()
                 } else {
                     default.map(json_value_to_env).unwrap_or_default()
                 }
@@ -193,6 +195,39 @@ fn json_value_to_env(value: &Value) -> String {
         Value::String(text) => text.clone(),
         _ => value.to_string(),
     }
+}
+
+fn choose_alternate_string_candidate(
+    candidates: &[Value],
+    default: Option<&str>,
+    permit_randomization: bool,
+) -> Option<String> {
+    let values = candidates.iter().map(json_value_to_env).collect::<Vec<_>>();
+    if values.is_empty() {
+        return None;
+    }
+
+    let default_index =
+        default.and_then(|default| values.iter().position(|value| value == default));
+    let alternate_indexes = values
+        .iter()
+        .enumerate()
+        .filter_map(|(index, _)| (Some(index) != default_index).then_some(index))
+        .collect::<Vec<_>>();
+    if alternate_indexes.is_empty() {
+        return values.first().cloned();
+    }
+
+    let selected_index = if permit_randomization {
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("time went backwards")
+            .as_nanos() as usize;
+        alternate_indexes[seed % alternate_indexes.len()]
+    } else {
+        alternate_indexes[0]
+    };
+    values.get(selected_index).cloned()
 }
 
 fn feature_option_env_name(key: &str) -> String {
@@ -337,4 +372,70 @@ fn scenario_config_root(workspace_dir: &Path, scenario_dir: &str) -> PathBuf {
 
 pub(super) fn shell_single_quote(value: &str) -> String {
     format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use serde_json::json;
+
+    use super::{
+        alternate_feature_option_values, choose_alternate_string_candidate, unique_feature_test_dir,
+    };
+
+    #[test]
+    fn choose_alternate_string_candidate_prefers_first_non_default_without_randomization() {
+        let selected = choose_alternate_string_candidate(
+            &json!(["blue", "green", "red"])
+                .as_array()
+                .expect("array")
+                .clone(),
+            Some("blue"),
+            false,
+        );
+
+        assert_eq!(selected.as_deref(), Some("green"));
+    }
+
+    #[test]
+    fn choose_alternate_string_candidate_returns_non_default_with_randomization() {
+        let selected = choose_alternate_string_candidate(
+            &json!(["blue", "green", "red"])
+                .as_array()
+                .expect("array")
+                .clone(),
+            Some("blue"),
+            true,
+        )
+        .expect("selection");
+
+        assert!(selected == "green" || selected == "red");
+    }
+
+    #[test]
+    fn alternate_feature_option_values_uses_first_non_default_by_default() {
+        let feature_dir = unique_feature_test_dir();
+        fs::create_dir_all(&feature_dir).expect("feature dir");
+        fs::write(
+            feature_dir.join("devcontainer-feature.json"),
+            r#"{
+  "id": "demo",
+  "version": "1.0.0",
+  "options": {
+    "color": {
+      "type": "string",
+      "enum": ["blue", "green", "red"],
+      "default": "blue"
+    }
+  }
+}"#,
+        )
+        .expect("manifest");
+
+        let values = alternate_feature_option_values(&feature_dir, false).expect("values");
+
+        assert_eq!(values, vec![("COLOR".to_string(), "green".to_string())]);
+        let _ = fs::remove_dir_all(feature_dir);
+    }
 }
