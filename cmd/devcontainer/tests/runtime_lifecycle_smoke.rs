@@ -180,6 +180,54 @@ fn dotfiles_marker_skips_reinstall_on_followup_lifecycle_runs() {
 }
 
 #[test]
+fn run_user_commands_stops_for_personalization_before_post_start_and_post_attach() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let dotfiles_repo = workspace.join("dotfiles-repo");
+    let order_log = workspace.join("order.log");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    init_dotfiles_repo(
+        &dotfiles_repo,
+        "#!/bin/sh\nset -eu\nprintf 'dotfiles\\n' >> ../order.log\n",
+    );
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"printf 'post-create\\\\n' > order.log\",\n  \"postStartCommand\": \"printf 'post-start\\\\n' >> order.log\",\n  \"postAttachCommand\": \"printf 'post-attach\\\\n' >> order.log\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run_in_dir(
+        &[
+            "run-user-commands",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--stop-for-personalization",
+            "--dotfiles-repository",
+            "./dotfiles-repo",
+            "--dotfiles-target-path",
+            "./applied-dotfiles",
+            "--container-data-folder",
+            "./.devcontainer-data",
+        ],
+        &[("FAKE_PODMAN_PS_OUTPUT", "fake-container-id")],
+        Some(&workspace),
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(order_log).expect("order log"),
+        "post-create\ndotfiles\n"
+    );
+    let exec_log = harness.read_exec_log();
+    assert!(exec_log.contains("/bin/sh -lc printf 'post-create\\n' > order.log"));
+    assert!(exec_log.contains("git clone --depth 1"));
+    assert!(!exec_log.contains("printf 'post-start\\n' >> order.log"));
+    assert!(!exec_log.contains("printf 'post-attach\\n' >> order.log"));
+}
+
+#[test]
 fn run_user_commands_with_container_id_loads_metadata_lifecycle_hooks() {
     let harness = RuntimeHarness::new();
     let inspect_path = harness.root.join("inspect.json");

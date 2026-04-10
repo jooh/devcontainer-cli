@@ -16,6 +16,8 @@ pub(crate) struct RuntimeOptions {
     pub(crate) buildkit: Option<String>,
     pub(crate) omit_syntax_directive: bool,
     pub(crate) skip_persisting_customizations_from_features: bool,
+    pub(crate) skip_feature_auto_mapping: bool,
+    pub(crate) stop_for_personalization: bool,
     pub(crate) dotfiles_repository: Option<String>,
     pub(crate) dotfiles_install_command: Option<String>,
     pub(crate) dotfiles_target_path: Option<String>,
@@ -55,6 +57,8 @@ pub(crate) fn runtime_options(args: &[String]) -> RuntimeOptions {
             args,
             "--skip-persisting-customizations-from-features",
         ),
+        skip_feature_auto_mapping: parse_bool_option(args, "--skip-feature-auto-mapping", false),
+        stop_for_personalization: parse_bool_option(args, "--stop-for-personalization", false),
         dotfiles_repository: parse_option_value(args, "--dotfiles-repository"),
         dotfiles_install_command: parse_option_value(args, "--dotfiles-install-command"),
         dotfiles_target_path: parse_option_value(args, "--dotfiles-target-path"),
@@ -470,6 +474,8 @@ mod tests {
             "never".to_string(),
             "--omit-syntax-directive".to_string(),
             "--skip-persisting-customizations-from-features".to_string(),
+            "--skip-feature-auto-mapping".to_string(),
+            "--stop-for-personalization".to_string(),
             "--dotfiles-repository".to_string(),
             "./dotfiles".to_string(),
             "--dotfiles-install-command".to_string(),
@@ -494,6 +500,8 @@ mod tests {
         assert_eq!(options.buildkit.as_deref(), Some("never"));
         assert!(options.omit_syntax_directive);
         assert!(options.skip_persisting_customizations_from_features);
+        assert!(options.skip_feature_auto_mapping);
+        assert!(options.stop_for_personalization);
         assert_eq!(options.dotfiles_repository.as_deref(), Some("./dotfiles"));
         assert_eq!(
             options.dotfiles_install_command.as_deref(),
@@ -520,5 +528,18 @@ mod tests {
             options.default_user_env_probe.as_deref(),
             Some("loginShell")
         );
+    }
+
+    #[test]
+    fn runtime_options_parse_explicit_false_for_hidden_runtime_flags() {
+        let options = runtime_options(&[
+            "--skip-feature-auto-mapping".to_string(),
+            "false".to_string(),
+            "--stop-for-personalization".to_string(),
+            "0".to_string(),
+        ]);
+
+        assert!(!options.skip_feature_auto_mapping);
+        assert!(!options.stop_for_personalization);
     }
 }

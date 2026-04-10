@@ -34,7 +34,10 @@ pub(crate) fn exec_command_and_args(args: &[String]) -> Result<Vec<String>, Stri
         }
         if matches!(
             arg.as_str(),
-            "--interactive" | "--mount-workspace-git-root" | "--mount-git-worktree-common-dir"
+            "--interactive"
+                | "--mount-workspace-git-root"
+                | "--mount-git-worktree-common-dir"
+                | "--skip-feature-auto-mapping"
         ) {
             index += if arg != "--interactive"
                 && args
@@ -212,6 +215,7 @@ mod tests {
             "/tmp/session".to_string(),
             "--default-user-env-probe".to_string(),
             "loginShell".to_string(),
+            "--skip-feature-auto-mapping".to_string(),
             "--terminal-columns".to_string(),
             "120".to_string(),
             "--terminal-rows".to_string(),

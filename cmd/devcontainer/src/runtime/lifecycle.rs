@@ -150,6 +150,7 @@ fn selected_lifecycle_steps(
     let skip_post_create = common::has_flag(args, "--skip-post-create");
     let skip_post_attach = common::has_flag(args, "--skip-post-attach");
     let skip_non_blocking = common::has_flag(args, "--skip-non-blocking-commands");
+    let stop_for_personalization = common::runtime_options(args).stop_for_personalization;
 
     if skip_post_create {
         return Vec::new();
@@ -198,11 +199,13 @@ fn selected_lifecycle_steps(
         if skip_non_blocking && stage == wait_for {
             break;
         }
-        if stage == "postCreateCommand"
-            && lifecycle_stage_runs_in_mode(stage, mode)
-            && dotfiles_install_command(args).is_some()
-        {
-            steps.push(LifecycleStep::InstallDotfiles);
+        if stage == "postCreateCommand" && lifecycle_stage_runs_in_mode(stage, mode) {
+            if dotfiles_install_command(args).is_some() {
+                steps.push(LifecycleStep::InstallDotfiles);
+            }
+            if stop_for_personalization {
+                break;
+            }
         }
     }
 
@@ -520,6 +523,27 @@ mod tests {
         assert!(matches!(steps[0], LifecycleStep::CommandGroup(_)));
         assert!(matches!(steps[1], LifecycleStep::InstallDotfiles));
         assert!(matches!(steps[2], LifecycleStep::CommandGroup(_)));
+    }
+
+    #[test]
+    fn selected_lifecycle_steps_stop_for_personalization_after_dotfiles() {
+        let steps = selected_lifecycle_steps(
+            &json!({
+                "postCreateCommand": "echo post-create",
+                "postStartCommand": "echo post-start",
+                "postAttachCommand": "echo post-attach"
+            }),
+            &[
+                "--stop-for-personalization".to_string(),
+                "--dotfiles-repository".to_string(),
+                "./dotfiles".to_string(),
+            ],
+            LifecycleMode::RunUserCommands,
+        );
+
+        assert_eq!(steps.len(), 2);
+        assert!(matches!(steps[0], LifecycleStep::CommandGroup(_)));
+        assert!(matches!(steps[1], LifecycleStep::InstallDotfiles));
     }
 
     #[test]
