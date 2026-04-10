@@ -5,7 +5,7 @@ Generated from the pinned upstream CLI command matrix and static source evidence
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped files: `198/200`
+- Upstream options with a native source reference in mapped files: `200/200`
 
 This report is a static inventory, not a semantic parity proof. A referenced option can still be only partially implemented, and command-level known gaps are called out explicitly below.
 
@@ -21,7 +21,7 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 | `outdated` | yes | 8/8 | 0 | 1 |
 | `upgrade` | yes | 8/8 | 0 | 1 |
 | `features` | yes | 0/0 | 0 | 1 |
-| `features test` | yes | 11/13 | 2 | 1 |
+| `features test` | yes | 13/13 | 0 | 1 |
 | `features package` | yes | 0/0 | 0 | 1 |
 | `features publish` | yes | 0/0 | 0 | 1 |
 | `features info` | yes | 2/2 | 0 | 1 |
@@ -102,8 +102,8 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Test Features
 - Declared natively: yes
-- Option source references: 11/13
-- Missing option references: `permit-randomization`, `quiet`
+- Option source references: 13/13
+- Missing option references: none
 - Known gaps: Native test runner exists, but parity with upstream feature resolution and registry-backed dependencies is incomplete.
 
 ## `features package`
