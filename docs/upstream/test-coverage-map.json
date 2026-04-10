@@ -300,11 +300,11 @@
 			"upstreamTest": "upstream/src/test/workspaceConfiguration.test.ts",
 			"status": "partial",
 			"nativeTests": [
-				"cmd/devcontainer/src/runtime/context.rs",
+				"cmd/devcontainer/src/runtime/context/workspace.rs",
 				"cmd/devcontainer/tests/runtime_container_smoke/basic.rs",
 				"cmd/devcontainer/tests/runtime_container_smoke/compose_project.rs"
 			],
-			"notes": "Workspace mount behavior is covered, but upstream cross-platform path cases are broader."
+			"notes": "Workspace mount behavior is covered, including lexical worktree common-dir normalization, but upstream cross-platform path cases are broader."
 		}
 	]
 }
