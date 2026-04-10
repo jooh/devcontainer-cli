@@ -5,7 +5,7 @@ Generated from the pinned upstream CLI command matrix and static source evidence
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped files: `192/200`
+- Upstream options with a native source reference in mapped files: `195/200`
 
 This report is a static inventory, not a semantic parity proof. A referenced option can still be only partially implemented, and command-level known gaps are called out explicitly below.
 
@@ -16,7 +16,7 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 | `up` | yes | 40/43 | 3 | 2 |
 | `set-up` | yes | 20/20 | 0 | 1 |
 | `build` | yes | 22/22 | 0 | 2 |
-| `run-user-commands` | yes | 25/27 | 2 | 1 |
+| `run-user-commands` | yes | 27/27 | 0 | 1 |
 | `read-configuration` | yes | 18/18 | 0 | 2 |
 | `outdated` | yes | 8/8 | 0 | 1 |
 | `upgrade` | yes | 8/8 | 0 | 1 |
@@ -32,7 +32,7 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 | `templates publish` | yes | 0/0 | 0 | 1 |
 | `templates metadata` | yes | 1/1 | 0 | 1 |
 | `templates generate-docs` | yes | 4/4 | 0 | 1 |
-| `exec` | yes | 18/19 | 1 | 1 |
+| `exec` | yes | 19/19 | 0 | 1 |
 
 ## `up`
 
@@ -62,8 +62,8 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Run user commands
 - Declared natively: yes
-- Option source references: 25/27
-- Missing option references: `skip-feature-auto-mapping`, `stop-for-personalization`
+- Option source references: 27/27
+- Missing option references: none
 - Known gaps: Lifecycle execution is native, but several upstream runtime and dotfiles flags are still missing.
 
 ## `read-configuration`
@@ -190,6 +190,6 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Execute a command on a running dev container
 - Declared natively: yes
-- Option source references: 18/19
-- Missing option references: `skip-feature-auto-mapping`
+- Option source references: 19/19
+- Missing option references: none
 - Known gaps: Core exec path is native, but upstream option coverage is still narrower.

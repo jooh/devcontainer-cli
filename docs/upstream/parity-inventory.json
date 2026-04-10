@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 192,
-		"optionsMissing": 8
+		"optionsReferenced": 195,
+		"optionsMissing": 5
 	},
 	"commands": [
 		{
@@ -296,8 +296,10 @@
 					"name": "skip-feature-auto-mapping",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
 				{
@@ -725,8 +727,10 @@
 					"name": "skip-feature-auto-mapping",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
 				{
@@ -772,8 +776,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 27,
-				"referenced": 25,
-				"missing": 2
+				"referenced": 27,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -934,8 +938,11 @@
 				},
 				{
 					"name": "skip-feature-auto-mapping",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "skip-non-blocking-commands",
@@ -953,8 +960,11 @@
 				},
 				{
 					"name": "stop-for-personalization",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
 				},
 				{
 					"name": "terminal-columns",
@@ -1139,8 +1149,10 @@
 					"name": "skip-feature-auto-mapping",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
 				{
@@ -1818,8 +1830,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 19,
-				"referenced": 18,
-				"missing": 1
+				"referenced": 19,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -1942,8 +1954,11 @@
 				},
 				{
 					"name": "skip-feature-auto-mapping",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "terminal-columns",
