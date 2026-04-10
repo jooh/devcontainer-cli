@@ -3,6 +3,9 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
+use serde_json::json;
+use sha2::{Digest, Sha256};
+
 use super::support::unique_temp_dir;
 use crate::commands::configuration::upgrade::{
     build_outdated_payload, feature_id_without_version, lockfile_path, run_upgrade_lockfile,
@@ -89,4 +92,171 @@ fn lockfile_path_matches_upstream_dotfile_rule() {
         lockfile_path(Path::new("/tmp/workspace/.devcontainer/devcontainer.json")),
         PathBuf::from("/tmp/workspace/.devcontainer/devcontainer-lock.json")
     );
+}
+
+#[test]
+fn outdated_payload_reads_workspace_oci_layout_versions() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("failed to create root");
+    let digest = write_workspace_layout_version(
+        &root,
+        "ghcr.io/acme/features/published-feature",
+        "1.0.0",
+        None,
+    );
+    write_workspace_layout_version(
+        &root,
+        "ghcr.io/acme/features/published-feature",
+        "1.0.1",
+        None,
+    );
+    write_workspace_layout_version(
+        &root,
+        "ghcr.io/acme/features/published-feature",
+        "2.0.0",
+        None,
+    );
+    fs::write(
+        root.join(".devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/acme/features/published-feature:1.0\": {}\n  }\n}\n",
+    )
+    .expect("failed to write config");
+    fs::write(
+        root.join(".devcontainer-lock.json"),
+        format!(
+            "{{\n  \"features\": {{\n    \"ghcr.io/acme/features/published-feature:1.0\": {{\n      \"version\": \"1.0.0\",\n      \"resolved\": \"ghcr.io/acme/features/published-feature@sha256:{digest}\",\n      \"integrity\": \"sha256:{digest}\"\n    }}\n  }}\n}}\n"
+        ),
+    )
+    .expect("failed to write lockfile");
+
+    let args = vec!["--workspace-folder".to_string(), root.display().to_string()];
+    let payload = build_outdated_payload(&args).expect("payload");
+
+    assert_eq!(
+        payload["features"]["ghcr.io/acme/features/published-feature:1.0"]["current"],
+        "1.0.0"
+    );
+    assert_eq!(
+        payload["features"]["ghcr.io/acme/features/published-feature:1.0"]["wanted"],
+        "1.0.1"
+    );
+    assert_eq!(
+        payload["features"]["ghcr.io/acme/features/published-feature:1.0"]["latest"],
+        "2.0.0"
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn upgrade_lockfile_reads_workspace_oci_layout_digests() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("failed to create root");
+    write_workspace_layout_version(
+        &root,
+        "ghcr.io/acme/features/published-feature",
+        "1.0.0",
+        None,
+    );
+    let latest_digest = write_workspace_layout_version(
+        &root,
+        "ghcr.io/acme/features/published-feature",
+        "1.1.0",
+        Some(&["ghcr.io/acme/features/dependency"]),
+    );
+    fs::write(
+        root.join(".devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/acme/features/published-feature:1\": {}\n  }\n}\n",
+    )
+    .expect("failed to write config");
+
+    let lockfile =
+        run_upgrade_lockfile(&["--workspace-folder".to_string(), root.display().to_string()])
+            .expect("lockfile payload");
+
+    assert_eq!(
+        lockfile.features["ghcr.io/acme/features/published-feature:1"].version,
+        "1.1.0"
+    );
+    assert_eq!(
+        lockfile.features["ghcr.io/acme/features/published-feature:1"].resolved,
+        format!("ghcr.io/acme/features/published-feature@sha256:{latest_digest}")
+    );
+    assert_eq!(
+        lockfile.features["ghcr.io/acme/features/published-feature:1"].depends_on,
+        Some(vec!["ghcr.io/acme/features/dependency".to_string()])
+    );
+    let _ = fs::remove_dir_all(root);
+}
+
+fn write_workspace_layout_version(
+    workspace_root: &Path,
+    base: &str,
+    version: &str,
+    depends_on: Option<&[&str]>,
+) -> String {
+    let layout_dir = workspace_root
+        .join(".devcontainer")
+        .join("oci-layouts")
+        .join(base);
+    fs::create_dir_all(layout_dir.join("blobs").join("sha256")).expect("layout blobs");
+    fs::write(
+        layout_dir.join("oci-layout"),
+        "{\n  \"imageLayoutVersion\": \"1.0.0\"\n}\n",
+    )
+    .expect("layout marker");
+
+    let metadata = json!({
+        "id": "published-feature",
+        "version": version,
+        "dependsOn": depends_on.map(|entries| entries.iter().copied().collect::<Vec<_>>()),
+    });
+    let manifest = json!({
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "annotations": {
+            "dev.containers.metadata": metadata.to_string(),
+        }
+    });
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("manifest bytes");
+    let digest = sha256_digest(&manifest_bytes);
+    fs::write(
+        layout_dir.join("blobs").join("sha256").join(&digest),
+        &manifest_bytes,
+    )
+    .expect("manifest blob");
+
+    let mut manifests = if layout_dir.join("index.json").is_file() {
+        let index: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(layout_dir.join("index.json")).expect("index"),
+        )
+        .expect("index json");
+        index["manifests"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    manifests.push(json!({
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "digest": format!("sha256:{digest}"),
+        "size": manifest_bytes.len(),
+        "annotations": {
+            "org.opencontainers.image.ref.name": version,
+        }
+    }));
+    fs::write(
+        layout_dir.join("index.json"),
+        serde_json::to_string_pretty(&json!({
+            "schemaVersion": 2,
+            "manifests": manifests,
+        }))
+        .expect("index payload"),
+    )
+    .expect("index write");
+
+    digest
+}
+
+fn sha256_digest(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
 }

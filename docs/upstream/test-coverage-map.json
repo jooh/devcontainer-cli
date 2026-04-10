@@ -181,7 +181,7 @@
 				"cmd/devcontainer/tests/cli_smoke/lockfile.rs",
 				"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs"
 			],
-			"notes": "Native lockfile coverage includes outdated, upgrade, dry-run, and root-relative path handling."
+			"notes": "Native lockfile coverage includes outdated, upgrade, dry-run, root-relative path handling, and workspace-local OCI layout mirrors for published Feature version and digest resolution."
 		},
 		{
 			"upstreamTest": "upstream/src/test/container-features/registryCompatibilityOCI.test.ts",

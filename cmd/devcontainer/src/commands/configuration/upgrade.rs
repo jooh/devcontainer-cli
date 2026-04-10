@@ -71,7 +71,10 @@ pub(super) fn ensure_native_lockfile(
         return Ok(());
     }
 
-    let generated = generate_lockfile(configuration)?;
+    let workspace_folder = common::parse_option_value(args, "--workspace-folder")
+        .map(PathBuf::from)
+        .or_else(|| config_file.parent().map(Path::to_path_buf));
+    let generated = generate_lockfile(configuration, workspace_folder.as_deref())?;
     let path = lockfile_path(config_file);
     if common::has_flag(args, "--experimental-frozen-lockfile") {
         let existing = read_lockfile(path.clone())?;
@@ -108,7 +111,11 @@ pub(super) fn build_outdated_payload(args: &[String]) -> Result<Value, String> {
             continue;
         };
 
-        let Some(feature_info) = build_feature_version_info(&reference, lockfile.as_ref()) else {
+        let Some(feature_info) = build_feature_version_info(
+            &reference,
+            lockfile.as_ref(),
+            Some(loaded.workspace_folder.as_path()),
+        ) else {
             continue;
         };
         payload_features.insert(feature_id.clone(), feature_info);
@@ -137,7 +144,10 @@ pub(super) fn run_upgrade_lockfile(args: &[String]) -> Result<Lockfile, String> 
         loaded = load_config(args)?;
     }
 
-    let generated = generate_lockfile(&loaded.configuration)?;
+    let generated = generate_lockfile(
+        &loaded.configuration,
+        Some(loaded.workspace_folder.as_path()),
+    )?;
     if !common::has_flag(args, "--dry-run") {
         let lockfile_path = lockfile_path(&loaded.config_file);
         fs::write(
@@ -175,7 +185,10 @@ fn validate_upgrade_options(args: &[String]) -> Result<(), String> {
     Ok(())
 }
 
-fn generate_lockfile(configuration: &Value) -> Result<Lockfile, String> {
+fn generate_lockfile(
+    configuration: &Value,
+    workspace_folder: Option<&Path>,
+) -> Result<Lockfile, String> {
     let features = configuration
         .get("features")
         .and_then(Value::as_object)
@@ -188,18 +201,22 @@ fn generate_lockfile(configuration: &Value) -> Result<Lockfile, String> {
             continue;
         };
 
-        let (lockfile_key, entry) = generate_lockfile_entry(&reference).ok_or_else(|| {
-            format!("Unsupported feature for native lockfile generation: {feature_id}")
-        })?;
+        let (lockfile_key, entry) = generate_lockfile_entry(&reference, workspace_folder)
+            .ok_or_else(|| {
+                format!("Unsupported feature for native lockfile generation: {feature_id}")
+            })?;
         resolved.insert(lockfile_key, entry);
     }
 
     Ok(Lockfile { features: resolved })
 }
 
-fn generate_lockfile_entry(feature: &FeatureReference) -> Option<(String, LockfileEntry)> {
+fn generate_lockfile_entry(
+    feature: &FeatureReference,
+    workspace_folder: Option<&Path>,
+) -> Option<(String, LockfileEntry)> {
     if feature.digest.is_some() {
-        return exact_catalog_entry(&feature.original).map(|entry| {
+        return exact_catalog_entry(&feature.original, workspace_folder).map(|entry| {
             (
                 feature.original.clone(),
                 LockfileEntry {
@@ -214,17 +231,17 @@ fn generate_lockfile_entry(feature: &FeatureReference) -> Option<(String, Lockfi
 
     let version = if let Some(tag) = feature.tag.as_deref() {
         if tag == "latest" {
-            latest_version(&feature.base)?
+            latest_version(&feature.base, workspace_folder)?
         } else if tag.matches('.').count() == 2 {
             tag.to_string()
         } else {
-            resolve_wanted_version(feature, None)?
+            resolve_wanted_version(feature, None, workspace_folder)?
         }
     } else {
-        latest_version(&feature.base)?
+        latest_version(&feature.base, workspace_folder)?
     };
 
-    let entry = catalog_entry_for_version(&feature.base, &version)?;
+    let entry = catalog_entry_for_version(&feature.base, &version, workspace_folder)?;
     Some((
         feature.original.clone(),
         LockfileEntry {

@@ -353,6 +353,7 @@
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/discovery.rs",
 						"cmd/devcontainer/src/runtime/context/inspection.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
@@ -732,6 +733,7 @@
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/discovery.rs",
 						"cmd/devcontainer/src/runtime/context/inspection.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
@@ -1145,6 +1147,7 @@
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/discovery.rs",
 						"cmd/devcontainer/src/runtime/context/inspection.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
@@ -1221,7 +1224,8 @@
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs"
+						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				}
 			],
@@ -1299,7 +1303,8 @@
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs"
+						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				}
 			],
