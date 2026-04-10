@@ -1,3 +1,5 @@
+//! Runtime smoke tests for configuration reporting behavior.
+
 mod support;
 
 use std::fs;

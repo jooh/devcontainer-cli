@@ -1,3 +1,5 @@
+//! Output rendering helpers for JSON and human-readable command results.
+
 #[derive(Clone, Copy)]
 pub enum LogFormat {
     Text,

@@ -1,29 +1,27 @@
-use std::collections::HashMap;
-use std::env;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::Command;
+//! Runtime config loading and container-context resolution helpers.
 
-use serde_json::{Map, Value};
+mod inspection;
+mod workspace;
+
+use std::path::PathBuf;
+
+use serde_json::Value;
 
 use crate::commands::common;
-use crate::config::{self, ConfigContext};
 
 use super::compose;
 use super::container;
-use super::engine;
-use super::metadata::{merged_container_metadata, mount_option_target};
+use inspection::{inspect_container_context, workspace_folder_from_args};
+
+pub(crate) use workspace::{
+    combined_remote_env, configured_user, default_remote_workspace_folder, derived_workspace_mount,
+    remote_user, remote_workspace_folder_for_args, workspace_mount_for_args,
+};
 
 pub(crate) struct ResolvedConfig {
     pub(crate) workspace_folder: PathBuf,
     pub(crate) config_file: PathBuf,
     pub(crate) configuration: Value,
-}
-
-struct InspectedContainerContext {
-    configuration: Value,
-    local_workspace_folder: Option<PathBuf>,
-    remote_workspace_folder: Option<String>,
 }
 
 pub(crate) struct ExistingContainerContext {
@@ -101,7 +99,7 @@ pub(crate) fn resolve_existing_container_context(
         .as_ref()
         .map(|value| value.configuration.clone())
         .or_else(|| inspected.as_ref().map(|value| value.configuration.clone()))
-        .unwrap_or_else(|| Value::Object(Map::new()));
+        .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
     let remote_workspace_folder = resolved
         .as_ref()
         .map(|resolved| remote_workspace_folder_for_args(resolved, args))
@@ -126,392 +124,14 @@ pub(crate) fn resolve_existing_container_context(
     })
 }
 
-pub(crate) fn remote_user(configuration: &Value) -> String {
-    configured_user(configuration).unwrap_or("root").to_string()
-}
-
-pub(crate) fn configured_user(configuration: &Value) -> Option<&str> {
-    configuration
-        .get("remoteUser")
-        .or_else(|| configuration.get("containerUser"))
-        .and_then(Value::as_str)
-}
-
-pub(crate) fn combined_remote_env(
-    args: &[String],
-    configuration: Option<&Value>,
-) -> Result<HashMap<String, String>, String> {
-    let mut remote_env = HashMap::new();
-    if let Some(config_env) = configuration
-        .and_then(|value| value.get("remoteEnv"))
-        .and_then(Value::as_object)
-    {
-        for (key, value) in config_env {
-            if let Some(value) = value.as_str() {
-                remote_env.insert(key.clone(), value.to_string());
-            }
-        }
-    }
-    remote_env.extend(common::secrets_env(args)?);
-    remote_env.extend(common::remote_env_overrides(args));
-    Ok(remote_env)
-}
-
-#[cfg_attr(not(test), allow(dead_code))]
-pub(crate) fn remote_workspace_folder(resolved: &ResolvedConfig) -> String {
-    resolved
-        .configuration
-        .get("workspaceFolder")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .or_else(|| {
-            resolved
-                .configuration
-                .get("workspaceMount")
-                .and_then(Value::as_str)
-                .and_then(mount_option_target)
-        })
-        .unwrap_or_else(|| {
-            derived_workspace_mount(&resolved.workspace_folder, &[])
-                .map(|derived| derived.remote_workspace_folder)
-                .unwrap_or_else(|| {
-                    default_remote_workspace_folder(Some(&resolved.workspace_folder))
-                })
-        })
-}
-
-#[allow(dead_code)]
-pub(crate) fn workspace_mount(resolved: &ResolvedConfig, remote_workspace_folder: &str) -> String {
-    resolved
-        .configuration
-        .get("workspaceMount")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .unwrap_or_else(|| {
-            default_workspace_mount(&resolved.workspace_folder, remote_workspace_folder, &[])
-        })
-}
-
-pub(crate) fn remote_workspace_folder_for_args(
-    resolved: &ResolvedConfig,
-    args: &[String],
-) -> String {
-    resolved
-        .configuration
-        .get("workspaceFolder")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .or_else(|| {
-            resolved
-                .configuration
-                .get("workspaceMount")
-                .and_then(Value::as_str)
-                .and_then(mount_option_target)
-        })
-        .unwrap_or_else(|| {
-            derived_workspace_mount(&resolved.workspace_folder, args)
-                .map(|derived| derived.remote_workspace_folder)
-                .unwrap_or_else(|| {
-                    default_remote_workspace_folder(Some(&resolved.workspace_folder))
-                })
-        })
-}
-
-pub(crate) fn workspace_mount_for_args(
-    resolved: &ResolvedConfig,
-    remote_workspace_folder: &str,
-    args: &[String],
-) -> String {
-    resolved
-        .configuration
-        .get("workspaceMount")
-        .and_then(Value::as_str)
-        .map(str::to_string)
-        .unwrap_or_else(|| {
-            default_workspace_mount(&resolved.workspace_folder, remote_workspace_folder, args)
-        })
-}
-
-pub(crate) fn default_remote_workspace_folder(workspace_folder: Option<&Path>) -> String {
-    let basename = workspace_folder
-        .and_then(Path::file_name)
-        .and_then(|value| value.to_str())
-        .unwrap_or("workspace");
-    format!("/workspaces/{basename}")
-}
-
-pub(crate) fn derived_workspace_mount(
-    workspace_folder: &Path,
-    args: &[String],
-) -> Option<DerivedWorkspaceMount> {
-    let mount_workspace_git_root =
-        common::parse_bool_option(args, "--mount-workspace-git-root", true);
-    let host_mount_folder = if mount_workspace_git_root {
-        find_git_root_folder(workspace_folder).unwrap_or_else(|| workspace_folder.to_path_buf())
-    } else {
-        workspace_folder.to_path_buf()
-    };
-    let mut container_mount_folder = format!(
-        "/workspaces/{}",
-        host_mount_folder
-            .file_name()
-            .and_then(|value| value.to_str())
-            .unwrap_or("workspace")
-    );
-    let mut additional_mounts = Vec::new();
-    if mount_workspace_git_root
-        && common::parse_bool_option(args, "--mount-git-worktree-common-dir", false)
-    {
-        if let Some((updated_container_mount_folder, additional_mount)) =
-            git_worktree_common_dir_mount(&host_mount_folder, args, &container_mount_folder)
-        {
-            container_mount_folder = updated_container_mount_folder;
-            additional_mounts.push(additional_mount);
-        }
-    }
-    let relative = workspace_folder.strip_prefix(&host_mount_folder).ok();
-    let remote_workspace_folder = relative
-        .filter(|path| !path.as_os_str().is_empty())
-        .map(|path| {
-            let suffix = path
-                .components()
-                .map(|component| component.as_os_str().to_string_lossy().into_owned())
-                .collect::<Vec<_>>()
-                .join("/");
-            format!("{container_mount_folder}/{suffix}")
-        })
-        .unwrap_or_else(|| container_mount_folder.clone());
-    Some(DerivedWorkspaceMount {
-        host_mount_folder,
-        container_mount_folder,
-        remote_workspace_folder,
-        additional_mounts,
-    })
-}
-
-fn default_workspace_mount(
-    workspace_folder: &Path,
-    remote_workspace_folder: &str,
-    args: &[String],
-) -> String {
-    let Some(derived) = derived_workspace_mount(workspace_folder, args) else {
-        return format!(
-            "type=bind,source={},target={remote_workspace_folder}",
-            workspace_folder.display()
-        );
-    };
-    let mut mount = format!(
-        "type=bind,source={},target={}",
-        derived.host_mount_folder.display(),
-        derived.container_mount_folder
-    );
-    append_workspace_mount_consistency(&mut mount, args);
-    mount
-}
-
-fn git_worktree_common_dir_mount(
-    host_mount_folder: &Path,
-    args: &[String],
-    default_container_mount_folder: &str,
-) -> Option<(String, String)> {
-    let dot_git_path = host_mount_folder.join(".git");
-    if !dot_git_path.is_file() {
-        return None;
-    }
-
-    let dot_git_content = fs::read_to_string(&dot_git_path).ok()?;
-    let gitdir = dot_git_content
-        .lines()
-        .find_map(|line| line.strip_prefix("gitdir:"))
-        .map(str::trim)?;
-    let gitdir_path = Path::new(gitdir);
-    if gitdir_path.is_absolute() {
-        return None;
-    }
-
-    let git_common_dir = normalize_path(host_mount_folder.join(gitdir_path).join("..").join(".."));
-    let mut current = host_mount_folder;
-    let mut segments = Vec::new();
-    while !git_common_dir.starts_with(current) {
-        segments.push(
-            current
-                .file_name()
-                .and_then(|value| value.to_str())
-                .unwrap_or("workspace")
-                .to_string(),
-        );
-        current = current.parent()?;
-    }
-    segments.reverse();
-
-    let container_mount_folder = if segments.is_empty() {
-        default_container_mount_folder.to_string()
-    } else {
-        format!("/workspaces/{}", segments.join("/"))
-    };
-    let relative_git_common_dir = git_common_dir.strip_prefix(current).ok()?;
-    let container_git_common_dir = join_container_path("/workspaces", relative_git_common_dir);
-
-    let mut additional_mount = format!(
-        "type=bind,source={},target={container_git_common_dir}",
-        git_common_dir.display()
-    );
-    append_workspace_mount_consistency(&mut additional_mount, args);
-
-    Some((container_mount_folder, additional_mount))
-}
-
-fn normalize_path(path: PathBuf) -> PathBuf {
-    fs::canonicalize(&path)
-        .ok()
-        .or_else(|| path.exists().then_some(path.clone()))
-        .unwrap_or(path)
-}
-
-fn join_container_path(base: &str, relative: &Path) -> String {
-    relative
-        .components()
-        .fold(base.to_string(), |mut path, component| {
-            if let std::path::Component::Normal(segment) = component {
-                path.push('/');
-                path.push_str(&segment.to_string_lossy());
-            }
-            path
-        })
-}
-
-fn append_workspace_mount_consistency(mount: &mut String, args: &[String]) {
-    if std::env::consts::OS != "linux" {
-        if let Some(consistency) = common::parse_option_value(args, "--workspace-mount-consistency")
-        {
-            mount.push_str(&format!(",consistency={consistency}"));
-        }
-    }
-}
-
-fn find_git_root_folder(workspace_folder: &Path) -> Option<PathBuf> {
-    let git_output = Command::new("git")
-        .args(["rev-parse", "--show-cdup"])
-        .current_dir(workspace_folder)
-        .output()
-        .ok()
-        .filter(|output| output.status.success())?;
-    let cdup = String::from_utf8_lossy(&git_output.stdout)
-        .trim()
-        .to_string();
-    if cdup.is_empty() {
-        return Some(workspace_folder.to_path_buf());
-    }
-    fs::canonicalize(workspace_folder.join(&cdup))
-        .ok()
-        .or_else(|| {
-            let candidate = workspace_folder.join(&cdup);
-            candidate.exists().then_some(candidate)
-        })
-}
-
-fn inspect_container_context(
-    args: &[String],
-    container_id: &str,
-) -> Result<InspectedContainerContext, String> {
-    let result = engine::run_engine(args, vec!["inspect".to_string(), container_id.to_string()])?;
-    if result.status_code != 0 {
-        return Err(engine::stderr_or_stdout(&result));
-    }
-
-    let inspected: Value = serde_json::from_str(&result.stdout)
-        .map_err(|error| format!("Invalid inspect JSON: {error}"))?;
-    let details = inspected
-        .as_array()
-        .and_then(|entries| entries.first())
-        .ok_or_else(|| "Container engine did not return inspect details".to_string())?;
-    let labels = details
-        .get("Config")
-        .and_then(|value| value.get("Labels"))
-        .and_then(Value::as_object);
-    let local_workspace_folder = labels
-        .and_then(|entries| entries.get("devcontainer.local_folder"))
-        .and_then(Value::as_str)
-        .map(PathBuf::from);
-    let mut configuration = merged_container_metadata(
-        labels
-            .and_then(|entries| entries.get("devcontainer.metadata"))
-            .and_then(Value::as_str),
-    );
-    if let Some(workspace_folder) = &local_workspace_folder {
-        configuration = config::substitute_local_context(
-            &configuration,
-            &ConfigContext {
-                workspace_folder: workspace_folder.clone(),
-                env: env::vars().collect(),
-                container_workspace_folder: None,
-                id_labels: HashMap::new(),
-            },
-        );
-    }
-    if configured_user(&configuration).is_none() {
-        if let Some(user) = details
-            .get("Config")
-            .and_then(|value| value.get("User"))
-            .and_then(Value::as_str)
-            .filter(|value| !value.is_empty())
-        {
-            if let Value::Object(entries) = &mut configuration {
-                entries.insert("containerUser".to_string(), Value::String(user.to_string()));
-            }
-        }
-    }
-
-    Ok(InspectedContainerContext {
-        remote_workspace_folder: configuration
-            .get("workspaceFolder")
-            .and_then(Value::as_str)
-            .map(str::to_string)
-            .or_else(|| inspect_workspace_mount(details, local_workspace_folder.as_deref())),
-        configuration,
-        local_workspace_folder,
-    })
-}
-
-fn inspect_workspace_mount(
-    details: &Value,
-    local_workspace_folder: Option<&Path>,
-) -> Option<String> {
-    let mounts = details.get("Mounts").and_then(Value::as_array)?;
-    if let Some(local_workspace_folder) = local_workspace_folder {
-        let local_workspace_folder = local_workspace_folder.display().to_string();
-        if let Some(destination) = mounts.iter().find_map(|mount| {
-            (mount.get("Source").and_then(Value::as_str) == Some(local_workspace_folder.as_str()))
-                .then(|| mount.get("Destination").and_then(Value::as_str))
-                .flatten()
-        }) {
-            return Some(destination.to_string());
-        }
-    }
-    mounts
-        .iter()
-        .find_map(|mount| mount.get("Destination").and_then(Value::as_str))
-        .map(str::to_string)
-}
-
-fn workspace_folder_from_args(args: &[String]) -> Result<Option<PathBuf>, String> {
-    if let Some(workspace_folder) = common::parse_option_value(args, "--workspace-folder") {
-        return Ok(Some(
-            fs::canonicalize(&workspace_folder).unwrap_or_else(|_| PathBuf::from(workspace_folder)),
-        ));
-    }
-    match env::current_dir() {
-        Ok(path) => Ok(Some(path)),
-        Err(error) => Err(error.to_string()),
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    //! Unit tests for runtime context helpers.
+
     use serde_json::json;
 
     use super::{
-        default_remote_workspace_folder, derived_workspace_mount, remote_workspace_folder,
+        default_remote_workspace_folder, derived_workspace_mount, remote_workspace_folder_for_args,
         workspace_mount_for_args, ResolvedConfig,
     };
 
@@ -525,7 +145,10 @@ mod tests {
             }),
         };
 
-        assert_eq!(remote_workspace_folder(&resolved), "/configured");
+        assert_eq!(
+            remote_workspace_folder_for_args(&resolved, &[]),
+            "/configured"
+        );
     }
 
     #[test]
@@ -538,7 +161,7 @@ mod tests {
             }),
         };
 
-        assert_eq!(remote_workspace_folder(&resolved), "/mounted");
+        assert_eq!(remote_workspace_folder_for_args(&resolved, &[]), "/mounted");
     }
 
     #[test]

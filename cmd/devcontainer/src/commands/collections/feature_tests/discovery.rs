@@ -1,3 +1,5 @@
+//! Feature test discovery helpers for collection commands.
+
 use std::fs;
 
 use serde_json::{Map, Value};

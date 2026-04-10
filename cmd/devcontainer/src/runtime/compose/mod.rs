@@ -1,3 +1,5 @@
+//! Compose-backed runtime orchestration for build, up, and container discovery.
+
 mod args;
 mod override_file;
 mod project;

@@ -1,3 +1,5 @@
+//! Native runtime exec argument assembly helpers.
+
 use std::io::IsTerminal;
 
 use serde_json::Value;

@@ -1,3 +1,5 @@
+//! Top-level command routing for the devcontainer CLI.
+
 mod collections;
 pub(crate) mod common;
 pub(crate) mod configuration;

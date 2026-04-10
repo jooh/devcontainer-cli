@@ -1,7 +1,7 @@
+//! Native image build orchestration for image, Dockerfile, and feature flows.
+
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{json, Value};
 
@@ -11,9 +11,7 @@ use crate::commands::configuration;
 use super::compose;
 use super::context::ResolvedConfig;
 use super::engine;
-use super::paths::resolve_relative;
-
-static NEXT_FEATURE_BUILD_ID: AtomicU64 = AtomicU64::new(0);
+use super::paths::{resolve_relative, unique_temp_path};
 
 pub(crate) fn runtime_image_name(
     resolved: &ResolvedConfig,
@@ -254,15 +252,7 @@ fn engine_build_args(args: &[String], image_name: &str, dockerfile_path: &Path) 
 }
 
 fn unique_feature_build_dir() -> PathBuf {
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos();
-    let unique_id = NEXT_FEATURE_BUILD_ID.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "devcontainer-feature-build-{}-{suffix}-{unique_id}",
-        std::process::id()
-    ))
+    unique_temp_path("devcontainer-feature-build", None)
 }
 
 fn shell_single_quote(value: &str) -> String {

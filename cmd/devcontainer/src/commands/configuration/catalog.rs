@@ -1,3 +1,5 @@
+//! Version catalog helpers for configuration upgrade and outdated commands.
+
 use std::cmp::Ordering;
 
 use serde_json::{Map, Value};

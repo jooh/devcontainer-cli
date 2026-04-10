@@ -1,3 +1,5 @@
+//! Exec command entrypoint and result formatting helpers.
+
 use std::io::{self, Write};
 use std::process::ExitCode;
 

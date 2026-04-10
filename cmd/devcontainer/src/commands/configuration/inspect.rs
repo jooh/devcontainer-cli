@@ -1,3 +1,5 @@
+//! Configuration inspection helpers for runtime and read-configuration flows.
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 

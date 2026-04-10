@@ -1,3 +1,5 @@
+//! Feature collection listing and inspection commands.
+
 use std::path::Path;
 
 use serde_json::{json, Value};

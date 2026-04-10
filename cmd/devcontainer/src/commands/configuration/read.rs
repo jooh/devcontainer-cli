@@ -1,3 +1,5 @@
+//! Native read-configuration command assembly and output helpers.
+
 use serde_json::{json, Map, Value};
 
 use super::inspect::{merged_configuration_payload, read_configuration_value, workspace_payload};

@@ -1,3 +1,5 @@
+//! CLI smoke tests for collection-oriented commands.
+
 use std::fs;
 
 use serde_json::Value;

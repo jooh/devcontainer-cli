@@ -1,5 +1,7 @@
 #![allow(dead_code)]
 
+//! Shared temporary-directory and binary lookup helpers for integration tests.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;

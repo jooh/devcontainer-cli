@@ -1,3 +1,5 @@
+//! Compose service inspection and build metadata helpers.
+
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;

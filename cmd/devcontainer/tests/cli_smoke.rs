@@ -1,3 +1,5 @@
+//! Integration test entrypoint for CLI smoke suites.
+
 mod support;
 
 #[path = "cli_smoke/collections.rs"]

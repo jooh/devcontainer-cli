@@ -1,3 +1,5 @@
+//! Template collection discovery, rendering, and write helpers.
+
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};

@@ -1,3 +1,5 @@
+//! Runtime smoke tests for context resolution and inspected-container behavior.
+
 mod support;
 
 use std::fs;
