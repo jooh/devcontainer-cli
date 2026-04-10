@@ -19,6 +19,7 @@ pub(crate) struct FeatureInstallation {
 #[derive(Clone, Debug)]
 pub(crate) struct ResolvedFeatureSupport {
     pub(crate) features_configuration: Value,
+    pub(crate) feature_advisories: Vec<Value>,
     pub(crate) metadata_entries: Vec<Value>,
     pub(crate) installations: Vec<FeatureInstallation>,
     pub(crate) ordered_feature_ids: Vec<String>,

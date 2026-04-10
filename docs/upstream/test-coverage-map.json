@@ -128,9 +128,12 @@
 		},
 		{
 			"upstreamTest": "upstream/src/test/container-features/featureAdvisories.test.ts",
-			"status": "missing",
-			"nativeTests": [],
-			"notes": "No native advisory fetch or range-matching tests exist yet."
+			"status": "covered",
+			"nativeTests": [
+				"cmd/devcontainer/src/commands/configuration/features/control.rs",
+				"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+			],
+			"notes": "Native coverage now exercises advisory range matching and read-configuration reporting for OCI-backed published Features."
 		},
 		{
 			"upstreamTest": "upstream/src/test/container-features/featureHelpers.test.ts",

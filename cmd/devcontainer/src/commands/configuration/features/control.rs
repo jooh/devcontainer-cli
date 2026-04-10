@@ -54,6 +54,46 @@ pub(crate) fn ensure_no_disallowed_features(
     Ok(())
 }
 
+pub(crate) fn feature_advisories_for_oci_features(
+    args: &[String],
+    features: &[(String, String)],
+) -> Result<Vec<Value>, String> {
+    if features.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let control_manifest = control_manifest(args)?;
+    let mut matches = Vec::new();
+    for (feature_id, version) in features {
+        let advisories = control_manifest
+            .feature_advisories
+            .iter()
+            .filter(|entry| {
+                entry.feature_id == *feature_id
+                    && feature_version_is_affected(
+                        version,
+                        &entry.introduced_in_version,
+                        &entry.fixed_in_version,
+                    )
+            })
+            .map(feature_advisory_json)
+            .collect::<Vec<_>>();
+        if advisories.is_empty() {
+            continue;
+        }
+
+        matches.push(serde_json::json!({
+            "feature": {
+                "id": feature_id,
+                "version": version,
+            },
+            "advisories": advisories,
+        }));
+    }
+
+    Ok(matches)
+}
+
 fn control_manifest(args: &[String]) -> Result<DevContainerControlManifest, String> {
     let Some(user_data_folder) = common::parse_option_value(args, "--user-data-folder") else {
         return Ok(fixture_control_manifest());
@@ -149,11 +189,53 @@ fn feature_matches_prefix(feature_id: &str, prefix: &str) -> bool {
             ))
 }
 
+fn feature_version_is_affected(
+    feature_version: &str,
+    introduced_in_version: &str,
+    fixed_in_version: &str,
+) -> bool {
+    let Some(feature_version) = parse_version(feature_version) else {
+        return false;
+    };
+    let Some(introduced_in_version) = parse_version(introduced_in_version) else {
+        return false;
+    };
+    let Some(fixed_in_version) = parse_version(fixed_in_version) else {
+        return false;
+    };
+
+    feature_version >= introduced_in_version && feature_version < fixed_in_version
+}
+
+fn parse_version(input: &str) -> Option<(u64, u64, u64)> {
+    let mut parts = input.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next().unwrap_or("0").parse().ok()?;
+    let patch = parts.next().unwrap_or("0").parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some((major, minor, patch))
+}
+
+fn feature_advisory_json(advisory: &FeatureAdvisory) -> Value {
+    serde_json::json!({
+        "featureId": advisory.feature_id,
+        "introducedInVersion": advisory.introduced_in_version,
+        "fixedInVersion": advisory.fixed_in_version,
+        "description": advisory.description,
+        "documentationURL": advisory.documentation_url,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{json, Map, Value};
 
-    use super::{ensure_no_disallowed_features, feature_matches_prefix, sanitize_control_manifest};
+    use super::{
+        ensure_no_disallowed_features, feature_advisories_for_oci_features, feature_matches_prefix,
+        sanitize_control_manifest,
+    };
     use crate::test_support::unique_temp_dir;
 
     #[test]
@@ -241,6 +323,81 @@ mod tests {
             "{error}"
         );
         let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn feature_advisories_match_versions_in_range() {
+        let advisories = feature_advisories_for_oci_features(
+            &[],
+            &[(
+                "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
+                "1.0.9".to_string(),
+            )],
+        )
+        .expect("advisories");
+
+        assert_eq!(advisories.len(), 1);
+        assert_eq!(
+            advisories[0]["feature"],
+            json!({
+                "id": "ghcr.io/devcontainers/features/feature-with-advisory",
+                "version": "1.0.9"
+            })
+        );
+        assert_eq!(
+            advisories[0]["advisories"].as_array().map(Vec::len),
+            Some(1)
+        );
+        assert_eq!(
+            advisories[0]["advisories"][0]["introducedInVersion"],
+            "1.0.7"
+        );
+        assert_eq!(advisories[0]["advisories"][0]["fixedInVersion"], "1.1.10");
+
+        let advisories = feature_advisories_for_oci_features(
+            &[],
+            &[(
+                "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
+                "1.1.5".to_string(),
+            )],
+        )
+        .expect("advisories");
+
+        assert_eq!(advisories.len(), 1);
+        assert_eq!(advisories[0]["feature"]["version"], "1.1.5");
+    }
+
+    #[test]
+    fn feature_advisories_skip_versions_outside_range() {
+        let advisories = feature_advisories_for_oci_features(
+            &[],
+            &[(
+                "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
+                "1.0.6".to_string(),
+            )],
+        )
+        .expect("advisories");
+        assert!(advisories.is_empty());
+
+        let advisories = feature_advisories_for_oci_features(
+            &[],
+            &[(
+                "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
+                "1.1.10".to_string(),
+            )],
+        )
+        .expect("advisories");
+        assert!(advisories.is_empty());
+
+        let advisories = feature_advisories_for_oci_features(
+            &[],
+            &[(
+                "ghcr.io/devcontainers/features/other-feature".to_string(),
+                "1.0.9".to_string(),
+            )],
+        )
+        .expect("advisories");
+        assert!(advisories.is_empty());
     }
 
     #[test]

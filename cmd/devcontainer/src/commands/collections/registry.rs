@@ -61,6 +61,12 @@ pub(crate) fn published_feature_manifest(feature_id: &str) -> Option<Value> {
                 "upgradePackages": { "type": "string", "default": "true" }
             }
         })),
+        "ghcr.io/devcontainers/features/feature-with-advisory" => Some(json!({
+            "id": "feature-with-advisory",
+            "name": "Feature With Advisory",
+            "version": "1.0.9",
+            "options": {}
+        })),
         "ghcr.io/devcontainers/features/docker-from-docker" => Some(json!({
             "id": "docker-from-docker",
             "name": "Docker from Docker",

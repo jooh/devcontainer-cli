@@ -4,9 +4,9 @@ Machine-readable upstream test coverage inventory for the native Rust CLI.
 
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Upstream tests inventoried: `34`
-- Covered: `4`
+- Covered: `5`
 - Partial: `24`
-- Missing: `6`
+- Missing: `5`
 
 ## Summary
 
@@ -25,7 +25,7 @@ Machine-readable upstream test coverage inventory for the native Rust CLI.
 | `upstream/src/test/container-features/containerFeaturesOCIPush.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/publish.rs` | Native publish tests only validate local OCI layout output, not authenticated registry push behavior. |
 | `upstream/src/test/container-features/containerFeaturesOrder.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/features.rs`<br>`cmd/devcontainer/src/commands/configuration/tests/read.rs` | Dependency ordering is covered, but not with the full upstream OCI-backed graph cases. |
 | `upstream/src/test/container-features/e2e.test.ts` | partial | `cmd/devcontainer/tests/runtime_build_smoke/features.rs`<br>`cmd/devcontainer/tests/cli_smoke/collections.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/basic.rs` | Feature end-to-end flows exist natively, but rely on repo-owned substitutes for published content. |
-| `upstream/src/test/container-features/featureAdvisories.test.ts` | missing | none | No native advisory fetch or range-matching tests exist yet. |
+| `upstream/src/test/container-features/featureAdvisories.test.ts` | covered | `cmd/devcontainer/src/commands/configuration/features/control.rs`<br>`cmd/devcontainer/src/commands/configuration/tests/read.rs` | Native coverage now exercises advisory range matching and read-configuration reporting for OCI-backed published Features. |
 | `upstream/src/test/container-features/featureHelpers.test.ts` | partial | `cmd/devcontainer/src/commands/collections/feature_tests/materialize.rs`<br>`cmd/devcontainer/src/commands/collections/tests/feature_tests.rs` | Native helper coverage focuses on test materialization, not the full upstream helper surface. |
 | `upstream/src/test/container-features/featuresCLICommands.test.ts` | partial | `cmd/devcontainer/tests/cli_smoke/collections.rs`<br>`cmd/devcontainer/src/commands/collections/tests/features.rs`<br>`cmd/devcontainer/src/commands/collections/tests/feature_tests.rs`<br>`cmd/devcontainer/src/commands/collections/tests/publish.rs` | CLI coverage exists for Features commands, but published flows remain substitute-based. |
 | `upstream/src/test/container-features/generateFeaturesConfig.test.ts` | partial | `cmd/devcontainer/src/commands/configuration/tests/read.rs`<br>`cmd/devcontainer/tests/runtime_build_smoke/features.rs` | Generated feature configuration is exercised indirectly through read/build paths. |

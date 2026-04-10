@@ -10,7 +10,7 @@ use crate::commands::collections::registry::{
 };
 use crate::commands::common;
 
-use super::control::ensure_no_disallowed_features;
+use super::control::{ensure_no_disallowed_features, feature_advisories_for_oci_features};
 use super::metadata::feature_metadata_entry;
 use super::options::{feature_object, feature_option_values_from_manifest, feature_options};
 use super::types::{
@@ -32,6 +32,7 @@ pub(crate) fn resolve_feature_support(
     let config_root = config_file.parent().unwrap_or(workspace_folder);
     let ordered_ids = resolve_feature_install_order(&declared, configuration, config_root)?;
     let mut feature_sets = Vec::new();
+    let mut advisory_inputs = Vec::new();
     let mut metadata_entries = Vec::new();
     let mut installations = Vec::new();
 
@@ -53,13 +54,26 @@ pub(crate) fn resolve_feature_support(
         {
             metadata_entries.push(spec.metadata_entry);
         }
+        if matches!(
+            &spec.installation.source,
+            FeatureInstallationSource::Published(_)
+        ) {
+            if let Some(version) = spec.manifest.get("version").and_then(Value::as_str) {
+                advisory_inputs.push((
+                    normalize_collection_reference(feature_id),
+                    version.to_string(),
+                ));
+            }
+        }
         installations.push(spec.installation);
     }
+    let feature_advisories = feature_advisories_for_oci_features(args, &advisory_inputs)?;
 
     Ok(Some(ResolvedFeatureSupport {
         features_configuration: json!({
             "featureSets": feature_sets,
         }),
+        feature_advisories,
         metadata_entries,
         installations,
         ordered_feature_ids: ordered_ids,
