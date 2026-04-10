@@ -10,6 +10,7 @@ use crate::commands::collections::registry::{
 };
 use crate::commands::common;
 
+use super::control::ensure_no_disallowed_features;
 use super::metadata::feature_metadata_entry;
 use super::options::{feature_object, feature_option_values_from_manifest, feature_options};
 use super::types::{
@@ -26,6 +27,7 @@ pub(crate) fn resolve_feature_support(
     if declared.is_empty() {
         return Ok(None);
     }
+    ensure_no_disallowed_features(args, &declared)?;
 
     let config_root = config_file.parent().unwrap_or(workspace_folder);
     let ordered_ids = resolve_feature_install_order(&declared, configuration, config_root)?;

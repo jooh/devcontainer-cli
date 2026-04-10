@@ -4,9 +4,9 @@ Machine-readable upstream test coverage inventory for the native Rust CLI.
 
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Upstream tests inventoried: `34`
-- Covered: `3`
+- Covered: `4`
 - Partial: `24`
-- Missing: `7`
+- Missing: `6`
 
 ## Summary
 
@@ -34,7 +34,7 @@ Machine-readable upstream test coverage inventory for the native Rust CLI.
 | `upstream/src/test/container-features/registryCompatibilityOCI.test.ts` | missing | none | No native registry-auth compatibility suite exists for anonymous or authenticated OCI pulls. |
 | `upstream/src/test/container-templates/containerTemplatesOCI.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/templates.rs` | Published template identifiers are covered, but real OCI template fetch behavior is not. |
 | `upstream/src/test/container-templates/templatesCLICommands.test.ts` | partial | `cmd/devcontainer/tests/cli_smoke/collections.rs`<br>`cmd/devcontainer/src/commands/collections/tests/templates.rs`<br>`cmd/devcontainer/src/commands/collections/tests/publish.rs` | Template CLI commands are covered locally, but published-template flows remain partial. |
-| `upstream/src/test/disallowedFeatures.test.ts` | missing | none | No native control-manifest enforcement tests for disallowed Features exist yet. |
+| `upstream/src/test/disallowedFeatures.test.ts` | covered | `cmd/devcontainer/src/commands/configuration/features/control.rs`<br>`cmd/devcontainer/src/commands/configuration/tests/read.rs`<br>`cmd/devcontainer/src/commands/collections/tests/features.rs` | Native coverage now includes prefix matching plus command-level failures for read-configuration and features resolve-dependencies. |
 | `upstream/src/test/dockerComposeUtils.test.ts` | partial | `cmd/devcontainer/src/runtime/compose/tests.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/compose_project.rs`<br>`cmd/devcontainer/tests/runtime_container_smoke/compose_flow.rs` | Compose project naming and mount behavior are covered, but not every upstream utility case. |
 | `upstream/src/test/dockerfileUtils.test.ts` | partial | `cmd/devcontainer/tests/runtime_build_smoke/dockerfile.rs` | Dockerfile build behavior is tested natively, but utility-level edge cases are not fully mirrored. |
 | `upstream/src/test/dockerUtils.test.ts` | missing | none | No direct native equivalent for upstream docker utility unit tests is tracked yet. |

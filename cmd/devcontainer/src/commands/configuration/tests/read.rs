@@ -266,6 +266,28 @@ fn read_configuration_resolves_feature_sets_and_feature_metadata() {
 }
 
 #[test]
+fn read_configuration_rejects_disallowed_published_features() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    fs::create_dir_all(&config_dir).expect("failed to create config directory");
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/problematic-feature:1\": {}\n  }\n}\n",
+    )
+    .expect("failed to write config");
+
+    let error = build_read_configuration_payload(&[
+        "--workspace-folder".to_string(),
+        root.display().to_string(),
+        "--include-features-configuration".to_string(),
+    ])
+    .expect_err("disallowed feature should fail");
+
+    assert!(error.contains("problematic-feature:1"), "{error}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn merged_configuration_normalizes_forward_ports_before_deduplication() {
     let merged = merge_configuration(
         &json!({ "image": "debian:bookworm" }),

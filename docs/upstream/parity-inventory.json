@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 185,
-		"optionsMissing": 15
+		"optionsReferenced": 186,
+		"optionsMissing": 14
 	},
 	"commands": [
 		{
@@ -340,6 +340,7 @@
 					"name": "user-data-folder",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/features/control.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -718,6 +719,7 @@
 					"name": "user-data-folder",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/features/control.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1130,6 +1132,7 @@
 					"name": "user-data-folder",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/features/control.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1160,8 +1163,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 8,
-				"referenced": 4,
-				"missing": 4
+				"referenced": 5,
+				"missing": 3
 			},
 			"options": [
 				{
@@ -1205,8 +1208,10 @@
 				},
 				{
 					"name": "user-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/features/control.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",

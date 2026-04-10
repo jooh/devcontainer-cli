@@ -206,9 +206,13 @@
 		},
 		{
 			"upstreamTest": "upstream/src/test/disallowedFeatures.test.ts",
-			"status": "missing",
-			"nativeTests": [],
-			"notes": "No native control-manifest enforcement tests for disallowed Features exist yet."
+			"status": "covered",
+			"nativeTests": [
+				"cmd/devcontainer/src/commands/configuration/features/control.rs",
+				"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+				"cmd/devcontainer/src/commands/collections/tests/features.rs"
+			],
+			"notes": "Native coverage now includes prefix matching plus command-level failures for read-configuration and features resolve-dependencies."
 		},
 		{
 			"upstreamTest": "upstream/src/test/dockerComposeUtils.test.ts",
