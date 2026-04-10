@@ -27,12 +27,15 @@ pub fn run_build(args: &[String]) -> Result<Value, String> {
         &resolved.config_file,
         &resolved.configuration,
     )?;
+    let skip_feature_customizations =
+        common::runtime_options(args).skip_persisting_customizations_from_features;
     let effective_configuration = feature_support
         .as_ref()
         .map(|resolved_features| {
-            configuration::apply_feature_metadata(
+            configuration::apply_feature_metadata_with_options(
                 &resolved.configuration,
                 &resolved_features.metadata_entries,
+                skip_feature_customizations,
             )
         })
         .unwrap_or_else(|| resolved.configuration.clone());

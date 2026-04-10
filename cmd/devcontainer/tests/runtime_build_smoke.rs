@@ -80,6 +80,41 @@ fn build_passes_configured_build_args_to_the_engine() {
 }
 
 #[test]
+fn build_never_buildkit_sets_engine_env() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("Dockerfile"),
+        "FROM scratch\n",
+    )
+    .expect("dockerfile");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"build\": {\n    \"dockerfile\": \"Dockerfile\",\n    \"context\": \".devcontainer\"\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--buildkit",
+            "never",
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let build_env =
+        fs::read_to_string(harness.log_dir.join("build-env.log")).expect("build env log");
+    assert!(build_env.contains("DOCKER_BUILDKIT=0"));
+}
+
+#[test]
 fn build_wraps_image_configs_with_feature_layers() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
@@ -123,6 +158,81 @@ fn build_wraps_image_configs_with_feature_layers() {
 }
 
 #[test]
+fn feature_build_includes_syntax_directive_by_default() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let feature_dir = workspace.join(".devcontainer").join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nset -eu\n").expect("install script");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"./local-feature\": {}\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--image-name",
+            "example/native-build:syntax",
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let dockerfiles = fs::read_to_string(harness.log_dir.join("build-dockerfiles.log"))
+        .expect("build dockerfiles log");
+    assert!(dockerfiles.contains("# syntax=docker/dockerfile:1.4"));
+}
+
+#[test]
+fn feature_build_omits_syntax_directive_when_requested() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let feature_dir = workspace.join(".devcontainer").join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\"\n}\n",
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nset -eu\n").expect("install script");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"./local-feature\": {}\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--image-name",
+            "example/native-build:no-syntax",
+            "--omit-syntax-directive",
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let dockerfiles = fs::read_to_string(harness.log_dir.join("build-dockerfiles.log"))
+        .expect("build dockerfiles log");
+    assert!(!dockerfiles.contains("# syntax=docker/dockerfile:1.4"));
+}
+
+#[test]
 fn build_pushes_final_feature_image_for_image_configs() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
@@ -158,6 +268,41 @@ fn build_pushes_final_feature_image_for_image_configs() {
     let invocations = harness.read_invocations();
     assert!(invocations.contains("build --tag example/native-build:features-push"));
     assert!(invocations.contains("push example/native-build:features-push"));
+}
+
+#[test]
+fn build_skips_feature_customizations_in_output_configuration_when_requested() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let feature_dir = workspace.join(".devcontainer").join("local-feature");
+    fs::create_dir_all(&feature_dir).expect("feature dir");
+    fs::write(
+        feature_dir.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"local-feature\",\n  \"name\": \"Local Feature\",\n  \"version\": \"1.0.0\",\n  \"customizations\": {\n    \"vscode\": {\n      \"extensions\": [\"ms-vscode.makefile-tools\"]\n    }\n  }\n}\n",
+    )
+    .expect("feature manifest");
+    fs::write(feature_dir.join("install.sh"), "#!/bin/sh\nset -eu\n").expect("install script");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"./local-feature\": {}\n  }\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "build",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--skip-persisting-customizations-from-features",
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert!(payload["configuration"].get("customizations").is_none());
 }
 
 #[test]

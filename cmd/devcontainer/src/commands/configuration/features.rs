@@ -482,7 +482,11 @@ fn ensure_feature_install_script(destination: &Path) -> Result<(), String> {
     fs::write(&install_path, "#!/bin/sh\nset -eu\n").map_err(|error| error.to_string())
 }
 
-pub(crate) fn apply_feature_metadata(configuration: &Value, metadata_entries: &[Value]) -> Value {
+pub(crate) fn apply_feature_metadata(
+    configuration: &Value,
+    metadata_entries: &[Value],
+    skip_feature_customizations: bool,
+) -> Value {
     let mut merged = configuration.as_object().cloned().unwrap_or_default();
     for metadata in metadata_entries {
         merge_boolean_true(&mut merged, metadata, "init");
@@ -494,7 +498,9 @@ pub(crate) fn apply_feature_metadata(configuration: &Value, metadata_entries: &[
         merge_object(&mut merged, metadata, "containerEnv");
         merge_object(&mut merged, metadata, "remoteEnv");
         merge_object(&mut merged, metadata, "portsAttributes");
-        merge_object(&mut merged, metadata, "customizations");
+        if !skip_feature_customizations {
+            merge_object(&mut merged, metadata, "customizations");
+        }
         merge_last_value(&mut merged, metadata, "containerUser");
         merge_last_value(&mut merged, metadata, "entrypoint");
         merge_last_value(&mut merged, metadata, "otherPortsAttributes");

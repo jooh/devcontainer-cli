@@ -212,6 +212,26 @@ ${2:-}"
     esac
     ;;
   build)
+    printf 'DOCKER_BUILDKIT=%s\n' "${DOCKER_BUILDKIT:-}" >> "$LOG_DIR/build-env.log"
+    build_file=""
+    while [ "$#" -gt 0 ]; do
+      case "${1:-}" in
+        --file)
+          build_file="${2:-}"
+          shift 2
+          ;;
+        *)
+          shift
+          ;;
+      esac
+    done
+    if [ -n "$build_file" ] && [ -f "$build_file" ]; then
+      {
+        printf '%s\n' "BEGIN"
+        cat "$build_file"
+        printf '%s\n' "END"
+      } >> "$LOG_DIR/build-dockerfiles.log"
+    fi
     exit 0
     ;;
   push)
