@@ -3,6 +3,7 @@
 use std::path::Path;
 
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use super::registry::{
     normalize_collection_reference, published_feature_manifest, published_feature_oci_manifest,
@@ -41,8 +42,12 @@ pub(super) fn build_feature_info_payload(mode: &str, feature_path: &str) -> Resu
     match mode {
         "manifest" => {
             if feature_path.starts_with("ghcr.io/") {
-                published_feature_oci_manifest(feature_path)
-                    .ok_or_else(|| format!("Unknown published feature: {feature_path}"))
+                let manifest = published_feature_oci_manifest(feature_path)
+                    .ok_or_else(|| format!("Unknown published feature: {feature_path}"))?;
+                Ok(json!({
+                    "manifest": manifest,
+                    "canonicalId": canonical_feature_id(feature_path, &manifest)?,
+                }))
             } else {
                 Ok(json!({
                     "id": manifest.get("id").cloned().unwrap_or_else(|| Value::String("unknown".to_string())),
@@ -52,20 +57,43 @@ pub(super) fn build_feature_info_payload(mode: &str, feature_path: &str) -> Resu
                 }))
             }
         }
-        "tags" => Ok(json!({
-            "feature": normalize_collection_reference(feature_path),
-            "tags": feature_tags(feature_path, &manifest),
-        })),
+        "tags" => {
+            if feature_path.starts_with("ghcr.io/") {
+                Ok(json!({
+                    "feature": normalize_collection_reference(feature_path),
+                    "publishedTags": feature_tags(feature_path, &manifest),
+                }))
+            } else {
+                Ok(json!({
+                    "feature": normalize_collection_reference(feature_path),
+                    "tags": feature_tags(feature_path, &manifest),
+                }))
+            }
+        }
         "dependencies" => Ok(json!({
             "feature": normalize_collection_reference(feature_path),
             "dependsOn": manifest.get("dependsOn").cloned().unwrap_or_else(|| json!({})),
         })),
-        "verbose" => Ok(json!({
-            "feature": normalize_collection_reference(feature_path),
-            "manifest": manifest,
-            "tags": feature_tags(feature_path, &manifest),
-            "dependsOn": manifest.get("dependsOn").cloned().unwrap_or_else(|| json!({})),
-        })),
+        "verbose" => {
+            if feature_path.starts_with("ghcr.io/") {
+                let oci_manifest = published_feature_oci_manifest(feature_path)
+                    .ok_or_else(|| format!("Unknown published feature: {feature_path}"))?;
+                Ok(json!({
+                    "feature": normalize_collection_reference(feature_path),
+                    "manifest": oci_manifest,
+                    "canonicalId": canonical_feature_id(feature_path, &oci_manifest)?,
+                    "publishedTags": feature_tags(feature_path, &manifest),
+                    "dependsOn": manifest.get("dependsOn").cloned().unwrap_or_else(|| json!({})),
+                }))
+            } else {
+                Ok(json!({
+                    "feature": normalize_collection_reference(feature_path),
+                    "manifest": manifest,
+                    "tags": feature_tags(feature_path, &manifest),
+                    "dependsOn": manifest.get("dependsOn").cloned().unwrap_or_else(|| json!({})),
+                }))
+            }
+        }
         _ => Err(format!("Unsupported features info mode: {mode}")),
     }
 }
@@ -96,4 +124,15 @@ fn feature_tags(feature_path: &str, manifest: &Value) -> Vec<Value> {
         .cloned()
         .map(|version| vec![version])
         .unwrap_or_default()
+}
+
+fn canonical_feature_id(feature_path: &str, manifest: &Value) -> Result<String, String> {
+    let bytes = serde_json::to_vec(manifest).map_err(|error| error.to_string())?;
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    Ok(format!(
+        "{}@sha256:{:x}",
+        normalize_collection_reference(feature_path),
+        hasher.finalize()
+    ))
 }

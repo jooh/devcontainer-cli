@@ -78,16 +78,21 @@ fn feature_info_reads_published_catalog_oci_manifest() {
         build_feature_info_payload("manifest", "ghcr.io/devcontainers/features/azure-cli:1")
             .expect("feature info");
 
-    assert_eq!(payload["schemaVersion"], 2);
+    assert!(payload["canonicalId"]
+        .as_str()
+        .expect("canonical id")
+        .starts_with("ghcr.io/devcontainers/features/azure-cli@sha256:"));
+    let manifest = &payload["manifest"];
+    assert_eq!(manifest["schemaVersion"], 2);
     assert_eq!(
-        payload["mediaType"],
+        manifest["mediaType"],
         "application/vnd.oci.image.manifest.v1+json"
     );
     assert_eq!(
-        payload["layers"][0]["mediaType"],
+        manifest["layers"][0]["mediaType"],
         "application/vnd.devcontainers.layer.v1+tar"
     );
-    let metadata = payload["annotations"]["dev.containers.metadata"]
+    let metadata = manifest["annotations"]["dev.containers.metadata"]
         .as_str()
         .expect("metadata string");
     assert!(metadata.contains("\"id\":\"azure-cli\""), "{metadata}");
@@ -100,10 +105,10 @@ fn feature_info_supports_generic_published_features() {
         .expect("feature info");
 
     assert_eq!(
-        payload["layers"][0]["annotations"]["org.opencontainers.image.title"],
+        payload["manifest"]["layers"][0]["annotations"]["org.opencontainers.image.title"],
         "devcontainer-feature-node.tgz"
     );
-    let metadata = payload["annotations"]["dev.containers.metadata"]
+    let metadata = payload["manifest"]["annotations"]["dev.containers.metadata"]
         .as_str()
         .expect("metadata string");
     assert!(metadata.contains("\"id\":\"node\""), "{metadata}");
@@ -119,10 +124,10 @@ fn feature_info_supports_digest_pinned_catalog_refs() {
     .expect("feature info");
 
     assert_eq!(
-        payload["layers"][0]["annotations"]["org.opencontainers.image.title"],
+        payload["manifest"]["layers"][0]["annotations"]["org.opencontainers.image.title"],
         "devcontainer-feature-git-lfs.tgz"
     );
-    let metadata = payload["annotations"]["dev.containers.metadata"]
+    let metadata = payload["manifest"]["annotations"]["dev.containers.metadata"]
         .as_str()
         .expect("metadata string");
     assert!(metadata.contains("\"id\":\"git-lfs\""), "{metadata}");
@@ -161,7 +166,9 @@ fn feature_info_reads_catalog_tags_for_published_features() {
     let payload = build_feature_info_payload("tags", "ghcr.io/devcontainers/features/git:1")
         .expect("tags payload");
 
-    let tags = payload["tags"].as_array().expect("tags array");
+    let tags = payload["publishedTags"]
+        .as_array()
+        .expect("published tags array");
     assert_eq!(tags[0], "1.2.0");
     assert_eq!(tags[1], "1.1.5");
 }

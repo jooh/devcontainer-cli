@@ -225,12 +225,15 @@ fn features_info_supports_additional_published_feature_ids() {
 
     assert!(output.status.success(), "{output:?}");
     let payload: Value = serde_json::from_slice(&output.stdout).expect("feature info payload");
-    assert_eq!(payload["schemaVersion"], 2);
+    assert!(payload["canonicalId"]
+        .as_str()
+        .expect("canonical id")
+        .starts_with("ghcr.io/devcontainers/features/node@sha256:"));
     assert_eq!(
-        payload["layers"][0]["annotations"]["org.opencontainers.image.title"],
+        payload["manifest"]["layers"][0]["annotations"]["org.opencontainers.image.title"],
         "devcontainer-feature-node.tgz"
     );
-    let metadata = payload["annotations"]["dev.containers.metadata"]
+    let metadata = payload["manifest"]["annotations"]["dev.containers.metadata"]
         .as_str()
         .expect("metadata string");
     assert!(metadata.contains("\"id\":\"node\""), "{metadata}");
@@ -254,7 +257,7 @@ fn features_info_supports_text_output_for_verbose_mode() {
     assert!(output.status.success(), "{output:?}");
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(stdout.contains("\"feature\": \"ghcr.io/devcontainers/features/git\""));
-    assert!(stdout.contains("\"tags\""));
+    assert!(stdout.contains("\"publishedTags\""));
 }
 
 #[test]
