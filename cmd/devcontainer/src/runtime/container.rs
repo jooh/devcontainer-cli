@@ -34,11 +34,21 @@ pub(crate) fn prepare_up_image(
     args: &[String],
     image_name: &str,
 ) -> Result<String, String> {
-    if !should_update_remote_user_uid(
-        &resolved.configuration,
+    prepare_up_image_for_platform(
+        resolved,
         args,
+        image_name,
         is_uid_update_platform_supported(),
-    ) {
+    )
+}
+
+fn prepare_up_image_for_platform(
+    resolved: &ResolvedConfig,
+    args: &[String],
+    image_name: &str,
+    platform_supported: bool,
+) -> Result<String, String> {
+    if !should_update_remote_user_uid(&resolved.configuration, args, platform_supported) {
         return Ok(image_name.to_string());
     }
 
@@ -713,11 +723,17 @@ fn target_container_labels(
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use std::fs;
+    use std::path::{Path, PathBuf};
 
     use serde_json::json;
 
-    use super::{mount_argument, should_update_remote_user_uid, uid_update_details};
+    use crate::runtime::context::ResolvedConfig;
+
+    use super::{
+        mount_argument, prepare_up_image_for_platform, should_update_remote_user_uid,
+        uid_update_details, uid_update_local_image_name, unique_uid_update_build_context,
+    };
 
     #[test]
     fn mount_argument_preserves_read_only_and_alias_keys() {
@@ -848,5 +864,214 @@ mod tests {
             .starts_with("vsc-example-workspace-"));
         assert!(details.updated_image_name.ends_with("-uid"));
         assert!(!details.updated_image_name.contains('@'));
+    }
+
+    #[test]
+    fn prepare_up_image_skips_uid_update_when_remote_image_is_not_present_locally() {
+        let fixture = FakeEngineFixture::new();
+        fixture.write("image-inspect.exit", "1\n");
+        fixture.write(
+            "image-inspect.stderr",
+            "Error: No such image: ghcr.io/example/app:latest\n",
+        );
+
+        let workspace = fixture.root.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace dir");
+        let resolved = resolved_config(json!({}), &workspace);
+
+        let updated_image = prepare_up_image_for_platform(
+            &resolved,
+            &fixture.args(),
+            "ghcr.io/example/app:latest",
+            true,
+        )
+        .expect("prepare up image");
+
+        assert_eq!(updated_image, "ghcr.io/example/app:latest");
+        let invocations = fixture.invocations();
+        assert!(invocations
+            .contains("image inspect --format {{.Config.User}} ghcr.io/example/app:latest"));
+        assert!(!invocations.contains("build "));
+    }
+
+    #[test]
+    fn prepare_up_image_uses_run_args_user_for_uid_update_selection() {
+        let fixture = FakeEngineFixture::new();
+        fixture.write("image-inspect.stdout", "root\n");
+
+        let workspace = fixture.root.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace dir");
+        let resolved = resolved_config(
+            json!({
+                "runArgs": ["--user", "vscode"]
+            }),
+            &workspace,
+        );
+
+        let updated_image =
+            prepare_up_image_for_platform(&resolved, &fixture.args(), "alpine:3.20", true)
+                .expect("prepare up image");
+
+        assert_ne!(updated_image, "alpine:3.20");
+        assert!(updated_image.ends_with("-uid"));
+        let invocations = fixture.invocations();
+        assert!(invocations.contains("build "));
+        assert!(invocations.contains("--build-arg REMOTE_USER=vscode"));
+        assert!(invocations.contains("--build-arg IMAGE_USER=root"));
+    }
+
+    #[test]
+    fn prepare_up_image_prefixes_local_podman_base_images_with_localhost() {
+        let fixture = FakeEngineFixture::new();
+        fixture.write("image-inspect.stdout", "node\n");
+
+        let workspace = fixture.root.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace dir");
+        let resolved = resolved_config(
+            json!({
+                "remoteUser": "vscode"
+            }),
+            &workspace,
+        );
+
+        let local_image_name = uid_update_local_image_name(&workspace);
+        let updated_image = prepare_up_image_for_platform(
+            &resolved,
+            &fixture.args_with_podman_name(),
+            &local_image_name,
+            true,
+        )
+        .expect("prepare up image");
+
+        assert_eq!(updated_image, format!("{local_image_name}-uid"));
+        let invocations = fixture.invocations();
+        assert!(invocations.contains("build "));
+        assert!(invocations.contains(&format!(
+            "--build-arg BASE_IMAGE=localhost/{local_image_name}"
+        )));
+    }
+
+    fn resolved_config(
+        configuration: serde_json::Value,
+        workspace_folder: &Path,
+    ) -> ResolvedConfig {
+        ResolvedConfig {
+            workspace_folder: workspace_folder.to_path_buf(),
+            config_file: workspace_folder
+                .join(".devcontainer")
+                .join("devcontainer.json"),
+            configuration,
+        }
+    }
+
+    struct FakeEngineFixture {
+        root: PathBuf,
+        engine_path: PathBuf,
+        podman_engine_path: PathBuf,
+        invocation_log: PathBuf,
+    }
+
+    impl FakeEngineFixture {
+        fn new() -> Self {
+            let root = unique_uid_update_build_context();
+            fs::create_dir_all(&root).expect("fixture root");
+            let engine_path = root.join("fake-engine");
+            let podman_engine_path = root.join("podman");
+            let invocation_log = root.join("invocations.log");
+            let script = r#"#!/bin/sh
+set -eu
+
+ROOT=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+LOG="$ROOT/invocations.log"
+printf '%s %s\n' "$1" "$*" >> "$LOG"
+
+COMMAND="$1"
+shift || true
+case "$COMMAND" in
+  image)
+    SUBCOMMAND="${1:-}"
+    shift || true
+    case "$SUBCOMMAND" in
+      inspect)
+        if [ -f "$ROOT/image-inspect.stdout" ]; then
+          cat "$ROOT/image-inspect.stdout"
+        fi
+        if [ -f "$ROOT/image-inspect.stderr" ]; then
+          cat "$ROOT/image-inspect.stderr" >&2
+        fi
+        if [ -f "$ROOT/image-inspect.exit" ]; then
+          exit "$(tr -d '\n' < "$ROOT/image-inspect.exit")"
+        fi
+        exit 0
+        ;;
+    esac
+    ;;
+  build)
+    if [ -f "$ROOT/build.stdout" ]; then
+      cat "$ROOT/build.stdout"
+    fi
+    if [ -f "$ROOT/build.stderr" ]; then
+      cat "$ROOT/build.stderr" >&2
+    fi
+    if [ -f "$ROOT/build.exit" ]; then
+      exit "$(tr -d '\n' < "$ROOT/build.exit")"
+    fi
+    exit 0
+    ;;
+esac
+
+echo "unsupported fake engine command: $COMMAND $*" >&2
+exit 1
+"#;
+            fs::write(&engine_path, script).expect("engine script");
+            fs::write(&podman_engine_path, script).expect("podman engine script");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+
+                let mut permissions = fs::metadata(&engine_path)
+                    .expect("engine metadata")
+                    .permissions();
+                permissions.set_mode(0o755);
+                fs::set_permissions(&engine_path, permissions.clone()).expect("engine permissions");
+                fs::set_permissions(&podman_engine_path, permissions)
+                    .expect("podman engine permissions");
+            }
+
+            Self {
+                root,
+                engine_path,
+                podman_engine_path,
+                invocation_log,
+            }
+        }
+
+        fn write(&self, name: &str, contents: &str) {
+            fs::write(self.root.join(name), contents).expect("fixture file");
+        }
+
+        fn args(&self) -> Vec<String> {
+            vec![
+                "--docker-path".to_string(),
+                self.engine_path.display().to_string(),
+            ]
+        }
+
+        fn args_with_podman_name(&self) -> Vec<String> {
+            vec![
+                "--docker-path".to_string(),
+                self.podman_engine_path.display().to_string(),
+            ]
+        }
+
+        fn invocations(&self) -> String {
+            fs::read_to_string(&self.invocation_log).expect("invocations")
+        }
+    }
+
+    impl Drop for FakeEngineFixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.root);
+        }
     }
 }
