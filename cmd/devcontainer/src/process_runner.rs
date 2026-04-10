@@ -89,10 +89,38 @@ fn log_result(request: &ProcessRequest, status_code: i32) {
 }
 
 fn command_summary(request: &ProcessRequest) -> String {
-    std::iter::once(request.program.as_str())
-        .chain(request.args.iter().map(String::as_str))
-        .collect::<Vec<_>>()
-        .join(" ")
+    let mut summary = vec![request.program.clone()];
+    let mut redact_next_env_assignment = false;
+
+    for arg in &request.args {
+        if redact_next_env_assignment {
+            summary.push(redacted_env_assignment(arg));
+            redact_next_env_assignment = false;
+            continue;
+        }
+
+        if matches!(arg.as_str(), "-e" | "--env") {
+            summary.push(arg.clone());
+            redact_next_env_assignment = true;
+            continue;
+        }
+
+        if let Some(value) = arg.strip_prefix("--env=") {
+            summary.push(format!("--env={}", redacted_env_assignment(value)));
+            continue;
+        }
+
+        summary.push(arg.clone());
+    }
+
+    summary.join(" ")
+}
+
+fn redacted_env_assignment(value: &str) -> String {
+    let Some((key, _)) = value.split_once('=') else {
+        return value.to_string();
+    };
+    format!("{key}=<redacted>")
 }
 
 fn env_summary_entries(request: &ProcessRequest) -> Vec<String> {
@@ -161,6 +189,30 @@ mod tests {
         assert_eq!(
             env_summary_entries(&request),
             vec!["COLUMNS=120".to_string(), "LINES=40".to_string()]
+        );
+    }
+
+    #[test]
+    fn command_summary_redacts_env_assignment_values() {
+        let request = ProcessRequest {
+            program: "docker".to_string(),
+            args: vec![
+                "exec".to_string(),
+                "-e".to_string(),
+                "TOKEN=super-secret".to_string(),
+                "--env".to_string(),
+                "API_KEY=hunter2".to_string(),
+                "--env=SESSION=abcdef".to_string(),
+                "container".to_string(),
+            ],
+            cwd: None,
+            env: HashMap::new(),
+            log_level: ProcessLogLevel::Debug,
+        };
+
+        assert_eq!(
+            command_summary(&request),
+            "docker exec -e TOKEN=<redacted> --env API_KEY=<redacted> --env=SESSION=<redacted> container"
         );
     }
 }
