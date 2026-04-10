@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 187,
-		"optionsMissing": 13
+		"optionsReferenced": 192,
+		"optionsMissing": 8
 	},
 	"commands": [
 		{
@@ -16,8 +16,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 43,
-				"referenced": 38,
-				"missing": 5
+				"referenced": 40,
+				"missing": 3
 			},
 			"options": [
 				{
@@ -39,8 +39,10 @@
 				},
 				{
 					"name": "buildkit",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "cache-from",
@@ -252,8 +254,10 @@
 				},
 				{
 					"name": "omit-syntax-directive",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "override-config",
@@ -562,8 +566,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 22,
-				"referenced": 19,
-				"missing": 3
+				"referenced": 22,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -577,8 +581,10 @@
 				},
 				{
 					"name": "buildkit",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "cache-from",
@@ -687,8 +693,10 @@
 				},
 				{
 					"name": "omit-syntax-directive",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "output",
@@ -723,8 +731,10 @@
 				},
 				{
 					"name": "skip-persisting-customizations-from-features",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",

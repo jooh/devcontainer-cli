@@ -5,7 +5,7 @@ Generated from the pinned upstream CLI command matrix and static source evidence
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped files: `187/200`
+- Upstream options with a native source reference in mapped files: `192/200`
 
 This report is a static inventory, not a semantic parity proof. A referenced option can still be only partially implemented, and command-level known gaps are called out explicitly below.
 
@@ -13,9 +13,9 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 | Command | Declared | Option refs | Missing refs | Known gaps |
 | --- | --- | --- | --- | --- |
-| `up` | yes | 38/43 | 5 | 2 |
+| `up` | yes | 40/43 | 3 | 2 |
 | `set-up` | yes | 20/20 | 0 | 1 |
-| `build` | yes | 19/22 | 3 | 2 |
+| `build` | yes | 22/22 | 0 | 2 |
 | `run-user-commands` | yes | 25/27 | 2 | 1 |
 | `read-configuration` | yes | 18/18 | 0 | 2 |
 | `outdated` | yes | 8/8 | 0 | 1 |
@@ -38,8 +38,8 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Create and run dev container
 - Declared natively: yes
-- Option source references: 38/43
-- Missing option references: `buildkit`, `gpu-availability`, `omit-config-remote-env-from-metadata`, `omit-syntax-directive`, `update-remote-user-uid-default`
+- Option source references: 40/43
+- Missing option references: `gpu-availability`, `omit-config-remote-env-from-metadata`, `update-remote-user-uid-default`
 - Known gaps: Native runtime now layers Features for image, dockerfile, and Docker Compose configs. Several upstream flags remain unimplemented or are only partially honored.
 
 ## `set-up`
@@ -54,8 +54,8 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Build a dev container image
 - Declared natively: yes
-- Option source references: 19/22
-- Missing option references: `buildkit`, `omit-syntax-directive`, `skip-persisting-customizations-from-features`
+- Option source references: 22/22
+- Missing option references: none
 - Known gaps: Native runtime now layers Features for image, dockerfile, and Docker Compose configs. Several upstream build flags are still unimplemented or are only partially honored.
 
 ## `run-user-commands`
