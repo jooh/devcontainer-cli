@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 178,
-		"optionsMissing": 22
+		"optionsReferenced": 187,
+		"optionsMissing": 13
 	},
 	"commands": [
 		{
@@ -16,8 +16,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 43,
-				"referenced": 35,
-				"missing": 8
+				"referenced": 38,
+				"missing": 5
 			},
 			"options": [
 				{
@@ -125,18 +125,25 @@
 				},
 				{
 					"name": "dotfiles-install-command",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "dotfiles-repository",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
 				},
 				{
 					"name": "dotfiles-target-path",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "expect-existing-container",
@@ -379,8 +386,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 20,
-				"referenced": 17,
-				"missing": 3
+				"referenced": 20,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -445,18 +452,25 @@
 				},
 				{
 					"name": "dotfiles-install-command",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "dotfiles-repository",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
 				},
 				{
 					"name": "dotfiles-target-path",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "include-configuration",
@@ -748,8 +762,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 27,
-				"referenced": 22,
-				"missing": 5
+				"referenced": 25,
+				"missing": 2
 			},
 			"options": [
 				{
@@ -822,18 +836,25 @@
 				},
 				{
 					"name": "dotfiles-install-command",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "dotfiles-repository",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/lifecycle.rs"
+					]
 				},
 				{
 					"name": "dotfiles-target-path",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "id-label",
