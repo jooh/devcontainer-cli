@@ -1,8 +1,8 @@
+//! Native container creation, reuse, and UID-update behavior.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
 use sha2::{Digest, Sha256};
@@ -14,13 +14,14 @@ use super::context::{derived_workspace_mount, workspace_mount_for_args, Resolved
 use super::engine;
 use super::lifecycle::LifecycleMode;
 use super::metadata::serialized_container_metadata;
+use super::mounts::mount_value_to_engine_arg;
+use super::paths::unique_temp_path;
 
 pub(crate) struct UpContainer {
     pub(crate) container_id: String,
     pub(crate) lifecycle_mode: LifecycleMode,
 }
 
-static NEXT_UID_UPDATE_BUILD_ID: AtomicU64 = AtomicU64::new(0);
 const UID_UPDATE_IMAGE_INSPECT_FORMAT: &str =
     "{{.Config.User}}\n{{.Os}}/{{.Architecture}}{{if .Variant}}/{{.Variant}}{{end}}";
 
@@ -349,7 +350,7 @@ fn start_container(
         .get("mounts")
         .and_then(Value::as_array)
     {
-        for mount in mounts.iter().filter_map(mount_argument) {
+        for mount in mounts.iter().filter_map(mount_value_to_engine_arg) {
             engine_args.push("--mount".to_string());
             engine_args.push(mount);
         }
@@ -714,15 +715,7 @@ fn uid_update_dockerfile_path() -> PathBuf {
 }
 
 fn unique_uid_update_build_context() -> PathBuf {
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos();
-    let unique_id = NEXT_UID_UPDATE_BUILD_ID.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "devcontainer-update-uid-{}-{suffix}-{unique_id}",
-        std::process::id()
-    ))
+    unique_temp_path("devcontainer-update-uid", None)
 }
 
 fn host_uid_gid() -> Result<(String, String), String> {
@@ -740,70 +733,6 @@ fn command_stdout(program: &str, args: &[&str]) -> Result<String, String> {
         return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
-}
-
-fn mount_argument(value: &Value) -> Option<String> {
-    match value {
-        Value::String(mount) => Some(mount.clone()),
-        Value::Object(entries) => {
-            let mut options = Vec::new();
-            if let Some(value) = entries.get("type").and_then(mount_option_value) {
-                options.push(format!("type={value}"));
-            }
-            if let Some(value) = entries
-                .get("source")
-                .or_else(|| entries.get("src"))
-                .and_then(mount_option_value)
-            {
-                options.push(format!("source={value}"));
-            }
-            if let Some(value) = entries
-                .get("target")
-                .or_else(|| entries.get("destination"))
-                .or_else(|| entries.get("dst"))
-                .and_then(mount_option_value)
-            {
-                options.push(format!("target={value}"));
-            }
-            if entries
-                .get("readonly")
-                .or_else(|| entries.get("readOnly"))
-                .and_then(Value::as_bool)
-                .unwrap_or(false)
-            {
-                options.push("readonly".to_string());
-            }
-            for (key, value) in entries {
-                if matches!(
-                    key.as_str(),
-                    "type"
-                        | "source"
-                        | "src"
-                        | "target"
-                        | "destination"
-                        | "dst"
-                        | "readonly"
-                        | "readOnly"
-                ) {
-                    continue;
-                }
-                if let Some(value) = mount_option_value(value) {
-                    options.push(format!("{key}={value}"));
-                }
-            }
-            (!options.is_empty()).then(|| options.join(","))
-        }
-        _ => None,
-    }
-}
-
-fn mount_option_value(value: &Value) -> Option<String> {
-    match value {
-        Value::Bool(boolean) => Some(boolean.to_string()),
-        Value::Number(number) => Some(number.to_string()),
-        Value::String(text) => Some(text.clone()),
-        _ => None,
-    }
 }
 
 fn start_existing_container(args: &[String], container_id: &str) -> Result<(), String> {
@@ -886,21 +815,24 @@ fn target_container_labels(
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for runtime container helpers.
+
     use std::fs;
     use std::path::{Path, PathBuf};
 
     use serde_json::json;
 
     use crate::runtime::context::ResolvedConfig;
+    use crate::runtime::mounts::mount_value_to_engine_arg;
 
     use super::{
-        mount_argument, prepare_up_image_for_platform, should_update_remote_user_uid,
-        uid_update_details, uid_update_local_image_name, unique_uid_update_build_context,
+        prepare_up_image_for_platform, should_update_remote_user_uid, uid_update_details,
+        uid_update_local_image_name, unique_uid_update_build_context,
     };
 
     #[test]
     fn mount_argument_preserves_read_only_and_alias_keys() {
-        let mount = mount_argument(&json!({
+        let mount = mount_value_to_engine_arg(&json!({
             "type": "bind",
             "src": "/cache",
             "dst": "/workspace/cache",
@@ -916,7 +848,7 @@ mod tests {
 
     #[test]
     fn mount_argument_preserves_additional_scalar_options() {
-        let mount = mount_argument(&json!({
+        let mount = mount_value_to_engine_arg(&json!({
             "type": "volume",
             "source": "devcontainer-cache",
             "target": "/cache",

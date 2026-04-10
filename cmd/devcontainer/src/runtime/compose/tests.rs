@@ -1,10 +1,7 @@
+//! Unit tests for compose runtime helpers.
+
 use serde_json::json;
 use std::fs;
-use std::os::unix::fs::PermissionsExt;
-use std::path::PathBuf;
-use std::process::Command;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use super::build_service;
 use super::override_file::compose_metadata_override_file;
@@ -15,36 +12,7 @@ use super::service::{
     compose_image_name_separator, inspect_service_definition, parse_semver_prefix,
 };
 use super::uses_compose_config;
-
-static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
-
-fn unique_temp_dir() -> PathBuf {
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos();
-    let unique_id = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
-    std::env::temp_dir().join(format!(
-        "devcontainer-compose-test-{}-{suffix}-{unique_id}",
-        std::process::id()
-    ))
-}
-
-fn init_git_repo(root: &std::path::Path) {
-    let status = Command::new("git")
-        .args(["init", "--quiet"])
-        .current_dir(root)
-        .status()
-        .expect("git init");
-    assert!(status.success(), "git init failed: {status:?}");
-}
-
-fn write_executable_script(path: &std::path::Path, content: &str) {
-    fs::write(path, content).expect("script");
-    let mut permissions = fs::metadata(path).expect("metadata").permissions();
-    permissions.set_mode(0o755);
-    fs::set_permissions(path, permissions).expect("permissions");
-}
+use crate::test_support::{init_git_repo, unique_temp_dir, write_executable_script};
 
 #[test]
 fn detects_compose_configs() {
@@ -59,7 +27,7 @@ fn detects_compose_configs() {
 
 #[test]
 fn inspects_service_image_and_build_presence() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     let compose_file = root.join("docker-compose.yml");
     fs::create_dir_all(&root).expect("compose root");
     fs::write(
@@ -82,7 +50,7 @@ fn inspects_service_image_and_build_presence() {
 
 #[test]
 fn compose_project_name_defaults_to_workspace_devcontainer() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     let compose_file = root.join(".devcontainer").join("docker-compose.yml");
     fs::create_dir_all(compose_file.parent().expect("compose dir")).expect("compose dir");
     fs::write(&compose_file, "services:\n  app:\n    image: alpine:3.20\n").expect("compose");
@@ -98,7 +66,7 @@ fn compose_project_name_defaults_to_workspace_devcontainer() {
 
 #[test]
 fn compose_name_from_file_reads_top_level_name() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     let compose_file = root.join("docker-compose.yml");
     fs::create_dir_all(&root).expect("compose dir");
     fs::write(
@@ -117,7 +85,7 @@ fn compose_name_from_file_reads_top_level_name() {
 
 #[test]
 fn compose_name_from_file_supports_colon_dash_default_interpolation() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     let compose_file = root.join("docker-compose.yml");
     let variable = format!("DEVCONTAINER_COMPOSE_TEST_MISSING_{}_A", std::process::id());
     fs::create_dir_all(&root).expect("compose dir");
@@ -138,7 +106,7 @@ fn compose_name_from_file_supports_colon_dash_default_interpolation() {
 
 #[test]
 fn compose_name_from_file_supports_dash_default_interpolation() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     let compose_file = root.join("docker-compose.yml");
     let variable = format!("DEVCONTAINER_COMPOSE_TEST_MISSING_{}_B", std::process::id());
     fs::create_dir_all(&root).expect("compose dir");
@@ -187,7 +155,7 @@ fn compose_image_name_separator_defaults_to_hyphen_without_runtime_args() {
 
 #[test]
 fn metadata_override_file_mounts_workspace_by_default() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");
     let resolved = crate::runtime::context::ResolvedConfig {
         workspace_folder: root.clone(),
@@ -220,7 +188,7 @@ fn metadata_override_file_mounts_workspace_by_default() {
 
 #[test]
 fn metadata_override_file_mounts_nested_workspaces_from_the_git_root() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     let repo_root = root.join("repo");
     let workspace = repo_root.join("packages").join("app");
     fs::create_dir_all(&workspace).expect("workspace root");
@@ -261,7 +229,7 @@ fn metadata_override_file_mounts_nested_workspaces_from_the_git_root() {
 
 #[test]
 fn metadata_override_file_can_pin_image_and_runtime_settings() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");
     let resolved = crate::runtime::context::ResolvedConfig {
         workspace_folder: root.clone(),
@@ -321,7 +289,7 @@ fn metadata_override_file_can_pin_image_and_runtime_settings() {
 
 #[test]
 fn metadata_override_file_preserves_workspace_mount_options() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");
     let resolved = crate::runtime::context::ResolvedConfig {
         workspace_folder: root.clone(),
@@ -350,7 +318,7 @@ fn metadata_override_file_preserves_workspace_mount_options() {
 
 #[test]
 fn metadata_override_file_preserves_extended_mount_keys() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");
     let resolved = crate::runtime::context::ResolvedConfig {
         workspace_folder: root.clone(),
@@ -395,7 +363,7 @@ fn metadata_override_file_preserves_extended_mount_keys() {
 
 #[test]
 fn metadata_override_file_does_not_promote_remote_user_to_service_user() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");
     let resolved = crate::runtime::context::ResolvedConfig {
         workspace_folder: root.clone(),
@@ -420,7 +388,7 @@ fn metadata_override_file_does_not_promote_remote_user_to_service_user() {
 
 #[test]
 fn metadata_override_file_adds_gpu_resources_when_requested() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");
     let resolved = crate::runtime::context::ResolvedConfig {
         workspace_folder: root.clone(),
@@ -453,7 +421,7 @@ fn metadata_override_file_adds_gpu_resources_when_requested() {
 
 #[test]
 fn compose_feature_build_enforces_frozen_lockfile() {
-    let root = unique_temp_dir();
+    let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");
     fs::write(
         root.join("docker-compose.yml"),

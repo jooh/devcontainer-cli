@@ -1,3 +1,5 @@
+//! Runtime config loading and container-context resolution helpers.
+
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -12,7 +14,8 @@ use crate::config::{self, ConfigContext};
 use super::compose;
 use super::container;
 use super::engine;
-use super::metadata::{merged_container_metadata, mount_option_target};
+use super::metadata::merged_container_metadata;
+use super::mounts::mount_option_target;
 
 pub(crate) struct ResolvedConfig {
     pub(crate) workspace_folder: PathBuf,

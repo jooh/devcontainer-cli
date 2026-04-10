@@ -1,3 +1,5 @@
+//! Shared command-line parsing and filesystem helpers used across commands.
+
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -7,6 +9,7 @@ use serde_json::{Map, Value};
 
 use crate::config::{self, ConfigContext};
 use crate::process_runner::{self, ProcessLogLevel, ProcessRequest};
+use crate::runtime::mounts::mount_option_target;
 
 #[derive(Clone, Debug, Default, Eq, PartialEq)]
 pub(crate) struct RuntimeOptions {
@@ -296,9 +299,7 @@ pub(crate) fn load_resolved_config(args: &[String]) -> Result<(PathBuf, PathBuf,
                         &Value::String(mount.to_string()),
                         &base_context,
                     );
-                    substituted
-                        .as_str()
-                        .and_then(crate::runtime::metadata::mount_option_target)
+                    substituted.as_str().and_then(mount_option_target)
                 })
         })
         .or_else(|| {

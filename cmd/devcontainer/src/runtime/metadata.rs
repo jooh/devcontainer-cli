@@ -1,3 +1,5 @@
+//! Container metadata serialization and merge helpers.
+
 use serde_json::{Map, Value};
 
 pub(crate) fn merged_container_metadata(metadata_label: Option<&str>) -> Value {
@@ -72,17 +74,6 @@ pub(crate) fn serialized_container_metadata(
         .map_err(|error| format!("Failed to serialize container metadata: {error}"))
 }
 
-pub(crate) fn mount_option_target(mount: &str) -> Option<String> {
-    split_mount_options(mount).into_iter().find_map(|option| {
-        for key in ["target", "destination", "dst"] {
-            if let Some(value) = option.strip_prefix(&format!("{key}=")) {
-                return Some(value.trim_matches('"').to_string());
-            }
-        }
-        None
-    })
-}
-
 fn merge_last_metadata_value(entries: &[Value], merged: &mut Map<String, Value>, key: &str) {
     if let Some(value) = entries
         .iter()
@@ -140,38 +131,11 @@ fn flatten_lifecycle_values(value: &Value) -> Vec<Value> {
     }
 }
 
-pub(crate) fn split_mount_options(mount: &str) -> Vec<String> {
-    let mut options = Vec::new();
-    let mut current = String::new();
-    let mut in_quotes = false;
-    for character in mount.chars() {
-        match character {
-            '"' => {
-                in_quotes = !in_quotes;
-                current.push(character);
-            }
-            ',' if !in_quotes => {
-                options.push(current.trim().to_string());
-                current.clear();
-            }
-            _ => current.push(character),
-        }
-    }
-    if !current.is_empty() {
-        options.push(current.trim().to_string());
-    }
-    options
-}
-
 #[cfg(test)]
 mod tests {
     use serde_json::{json, Value};
 
-    use super::{
-        merged_container_metadata, metadata_entries, mount_option_target,
-        serialized_container_metadata,
-    };
-
+    use super::{merged_container_metadata, metadata_entries, serialized_container_metadata};
     #[test]
     fn merged_container_metadata_prefers_last_scalar_and_merges_objects() {
         let metadata = serde_json::to_string(&json!([
@@ -217,14 +181,6 @@ mod tests {
             .as_object()
             .expect("expected flattened object");
         assert_eq!(commands.len(), 3);
-    }
-
-    #[test]
-    fn mount_option_target_reads_quoted_targets() {
-        assert_eq!(
-            mount_option_target(r#"type=bind,source=/tmp/src,target="/workspace,with,comma""#),
-            Some("/workspace,with,comma".to_string())
-        );
     }
 
     #[test]

@@ -1,3 +1,5 @@
+//! Feature resolution, materialization, and metadata merge helpers.
+
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -9,7 +11,7 @@ use crate::commands::collections::registry::{
     published_feature_manifest,
 };
 use crate::commands::common;
-use crate::runtime::metadata::mount_option_target;
+use crate::runtime::mounts::mount_option_target;
 
 #[derive(Clone, Debug)]
 pub(crate) enum FeatureInstallationSource {

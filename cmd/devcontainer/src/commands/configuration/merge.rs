@@ -1,3 +1,5 @@
+//! Native merge behavior for read-configuration output.
+
 use std::collections::HashSet;
 
 use serde_json::{Map, Value};
@@ -392,7 +394,7 @@ fn merge_mounts(entries: &[Value]) -> Vec<Value> {
         .collect::<Vec<_>>();
     for value in flattened.into_iter().rev() {
         let target = match &value {
-            Value::String(text) => runtime::metadata::mount_option_target(text),
+            Value::String(text) => runtime::mounts::mount_option_target(text),
             Value::Object(entries) => entries
                 .get("target")
                 .and_then(Value::as_str)

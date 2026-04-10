@@ -1,3 +1,5 @@
+//! Dev container config parsing, path resolution, and variable substitution.
+
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -385,34 +387,21 @@ pub fn substitute_container_env(value: &Value, env: &HashMap<String, String>) ->
 
 #[cfg(test)]
 mod tests {
+    //! Unit tests for config parsing and substitution behavior.
+
     use super::{
         parse_jsonc_value, resolve_config_path, substitute_container_env, substitute_local_context,
         ConfigContext,
     };
+    use crate::test_support::unique_temp_dir;
     use serde_json::json;
     use std::collections::HashMap;
     use std::fs;
     use std::path::PathBuf;
-    use std::sync::atomic::{AtomicU64, Ordering};
-    use std::time::{SystemTime, UNIX_EPOCH};
-
-    static NEXT_TEMP_DIR_ID: AtomicU64 = AtomicU64::new(0);
-
-    fn unique_temp_dir() -> PathBuf {
-        let suffix = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("time went backwards")
-            .as_nanos();
-        let unique_id = NEXT_TEMP_DIR_ID.fetch_add(1, Ordering::Relaxed);
-        std::env::temp_dir().join(format!(
-            "devcontainer-config-test-{}-{suffix}-{unique_id}",
-            std::process::id()
-        ))
-    }
 
     #[test]
     fn discovers_standard_devcontainer_config_path() {
-        let root = unique_temp_dir();
+        let root = unique_temp_dir("devcontainer-config-test");
         let config_dir = root.join(".devcontainer");
         let config_path = config_dir.join("devcontainer.json");
         fs::create_dir_all(&config_dir).expect("failed to create config directory");

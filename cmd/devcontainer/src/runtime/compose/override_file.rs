@@ -1,7 +1,6 @@
-use std::env;
+//! Compose override-file generation for native runtime flows.
+
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::{Map, Number, Value};
 
@@ -9,9 +8,9 @@ use crate::commands::common;
 
 use super::super::container;
 use super::super::context::{derived_workspace_mount, workspace_mount_for_args, ResolvedConfig};
-use super::super::metadata::{serialized_container_metadata, split_mount_options};
-
-static NEXT_OVERRIDE_FILE_ID: AtomicU64 = AtomicU64::new(0);
+use super::super::metadata::serialized_container_metadata;
+use super::super::mounts::split_mount_options;
+use super::super::paths::unique_temp_path;
 
 enum ComposeVolumeEntry {
     Short(String),
@@ -512,13 +511,5 @@ fn compose_environment(configuration: &Value) -> Option<Vec<(String, String)>> {
 }
 
 fn unique_override_file_path() -> PathBuf {
-    let suffix = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .expect("time went backwards")
-        .as_nanos();
-    let unique_id = NEXT_OVERRIDE_FILE_ID.fetch_add(1, Ordering::Relaxed);
-    env::temp_dir().join(format!(
-        "devcontainer-compose-override-{}-{suffix}-{unique_id}.yml",
-        std::process::id()
-    ))
+    unique_temp_path("devcontainer-compose-override", Some("yml"))
 }

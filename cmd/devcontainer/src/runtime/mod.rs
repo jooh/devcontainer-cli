@@ -1,3 +1,5 @@
+//! Public runtime command orchestration for build, up, exec, and lifecycle flows.
+
 mod build;
 pub(crate) mod compose;
 mod container;
@@ -6,6 +8,7 @@ pub(crate) mod engine;
 mod exec;
 mod lifecycle;
 pub(crate) mod metadata;
+pub(crate) mod mounts;
 mod paths;
 
 use serde_json::{json, Value};

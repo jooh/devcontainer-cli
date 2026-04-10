@@ -1,3 +1,5 @@
+//! Crate entry points and shared module wiring for the native devcontainer CLI.
+
 use std::env;
 use std::process::ExitCode;
 
@@ -7,6 +9,9 @@ pub mod config;
 pub mod output;
 pub mod process_runner;
 pub mod runtime;
+
+#[cfg(test)]
+pub(crate) mod test_support;
 
 pub const NATIVE_ONLY_ENV_VAR: &str = "DEVCONTAINER_NATIVE_ONLY";
 
