@@ -18,6 +18,7 @@ pub(crate) struct ComposeSpec {
     pub(crate) service: String,
     pub(crate) image: Option<String>,
     pub(crate) has_build: bool,
+    pub(crate) user: Option<String>,
     pub(crate) project_name: String,
 }
 
@@ -46,13 +47,14 @@ pub(crate) fn load_compose_spec(resolved: &ResolvedConfig) -> Result<Option<Comp
         .ok_or_else(|| "Compose configuration must define service".to_string())?
         .to_string();
     let project_name = project::compose_project_name(&files)?;
-    let (image, has_build) = service::inspect_service_definition(&files, &service)?;
+    let definition = service::inspect_service_definition(&files, &service)?;
 
     Ok(Some(ComposeSpec {
         files,
         service,
-        image,
-        has_build,
+        image: definition.image,
+        has_build: definition.has_build,
+        user: definition.user,
         project_name,
     }))
 }

@@ -68,11 +68,15 @@ fn inspects_service_image_and_build_presence() {
     )
     .expect("compose file");
 
-    let (image, has_build) =
+    let definition =
         inspect_service_definition(&[compose_file], "app").expect("service definition");
 
-    assert_eq!(image.as_deref(), Some("example/native-compose:test"));
-    assert!(has_build);
+    assert_eq!(
+        definition.image.as_deref(),
+        Some("example/native-compose:test")
+    );
+    assert!(definition.has_build);
+    assert_eq!(definition.user, None);
     let _ = fs::remove_dir_all(root);
 }
 

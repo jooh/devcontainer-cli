@@ -21,12 +21,21 @@ pub(crate) struct UpContainer {
 }
 
 static NEXT_UID_UPDATE_BUILD_ID: AtomicU64 = AtomicU64::new(0);
+const UID_UPDATE_IMAGE_INSPECT_FORMAT: &str =
+    "{{.Config.User}}\n{{.Os}}/{{.Architecture}}{{if .Variant}}/{{.Variant}}{{end}}";
 
 #[derive(Debug, Eq, PartialEq)]
 struct UidUpdateDetails {
     remote_user: String,
     image_user: String,
     updated_image_name: String,
+    platform: Option<String>,
+}
+
+#[derive(Debug, Eq, PartialEq)]
+struct ImageInspectDetails {
+    user: String,
+    platform: Option<String>,
 }
 
 pub(crate) fn prepare_up_image(
@@ -52,11 +61,17 @@ fn prepare_up_image_for_platform(
         return Ok(image_name.to_string());
     }
 
+    let compose_service_user = if compose::uses_compose_config(&resolved.configuration) {
+        compose::load_compose_spec(resolved)?.and_then(|spec| spec.user)
+    } else {
+        None
+    };
     let Some(update) = resolve_uid_update_details(
         &resolved.configuration,
         args,
         &resolved.workspace_folder,
         image_name,
+        compose_service_user.as_deref(),
     )?
     else {
         return Ok(image_name.to_string());
@@ -65,8 +80,12 @@ fn prepare_up_image_for_platform(
     let build_context = unique_uid_update_build_context();
     fs::create_dir_all(&build_context).map_err(|error| error.to_string())?;
     let dockerfile = uid_update_dockerfile_path();
-    let mut build_args = vec![
-        "build".to_string(),
+    let mut build_args = vec!["build".to_string()];
+    if let Some(platform) = &update.platform {
+        build_args.push("--platform".to_string());
+        build_args.push(platform.clone());
+    }
+    build_args.extend([
         "--build-arg".to_string(),
         format!("BASE_IMAGE={}", uid_update_base_image(args, image_name)),
         "--build-arg".to_string(),
@@ -82,7 +101,7 @@ fn prepare_up_image_for_platform(
         "-f".to_string(),
         dockerfile.display().to_string(),
         build_context.display().to_string(),
-    ];
+    ]);
 
     let result = engine::run_engine(args, std::mem::take(&mut build_args))?;
     let _ = fs::remove_dir_all(&build_context);
@@ -464,13 +483,15 @@ fn uid_update_details(
     workspace_folder: &Path,
     image_name: &str,
     image_user: &str,
-    run_args_user: Option<&str>,
+    runtime_user: Option<&str>,
+    platform: Option<&str>,
 ) -> Option<UidUpdateDetails> {
-    let remote_user = uid_update_remote_user(configuration, run_args_user, image_user)?;
+    let remote_user = uid_update_remote_user(configuration, runtime_user, image_user)?;
     Some(UidUpdateDetails {
         remote_user,
         image_user: image_user.to_string(),
         updated_image_name: uid_update_image_name(workspace_folder, image_name),
+        platform: platform.map(str::to_string),
     })
 }
 
@@ -479,15 +500,19 @@ fn resolve_uid_update_details(
     args: &[String],
     workspace_folder: &Path,
     image_name: &str,
+    compose_service_user: Option<&str>,
 ) -> Result<Option<UidUpdateDetails>, String> {
-    let run_args_user = uid_update_run_args_user(configuration);
-    if let Some(user) = uid_update_configured_user(configuration, run_args_user.as_deref()) {
+    let runtime_user = uid_update_run_args_user(configuration)
+        .or_else(|| compose_service_user.map(str::to_string));
+    if let Some(user) = uid_update_configured_user(configuration, runtime_user.as_deref()) {
         if !is_updatable_user(&user) {
             return Ok(None);
         }
     }
 
-    let Some(image_user) = inspect_image_user_for_uid_update(args, image_name)? else {
+    let Some(image_details) =
+        inspect_image_details_for_uid_update(args, configuration, image_name)?
+    else {
         return Ok(None);
     };
 
@@ -495,8 +520,9 @@ fn resolve_uid_update_details(
         configuration,
         workspace_folder,
         image_name,
-        &image_user,
-        run_args_user.as_deref(),
+        &image_details.user,
+        runtime_user.as_deref(),
+        image_details.platform.as_deref(),
     ))
 }
 
@@ -552,17 +578,32 @@ fn is_updatable_user(user: &str) -> bool {
     user != "root" && !user.chars().all(|character| character.is_ascii_digit())
 }
 
-fn inspect_image_user_for_uid_update(
+fn inspect_image_details_for_uid_update(
+    args: &[String],
+    configuration: &Value,
+    image_name: &str,
+) -> Result<Option<ImageInspectDetails>, String> {
+    match inspect_image_details_for_uid_update_once(args, image_name)? {
+        Some(details) => Ok(Some(details)),
+        None if configuration.get("image").and_then(Value::as_str).is_some() => {
+            pull_image_for_uid_update(args, image_name)?;
+            inspect_image_details_for_uid_update_once(args, image_name)
+        }
+        None => Ok(None),
+    }
+}
+
+fn inspect_image_details_for_uid_update_once(
     args: &[String],
     image_name: &str,
-) -> Result<Option<String>, String> {
+) -> Result<Option<ImageInspectDetails>, String> {
     let result = engine::run_engine(
         args,
         vec![
             "image".to_string(),
             "inspect".to_string(),
             "--format".to_string(),
-            "{{.Config.User}}".to_string(),
+            UID_UPDATE_IMAGE_INSPECT_FORMAT.to_string(),
             image_name.to_string(),
         ],
     )?;
@@ -573,12 +614,29 @@ fn inspect_image_user_for_uid_update(
         }
         return Err(error);
     }
-    let user = result.stdout.trim();
-    if user.is_empty() {
-        Ok(Some("root".to_string()))
-    } else {
-        Ok(Some(user.to_string()))
+
+    let mut lines = result.stdout.lines();
+    let user = lines
+        .next()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .unwrap_or("root")
+        .to_string();
+    let platform = lines
+        .next()
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string);
+
+    Ok(Some(ImageInspectDetails { user, platform }))
+}
+
+fn pull_image_for_uid_update(args: &[String], image_name: &str) -> Result<(), String> {
+    let result = engine::run_engine(args, vec!["pull".to_string(), image_name.to_string()])?;
+    if result.status_code != 0 {
+        return Err(engine::stderr_or_stdout(&result));
     }
+    Ok(())
 }
 
 fn is_missing_local_image_inspect_error(error: &str) -> bool {
@@ -926,11 +984,13 @@ mod tests {
             "ghcr.io/example/app:latest",
             "node",
             None,
+            Some("linux/amd64"),
         )
         .expect("uid update details");
 
         assert_eq!(details.remote_user, "node");
         assert_eq!(details.image_user, "node");
+        assert_eq!(details.platform.as_deref(), Some("linux/amd64"));
         assert!(details
             .updated_image_name
             .starts_with("vsc-example-workspace-"));
@@ -946,6 +1006,7 @@ mod tests {
             Path::new("/tmp/example-workspace"),
             "ghcr.io/example/app:latest",
             "node",
+            None,
             None,
         )
         .expect("uid update details");
@@ -964,6 +1025,7 @@ mod tests {
             "ghcr.io/example/app@sha256:0123456789abcdef",
             "node",
             None,
+            None,
         )
         .expect("uid update details");
 
@@ -975,17 +1037,27 @@ mod tests {
     }
 
     #[test]
-    fn prepare_up_image_skips_uid_update_when_remote_image_is_not_present_locally() {
+    fn prepare_up_image_pulls_missing_image_before_uid_update() {
         let fixture = FakeEngineFixture::new();
         fixture.write("image-inspect.exit", "1\n");
         fixture.write(
             "image-inspect.stderr",
             "Error: No such image: ghcr.io/example/app:latest\n",
         );
+        fixture.write(
+            "image-inspect-after-pull.stdout",
+            &image_inspect_output("root", Some("linux/amd64")),
+        );
 
         let workspace = fixture.root.join("workspace");
         fs::create_dir_all(&workspace).expect("workspace dir");
-        let resolved = resolved_config(json!({}), &workspace);
+        let resolved = resolved_config(
+            json!({
+                "image": "ghcr.io/example/app:latest",
+                "remoteUser": "vscode",
+            }),
+            &workspace,
+        );
 
         let updated_image = prepare_up_image_for_platform(
             &resolved,
@@ -995,17 +1067,26 @@ mod tests {
         )
         .expect("prepare up image");
 
-        assert_eq!(updated_image, "ghcr.io/example/app:latest");
+        assert_ne!(updated_image, "ghcr.io/example/app:latest");
+        assert!(updated_image.ends_with("-uid"));
         let invocations = fixture.invocations();
-        assert!(invocations
-            .contains("image inspect --format {{.Config.User}} ghcr.io/example/app:latest"));
-        assert!(!invocations.contains("build "));
+        assert!(invocations.contains(&format!(
+            "image inspect --format {} ghcr.io/example/app:latest",
+            super::UID_UPDATE_IMAGE_INSPECT_FORMAT
+        )));
+        assert!(invocations.contains("pull ghcr.io/example/app:latest"));
+        assert!(invocations.contains("build "));
+        assert!(invocations.contains("--build-arg REMOTE_USER=vscode"));
+        assert!(invocations.contains("--build-arg IMAGE_USER=root"));
     }
 
     #[test]
     fn prepare_up_image_uses_run_args_user_for_uid_update_selection() {
         let fixture = FakeEngineFixture::new();
-        fixture.write("image-inspect.stdout", "root\n");
+        fixture.write(
+            "image-inspect.stdout",
+            &image_inspect_output("root", Some("linux/amd64")),
+        );
 
         let workspace = fixture.root.join("workspace");
         fs::create_dir_all(&workspace).expect("workspace dir");
@@ -1029,9 +1110,43 @@ mod tests {
     }
 
     #[test]
+    fn prepare_up_image_preserves_the_inspected_platform_for_uid_update_builds() {
+        let fixture = FakeEngineFixture::new();
+        fixture.write(
+            "image-inspect.stdout",
+            &image_inspect_output("node", Some("linux/arm64/v8")),
+        );
+
+        let workspace = fixture.root.join("workspace");
+        fs::create_dir_all(&workspace).expect("workspace dir");
+        let resolved = resolved_config(
+            json!({
+                "remoteUser": "vscode"
+            }),
+            &workspace,
+        );
+
+        let updated_image = prepare_up_image_for_platform(
+            &resolved,
+            &fixture.args(),
+            "ghcr.io/example/app:latest",
+            true,
+        )
+        .expect("prepare up image");
+
+        assert!(updated_image.ends_with("-uid"));
+        let invocations = fixture.invocations();
+        assert!(invocations.contains("build "));
+        assert!(invocations.contains("--platform linux/arm64/v8"));
+    }
+
+    #[test]
     fn prepare_up_image_prefixes_local_podman_base_images_with_localhost() {
         let fixture = FakeEngineFixture::new();
-        fixture.write("image-inspect.stdout", "node\n");
+        fixture.write(
+            "image-inspect.stdout",
+            &image_inspect_output("node", Some("linux/amd64")),
+        );
 
         let workspace = fixture.root.join("workspace");
         fs::create_dir_all(&workspace).expect("workspace dir");
@@ -1057,6 +1172,45 @@ mod tests {
         assert!(invocations.contains(&format!(
             "--build-arg BASE_IMAGE=localhost/{local_image_name}"
         )));
+    }
+
+    #[test]
+    fn prepare_up_image_uses_compose_service_user_for_uid_update_selection() {
+        let fixture = FakeEngineFixture::new();
+        fixture.write(
+            "image-inspect.stdout",
+            &image_inspect_output("root", Some("linux/amd64")),
+        );
+
+        let workspace = fixture.root.join("workspace");
+        let config_root = workspace.join(".devcontainer");
+        fs::create_dir_all(&config_root).expect("config dir");
+        fs::write(
+            config_root.join("docker-compose.yml"),
+            "services:\n  app:\n    image: ghcr.io/example/app:latest\n    user: vscode\n",
+        )
+        .expect("compose file");
+        let resolved = ResolvedConfig {
+            workspace_folder: workspace.clone(),
+            config_file: config_root.join("devcontainer.json"),
+            configuration: json!({
+                "dockerComposeFile": "docker-compose.yml",
+                "service": "app",
+            }),
+        };
+
+        let updated_image = prepare_up_image_for_platform(
+            &resolved,
+            &fixture.args(),
+            "ghcr.io/example/app:latest",
+            true,
+        )
+        .expect("prepare up image");
+
+        assert!(updated_image.ends_with("-uid"));
+        let invocations = fixture.invocations();
+        assert!(invocations.contains("build "));
+        assert!(invocations.contains("--build-arg REMOTE_USER=vscode"));
     }
 
     fn resolved_config(
@@ -1099,13 +1253,25 @@ case "$COMMAND" in
   image)
     SUBCOMMAND="${1:-}"
     shift || true
-    case "$SUBCOMMAND" in
-      inspect)
-        if [ -f "$ROOT/image-inspect.stdout" ]; then
-          cat "$ROOT/image-inspect.stdout"
-        fi
-        if [ -f "$ROOT/image-inspect.stderr" ]; then
-          cat "$ROOT/image-inspect.stderr" >&2
+            case "$SUBCOMMAND" in
+              inspect)
+                if [ -f "$ROOT/pulled" ]; then
+                  if [ -f "$ROOT/image-inspect-after-pull.stdout" ]; then
+                    cat "$ROOT/image-inspect-after-pull.stdout"
+                  fi
+                  if [ -f "$ROOT/image-inspect-after-pull.stderr" ]; then
+                    cat "$ROOT/image-inspect-after-pull.stderr" >&2
+                  fi
+                  if [ -f "$ROOT/image-inspect-after-pull.exit" ]; then
+                    exit "$(tr -d '\n' < "$ROOT/image-inspect-after-pull.exit")"
+                  fi
+                  exit 0
+                fi
+                if [ -f "$ROOT/image-inspect.stdout" ]; then
+                  cat "$ROOT/image-inspect.stdout"
+                fi
+                if [ -f "$ROOT/image-inspect.stderr" ]; then
+                  cat "$ROOT/image-inspect.stderr" >&2
         fi
         if [ -f "$ROOT/image-inspect.exit" ]; then
           exit "$(tr -d '\n' < "$ROOT/image-inspect.exit")"
@@ -1113,6 +1279,19 @@ case "$COMMAND" in
         exit 0
         ;;
     esac
+    ;;
+  pull)
+    touch "$ROOT/pulled"
+    if [ -f "$ROOT/pull.stdout" ]; then
+      cat "$ROOT/pull.stdout"
+    fi
+    if [ -f "$ROOT/pull.stderr" ]; then
+      cat "$ROOT/pull.stderr" >&2
+    fi
+    if [ -f "$ROOT/pull.exit" ]; then
+      exit "$(tr -d '\n' < "$ROOT/pull.exit")"
+    fi
+    exit 0
     ;;
   build)
     if [ -f "$ROOT/build.stdout" ]; then
@@ -1181,5 +1360,9 @@ exit 1
         fn drop(&mut self) {
             let _ = fs::remove_dir_all(&self.root);
         }
+    }
+
+    fn image_inspect_output(user: &str, platform: Option<&str>) -> String {
+        format!("{user}\n{}\n", platform.unwrap_or_default())
     }
 }

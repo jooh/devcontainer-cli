@@ -7,6 +7,12 @@ use super::ComposeSpec;
 use crate::runtime::engine;
 use crate::runtime::paths::resolve_relative;
 
+pub(super) struct ServiceDefinition {
+    pub(super) image: Option<String>,
+    pub(super) has_build: bool,
+    pub(super) user: Option<String>,
+}
+
 pub(super) fn compose_files(
     configuration: &Value,
     config_root: &Path,
@@ -30,9 +36,10 @@ pub(super) fn compose_files(
 pub(super) fn inspect_service_definition(
     compose_files: &[PathBuf],
     service: &str,
-) -> Result<(Option<String>, bool), String> {
+) -> Result<ServiceDefinition, String> {
     let mut image = None;
     let mut has_build = false;
+    let mut user = None;
     let mut found_service = false;
 
     for compose_file in compose_files {
@@ -57,6 +64,9 @@ pub(super) fn inspect_service_definition(
         {
             image = Some(value.to_string());
         }
+        if let Some(value) = service_field(service_definition, "user").and_then(YamlValue::as_str) {
+            user = Some(value.to_string());
+        }
     }
 
     if !found_service {
@@ -65,7 +75,11 @@ pub(super) fn inspect_service_definition(
         ));
     }
 
-    Ok((image, has_build))
+    Ok(ServiceDefinition {
+        image,
+        has_build,
+        user,
+    })
 }
 
 fn service_field<'a>(mapping: &'a Mapping, key: &str) -> Option<&'a YamlValue> {
