@@ -211,6 +211,42 @@ ${2:-}"
         ;;
     esac
     ;;
+  image)
+    SUBCOMMAND="${1:-}"
+    shift || true
+    case "$SUBCOMMAND" in
+      inspect)
+        if [ -n "${FAKE_PODMAN_IMAGE_INSPECT_STDOUT_FILE:-}" ]; then
+          cat "${FAKE_PODMAN_IMAGE_INSPECT_STDOUT_FILE}"
+          exit 0
+        fi
+        if [ -n "${FAKE_PODMAN_IMAGE_INSPECT_STDERR:-}" ]; then
+          printf '%s\n' "${FAKE_PODMAN_IMAGE_INSPECT_STDERR}" >&2
+        fi
+        if [ -n "${FAKE_PODMAN_IMAGE_INSPECT_EXIT_CODE:-}" ]; then
+          exit "${FAKE_PODMAN_IMAGE_INSPECT_EXIT_CODE}"
+        fi
+        image_user="${FAKE_PODMAN_IMAGE_USER:-root}"
+        image_platform="${FAKE_PODMAN_IMAGE_PLATFORM:-linux/amd64}"
+        if [ "${1:-}" = "--format" ]; then
+          format_string="${2:-}"
+          if printf '%s' "$format_string" | grep -Fq '{{.Config.User}}'; then
+            printf '%s\n' "$image_user"
+          fi
+          if printf '%s' "$format_string" | grep -Fq '{{.Os}}/{{.Architecture}}{{if .Variant}}/{{.Variant}}{{end}}'; then
+            printf '%s\n' "$image_platform"
+          fi
+          exit 0
+        fi
+        printf '[{"Config":{"User":"%s"},"Os":"linux","Architecture":"amd64"}]\n' "$image_user"
+        exit 0
+        ;;
+      *)
+        echo "unsupported fake podman image command: $SUBCOMMAND" >&2
+        exit 1
+        ;;
+    esac
+    ;;
   build)
     printf 'DOCKER_BUILDKIT=%s\n' "${DOCKER_BUILDKIT:-}" >> "$LOG_DIR/build-env.log"
     build_file=""

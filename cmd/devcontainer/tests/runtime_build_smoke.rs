@@ -498,6 +498,9 @@ fn up_honors_build_no_cache() {
     let invocations = harness.read_invocations();
     assert!(invocations.contains("build "));
     assert!(invocations.contains("--no-cache"));
+    if cfg!(target_os = "linux") {
+        assert!(invocations.contains("image inspect --format"));
+    }
 }
 
 #[test]
