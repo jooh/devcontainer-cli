@@ -96,9 +96,9 @@
 			"status": "partial",
 			"nativeTests": [
 				"cmd/devcontainer/src/commands/collections/tests/features.rs",
-				"cmd/devcontainer/tests/cli_smoke/collections.rs"
+				"cmd/devcontainer/tests/network_smoke/ghcr.rs"
 			],
-			"notes": "Published Feature identifiers and metadata are covered, and an opt-in live GHCR manifest fetch now verifies real anonymous OCI manifest resolution for a public Feature, but broader OCI fetch coverage is still partial."
+			"notes": "Published Feature identifiers and metadata are covered, and a dedicated GHCR network smoke test now verifies real anonymous OCI manifest resolution for a public Feature, but broader OCI fetch coverage is still partial."
 		},
 		{
 			"upstreamTest": "upstream/src/test/container-features/containerFeaturesOCIPush.test.ts",
@@ -189,9 +189,9 @@
 			"status": "partial",
 			"nativeTests": [
 				"cmd/devcontainer/src/commands/collections/tests/features.rs",
-				"cmd/devcontainer/tests/cli_smoke/collections.rs"
+				"cmd/devcontainer/tests/network_smoke/ghcr.rs"
 			],
-			"notes": "Native coverage now includes OCI-manifest-shaped `features info manifest`, canonical ids, `publishedTags` output, and an opt-in anonymous GHCR manifest fetch check, but registry auth and broader live OCI pull flows are still missing."
+			"notes": "Native coverage now includes OCI-manifest-shaped `features info manifest`, canonical ids, `publishedTags` output, and a dedicated anonymous GHCR manifest smoke check, but registry auth and broader live OCI pull flows are still missing."
 		},
 		{
 			"upstreamTest": "upstream/src/test/container-templates/containerTemplatesOCI.test.ts",

@@ -263,43 +263,6 @@ fn features_info_supports_text_output_for_verbose_mode() {
 }
 
 #[test]
-fn features_info_reads_live_ghcr_manifest_when_enabled() {
-    if std::env::var("DEVCONTAINER_LIVE_GHCR_TESTS")
-        .ok()
-        .as_deref()
-        != Some("1")
-    {
-        return;
-    }
-
-    let output = devcontainer_command(None)
-        .env("DEVCONTAINER_ENABLE_LIVE_GHCR", "1")
-        .args([
-            "features",
-            "info",
-            "manifest",
-            "ghcr.io/codspace/features/ruby:1.0.13",
-        ])
-        .output()
-        .expect("features info should run");
-
-    assert!(output.status.success(), "{output:?}");
-    let payload: Value = serde_json::from_slice(&output.stdout).expect("feature info payload");
-    assert_eq!(
-        payload["canonicalId"],
-        "ghcr.io/codspace/features/ruby@sha256:4757b07cbfbfc09015d8a5b7fb1c44e83d85de4fae13e9f311f7b9ae9ae0c25c"
-    );
-    assert_eq!(
-        payload["manifest"]["layers"][0]["mediaType"],
-        "application/vnd.devcontainers.layer.v1+tar"
-    );
-    assert_eq!(
-        payload["manifest"]["layers"][0]["digest"],
-        "sha256:8f59630bd1ba6d9e78b485233a0280530b3d0a44338f472206090412ffbd3efb"
-    );
-}
-
-#[test]
 fn templates_metadata_supports_additional_published_template_ids() {
     let output = devcontainer_command(None)
         .args([
