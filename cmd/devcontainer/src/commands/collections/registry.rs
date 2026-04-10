@@ -1,7 +1,8 @@
 //! Registry lookup helpers for bundled collections and published features.
 
 use std::env;
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -18,6 +19,11 @@ pub(super) fn embedded_template_source_dir(reference: &str) -> Option<PathBuf> {
         ),
         _ => None,
     }
+}
+
+pub(super) struct LocalOciArtifact {
+    pub metadata: Value,
+    pub layer_path: Option<PathBuf>,
 }
 
 pub(crate) fn published_feature_install_script(feature_id: &str) -> &'static str {
@@ -134,7 +140,14 @@ pub(crate) fn published_feature_oci_manifest(feature_id: &str) -> Option<Value> 
     }))
 }
 
-pub(super) fn published_template_manifest(template_id: &str) -> Option<Value> {
+pub(super) fn published_template_manifest_with_workspace(
+    template_id: &str,
+    workspace_folder: Option<&Path>,
+) -> Option<Value> {
+    if let Some(artifact) = local_oci_artifact(template_id, workspace_folder) {
+        return Some(artifact.metadata);
+    }
+
     let normalized = normalize_collection_reference(template_id);
     let manifest = match normalized.as_str() {
         "ghcr.io/devcontainers/templates/docker-from-docker" => Some(json!({
@@ -159,6 +172,28 @@ pub(super) fn published_template_manifest(template_id: &str) -> Option<Value> {
         "description": "",
         "version": collection_reference_version(template_id),
     }))
+}
+
+pub(super) fn local_oci_artifact(
+    reference: &str,
+    workspace_folder: Option<&Path>,
+) -> Option<LocalOciArtifact> {
+    let layout_dir = workspace_oci_layout_dir(reference, workspace_folder)?;
+    let manifest_digest = resolve_local_oci_manifest_digest(reference, &layout_dir)?;
+    let manifest = read_local_oci_blob_json(&layout_dir, &manifest_digest)?;
+    let metadata = manifest["annotations"]["dev.containers.metadata"]
+        .as_str()
+        .and_then(|value| serde_json::from_str::<Value>(value).ok())?;
+    let layer_path = manifest["layers"]
+        .as_array()
+        .and_then(|layers| layers.first())
+        .and_then(|layer| layer["digest"].as_str())
+        .and_then(|digest| digest.strip_prefix("sha256:"))
+        .map(|digest| layout_dir.join("blobs").join("sha256").join(digest));
+    Some(LocalOciArtifact {
+        metadata,
+        layer_path,
+    })
 }
 
 pub(crate) fn normalize_collection_reference(reference: &str) -> String {
@@ -216,6 +251,45 @@ fn sha256_digest(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
+}
+
+fn workspace_oci_layout_dir(reference: &str, workspace_folder: Option<&Path>) -> Option<PathBuf> {
+    let layout_dir = workspace_folder?
+        .join(".devcontainer")
+        .join("oci-layouts")
+        .join(normalize_collection_reference(reference));
+    layout_dir
+        .join("oci-layout")
+        .is_file()
+        .then_some(layout_dir)
+}
+
+fn resolve_local_oci_manifest_digest(reference: &str, layout_dir: &Path) -> Option<String> {
+    if let Some((_, digest)) = reference.rsplit_once("@sha256:") {
+        return Some(digest.to_string());
+    }
+
+    let wanted_tag = collection_reference_version(reference);
+    let index: Value =
+        serde_json::from_str(&fs::read_to_string(layout_dir.join("index.json")).ok()?).ok()?;
+    index["manifests"].as_array()?.iter().find_map(|entry| {
+        let tag = entry["annotations"]["org.opencontainers.image.ref.name"].as_str()?;
+        (tag == wanted_tag)
+            .then(|| {
+                entry["digest"]
+                    .as_str()?
+                    .strip_prefix("sha256:")
+                    .map(str::to_string)
+            })
+            .flatten()
+    })
+}
+
+fn read_local_oci_blob_json(layout_dir: &Path, digest: &str) -> Option<Value> {
+    serde_json::from_str(
+        &fs::read_to_string(layout_dir.join("blobs").join("sha256").join(digest)).ok()?,
+    )
+    .ok()
 }
 
 fn embedded_template_manifest(reference: &str) -> Option<Value> {

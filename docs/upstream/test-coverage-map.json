@@ -195,9 +195,10 @@
 			"upstreamTest": "upstream/src/test/container-templates/containerTemplatesOCI.test.ts",
 			"status": "partial",
 			"nativeTests": [
-				"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+				"cmd/devcontainer/src/commands/collections/tests/templates.rs",
+				"cmd/devcontainer/tests/cli_smoke/collections.rs"
 			],
-			"notes": "Published template identifiers are covered, but real OCI template fetch behavior is not."
+			"notes": "Native coverage now includes workspace-local OCI metadata lookup and archive-backed template apply flows, but live registry template fetch behavior is still missing."
 		},
 		{
 			"upstreamTest": "upstream/src/test/container-templates/templatesCLICommands.test.ts",
@@ -207,7 +208,7 @@
 				"cmd/devcontainer/src/commands/collections/tests/templates.rs",
 				"cmd/devcontainer/src/commands/collections/tests/publish.rs"
 			],
-			"notes": "Template CLI commands are covered locally, but published-template flows remain partial."
+			"notes": "Template CLI commands now cover workspace-local OCI metadata and apply flows, but published-template behavior is still partial without live registry fetches."
 		},
 		{
 			"upstreamTest": "upstream/src/test/disallowedFeatures.test.ts",

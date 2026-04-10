@@ -117,7 +117,9 @@ pub(crate) fn run_templates(args: &[String]) -> ExitCode {
             if args.len() < 2 {
                 Err("templates metadata requires <target>".to_string())
             } else {
-                templates::build_template_metadata_payload(&args[1])
+                let workspace_folder = common::parse_option_value(&args[2..], "--workspace-folder")
+                    .map(std::path::PathBuf::from);
+                templates::build_template_metadata_payload(&args[1], workspace_folder.as_deref())
             }
         }
         "publish" => {
