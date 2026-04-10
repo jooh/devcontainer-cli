@@ -80,11 +80,12 @@ fn apply_buildkit_env(args: &[String], request_args: &[String], request: &mut Pr
 }
 
 fn is_build_request(request_args: &[String]) -> bool {
-    if request_args.first().map(String::as_str) == Some("build") {
+    let mut index = usize::from(request_args.first().map(String::as_str) == Some("compose"));
+
+    if request_args.get(index).map(String::as_str) == Some("build") {
         return true;
     }
 
-    let mut index = 0;
     while index < request_args.len() {
         match request_args[index].as_str() {
             "--project-name" | "-f" => {
@@ -105,7 +106,7 @@ fn is_build_request(request_args: &[String]) -> bool {
 mod tests {
     use crate::process_runner::ProcessLogLevel;
 
-    use super::{engine_request, is_build_request};
+    use super::{compose_request, engine_request, is_build_request};
 
     #[test]
     fn engine_request_applies_terminal_env_and_log_level() {
@@ -130,10 +131,22 @@ mod tests {
     fn detects_build_requests_for_compose_invocations() {
         assert!(is_build_request(&["build".to_string()]));
         assert!(is_build_request(&[
+            "compose".to_string(),
+            "build".to_string(),
+            "app".to_string(),
+        ]));
+        assert!(is_build_request(&[
             "--project-name".to_string(),
             "workspace".to_string(),
             "-f".to_string(),
             "docker-compose.yml".to_string(),
+            "build".to_string(),
+            "app".to_string(),
+        ]));
+        assert!(is_build_request(&[
+            "compose".to_string(),
+            "--project-name".to_string(),
+            "workspace".to_string(),
             "build".to_string(),
             "app".to_string(),
         ]));
@@ -142,5 +155,22 @@ mod tests {
             "workspace".to_string(),
             "up".to_string(),
         ]));
+        assert!(!is_build_request(&[
+            "compose".to_string(),
+            "up".to_string(),
+        ]));
+    }
+
+    #[test]
+    fn compose_request_applies_buildkit_env_for_default_docker_compose_builds() {
+        let request = compose_request(
+            &["--buildkit".to_string(), "never".to_string()],
+            vec!["build".to_string(), "app".to_string()],
+        );
+
+        assert_eq!(
+            request.env.get("DOCKER_BUILDKIT").map(String::as_str),
+            Some("0")
+        );
     }
 }
