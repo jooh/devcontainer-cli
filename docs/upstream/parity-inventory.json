@@ -1522,6 +1522,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/collections/mod.rs",
 						"cmd/devcontainer/src/commands/collections/templates.rs",
 						"cmd/devcontainer/src/commands/collections/tests/features.rs",
 						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
@@ -1673,6 +1674,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/collections/mod.rs",
 						"cmd/devcontainer/src/commands/collections/templates.rs",
 						"cmd/devcontainer/src/commands/collections/tests/features.rs",
 						"cmd/devcontainer/src/commands/collections/tests/templates.rs"

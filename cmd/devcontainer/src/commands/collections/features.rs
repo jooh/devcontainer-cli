@@ -6,7 +6,8 @@ use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
 use super::registry::{
-    normalize_collection_reference, published_feature_manifest, published_feature_oci_manifest,
+    live_ghcr_feature_manifest, normalize_collection_reference, published_feature_manifest,
+    published_feature_oci_manifest,
 };
 use crate::commands::common;
 use crate::commands::configuration::catalog_versions;
@@ -42,6 +43,16 @@ pub(super) fn build_feature_info_payload(mode: &str, feature_path: &str) -> Resu
     match mode {
         "manifest" => {
             if feature_path.starts_with("ghcr.io/") {
+                if let Some(live_manifest) = live_ghcr_feature_manifest(feature_path)? {
+                    return Ok(json!({
+                        "manifest": live_manifest.manifest,
+                        "canonicalId": format!(
+                            "{}@{}",
+                            normalize_collection_reference(feature_path),
+                            live_manifest.digest
+                        ),
+                    }));
+                }
                 let manifest = published_feature_oci_manifest(feature_path)
                     .ok_or_else(|| format!("Unknown published feature: {feature_path}"))?;
                 Ok(json!({
