@@ -52,13 +52,13 @@ fn prepare_up_image_for_platform(
         return Ok(image_name.to_string());
     }
 
-    let image_user = inspect_image_user(args, image_name)?;
-    let Some(update) = uid_update_details(
+    let Some(update) = resolve_uid_update_details(
         &resolved.configuration,
+        args,
         &resolved.workspace_folder,
         image_name,
-        &image_user,
-    ) else {
+    )?
+    else {
         return Ok(image_name.to_string());
     };
     let (new_uid, new_gid) = host_uid_gid()?;
@@ -68,7 +68,7 @@ fn prepare_up_image_for_platform(
     let mut build_args = vec![
         "build".to_string(),
         "--build-arg".to_string(),
-        format!("BASE_IMAGE={image_name}"),
+        format!("BASE_IMAGE={}", uid_update_base_image(args, image_name)),
         "--build-arg".to_string(),
         format!("REMOTE_USER={}", update.remote_user),
         "--build-arg".to_string(),
@@ -464,29 +464,98 @@ fn uid_update_details(
     workspace_folder: &Path,
     image_name: &str,
     image_user: &str,
+    run_args_user: Option<&str>,
 ) -> Option<UidUpdateDetails> {
-    let remote_user = uid_update_remote_user(configuration, image_user)?;
+    let remote_user = uid_update_remote_user(configuration, run_args_user, image_user)?;
     Some(UidUpdateDetails {
-        remote_user: remote_user.to_string(),
+        remote_user,
         image_user: image_user.to_string(),
         updated_image_name: uid_update_image_name(workspace_folder, image_name),
     })
 }
 
-fn uid_update_remote_user<'a>(configuration: &'a Value, image_user: &'a str) -> Option<&'a str> {
+fn resolve_uid_update_details(
+    configuration: &Value,
+    args: &[String],
+    workspace_folder: &Path,
+    image_name: &str,
+) -> Result<Option<UidUpdateDetails>, String> {
+    let run_args_user = uid_update_run_args_user(configuration);
+    if let Some(user) = uid_update_configured_user(configuration, run_args_user.as_deref()) {
+        if !is_updatable_user(&user) {
+            return Ok(None);
+        }
+    }
+
+    let Some(image_user) = inspect_image_user_for_uid_update(args, image_name)? else {
+        return Ok(None);
+    };
+
+    Ok(uid_update_details(
+        configuration,
+        workspace_folder,
+        image_name,
+        &image_user,
+        run_args_user.as_deref(),
+    ))
+}
+
+fn uid_update_remote_user(
+    configuration: &Value,
+    run_args_user: Option<&str>,
+    image_user: &str,
+) -> Option<String> {
     let user = configuration
         .get("remoteUser")
         .or_else(|| configuration.get("containerUser"))
         .and_then(Value::as_str)
+        .or(run_args_user)
         .unwrap_or(image_user);
-    is_updatable_user(user).then_some(user)
+    is_updatable_user(user).then(|| user.to_string())
+}
+
+fn uid_update_configured_user(
+    configuration: &Value,
+    run_args_user: Option<&str>,
+) -> Option<String> {
+    configuration
+        .get("remoteUser")
+        .or_else(|| configuration.get("containerUser"))
+        .and_then(Value::as_str)
+        .map(str::to_string)
+        .or_else(|| run_args_user.map(str::to_string))
+}
+
+fn uid_update_run_args_user(configuration: &Value) -> Option<String> {
+    let run_args = configuration.get("runArgs").and_then(Value::as_array)?;
+    for index in (0..run_args.len()).rev() {
+        let Some(arg) = run_args[index].as_str() else {
+            continue;
+        };
+        if matches!(arg, "-u" | "--user") {
+            if let Some(user) = run_args.get(index + 1).and_then(Value::as_str) {
+                return Some(user.to_string());
+            }
+            continue;
+        }
+        if let Some(user) = arg
+            .strip_prefix("-u=")
+            .or_else(|| arg.strip_prefix("--user="))
+        {
+            return Some(user.to_string());
+        }
+    }
+    None
 }
 
 fn is_updatable_user(user: &str) -> bool {
     user != "root" && !user.chars().all(|character| character.is_ascii_digit())
 }
 
-fn inspect_image_user(args: &[String], image_name: &str) -> Result<String, String> {
+fn inspect_image_user_for_uid_update(
+    args: &[String],
+    image_name: &str,
+) -> Result<Option<String>, String> {
     let result = engine::run_engine(
         args,
         vec![
@@ -498,14 +567,23 @@ fn inspect_image_user(args: &[String], image_name: &str) -> Result<String, Strin
         ],
     )?;
     if result.status_code != 0 {
-        return Err(engine::stderr_or_stdout(&result));
+        let error = engine::stderr_or_stdout(&result);
+        if is_missing_local_image_inspect_error(&error) {
+            return Ok(None);
+        }
+        return Err(error);
     }
     let user = result.stdout.trim();
     if user.is_empty() {
-        Ok("root".to_string())
+        Ok(Some("root".to_string()))
     } else {
-        Ok(user.to_string())
+        Ok(Some(user.to_string()))
     }
+}
+
+fn is_missing_local_image_inspect_error(error: &str) -> bool {
+    let error = error.to_ascii_lowercase();
+    error.contains("no such image") || error.contains("image not known")
 }
 
 fn uid_update_image_name(workspace_folder: &Path, image_name: &str) -> String {
@@ -535,6 +613,33 @@ fn uid_update_local_image_name(workspace_folder: &Path) -> String {
         .collect::<String>();
     let hash = Sha256::digest(workspace_folder.to_string_lossy().as_bytes());
     format!("vsc-{basename}-{hash:x}")
+}
+
+fn uid_update_base_image(args: &[String], image_name: &str) -> String {
+    if uses_podman_engine(args) && !has_registry_hostname(image_name) {
+        return format!("localhost/{image_name}");
+    }
+    image_name.to_string()
+}
+
+fn uses_podman_engine(args: &[String]) -> bool {
+    common::parse_option_value(args, "--docker-path")
+        .and_then(|value| {
+            Path::new(&value)
+                .file_name()
+                .and_then(|name| name.to_str())
+                .map(str::to_string)
+        })
+        .is_some_and(|value| value.eq_ignore_ascii_case("podman"))
+}
+
+fn has_registry_hostname(image_name: &str) -> bool {
+    if image_name.starts_with("localhost/") {
+        return true;
+    }
+    let dot = image_name.find('.');
+    let slash = image_name.find('/');
+    dot.is_some_and(|dot| slash.is_some_and(|slash| dot < slash))
 }
 
 fn is_uid_update_platform_supported() -> bool {
@@ -820,6 +925,7 @@ mod tests {
             Path::new("/tmp/example-workspace"),
             "ghcr.io/example/app:latest",
             "node",
+            None,
         )
         .expect("uid update details");
 
@@ -840,6 +946,7 @@ mod tests {
             Path::new("/tmp/example-workspace"),
             "ghcr.io/example/app:latest",
             "node",
+            None,
         )
         .expect("uid update details");
 
@@ -856,6 +963,7 @@ mod tests {
             Path::new("/tmp/example-workspace"),
             "ghcr.io/example/app@sha256:0123456789abcdef",
             "node",
+            None,
         )
         .expect("uid update details");
 
