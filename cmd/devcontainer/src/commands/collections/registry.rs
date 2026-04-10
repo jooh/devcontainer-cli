@@ -4,6 +4,7 @@ use std::env;
 use std::path::PathBuf;
 
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 pub(super) fn embedded_template_source_dir(reference: &str) -> Option<PathBuf> {
     let slug = collection_slug(reference)?;
@@ -101,6 +102,38 @@ pub(crate) fn published_feature_manifest(feature_id: &str) -> Option<Value> {
     }))
 }
 
+pub(crate) fn published_feature_oci_manifest(feature_id: &str) -> Option<Value> {
+    let normalized = normalize_collection_reference(feature_id);
+    let feature_manifest = published_feature_manifest(feature_id)?;
+    let metadata = serde_json::to_string(&feature_manifest).ok()?;
+    let config_bytes = metadata.as_bytes();
+    let layer_title = format!("devcontainer-feature-{}.tgz", collection_slug(&normalized)?);
+    let layer_bytes = published_feature_install_script(feature_id).as_bytes();
+
+    Some(json!({
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "config": {
+            "mediaType": "application/vnd.devcontainers",
+            "digest": format!("sha256:{}", sha256_digest(config_bytes)),
+            "size": config_bytes.len(),
+        },
+        "layers": [{
+            "mediaType": "application/vnd.devcontainers.layer.v1+tar",
+            "digest": format!("sha256:{}", sha256_digest(layer_bytes)),
+            "size": layer_bytes.len(),
+            "annotations": {
+                "org.opencontainers.image.title": layer_title,
+            }
+        }],
+        "annotations": {
+            "dev.containers.metadata": metadata,
+            "com.github.package.type": "devcontainer_feature",
+            "org.opencontainers.image.ref.name": feature_id,
+        }
+    }))
+}
+
 pub(super) fn published_template_manifest(template_id: &str) -> Option<Value> {
     let normalized = normalize_collection_reference(template_id);
     let manifest = match normalized.as_str() {
@@ -177,6 +210,12 @@ pub(super) fn humanize_collection_slug(slug: &str) -> String {
         })
         .collect::<Vec<_>>()
         .join(" ")
+}
+
+fn sha256_digest(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
 }
 
 fn embedded_template_manifest(reference: &str) -> Option<Value> {

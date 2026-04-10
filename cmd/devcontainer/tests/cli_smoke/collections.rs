@@ -225,8 +225,16 @@ fn features_info_supports_additional_published_feature_ids() {
 
     assert!(output.status.success(), "{output:?}");
     let payload: Value = serde_json::from_slice(&output.stdout).expect("feature info payload");
-    assert_eq!(payload["id"], "node");
-    assert_eq!(payload["name"], "Node");
+    assert_eq!(payload["schemaVersion"], 2);
+    assert_eq!(
+        payload["layers"][0]["annotations"]["org.opencontainers.image.title"],
+        "devcontainer-feature-node.tgz"
+    );
+    let metadata = payload["annotations"]["dev.containers.metadata"]
+        .as_str()
+        .expect("metadata string");
+    assert!(metadata.contains("\"id\":\"node\""), "{metadata}");
+    assert!(metadata.contains("\"name\":\"Node\""), "{metadata}");
 }
 
 #[test]

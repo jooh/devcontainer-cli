@@ -5,8 +5,8 @@ Machine-readable upstream test coverage inventory for the native Rust CLI.
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Upstream tests inventoried: `34`
 - Covered: `5`
-- Partial: `24`
-- Missing: `5`
+- Partial: `25`
+- Missing: `4`
 
 ## Summary
 
@@ -31,7 +31,7 @@ Machine-readable upstream test coverage inventory for the native Rust CLI.
 | `upstream/src/test/container-features/generateFeaturesConfig.test.ts` | partial | `cmd/devcontainer/src/commands/configuration/tests/read.rs`<br>`cmd/devcontainer/tests/runtime_build_smoke/features.rs` | Generated feature configuration is exercised indirectly through read/build paths. |
 | `upstream/src/test/container-features/lifecycleHooks.test.ts` | partial | `cmd/devcontainer/tests/runtime_lifecycle_smoke.rs`<br>`cmd/devcontainer/tests/runtime_lifecycle_smoke/commands.rs`<br>`cmd/devcontainer/tests/runtime_lifecycle_smoke/selection.rs` | Lifecycle behavior is tested natively, but not specifically as upstream Feature-contributed hook cases. |
 | `upstream/src/test/container-features/lockfile.test.ts` | covered | `cmd/devcontainer/tests/cli_smoke/lockfile.rs`<br>`cmd/devcontainer/src/commands/configuration/tests/upgrade.rs` | Native lockfile coverage includes outdated, upgrade, dry-run, and root-relative path handling. |
-| `upstream/src/test/container-features/registryCompatibilityOCI.test.ts` | missing | none | No native registry-auth compatibility suite exists for anonymous or authenticated OCI pulls. |
+| `upstream/src/test/container-features/registryCompatibilityOCI.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/features.rs` | Native coverage now includes OCI-manifest-shaped output for published `features info manifest`, but registry auth and live OCI pull flows are still missing. |
 | `upstream/src/test/container-templates/containerTemplatesOCI.test.ts` | partial | `cmd/devcontainer/src/commands/collections/tests/templates.rs` | Published template identifiers are covered, but real OCI template fetch behavior is not. |
 | `upstream/src/test/container-templates/templatesCLICommands.test.ts` | partial | `cmd/devcontainer/tests/cli_smoke/collections.rs`<br>`cmd/devcontainer/src/commands/collections/tests/templates.rs`<br>`cmd/devcontainer/src/commands/collections/tests/publish.rs` | Template CLI commands are covered locally, but published-template flows remain partial. |
 | `upstream/src/test/disallowedFeatures.test.ts` | covered | `cmd/devcontainer/src/commands/configuration/features/control.rs`<br>`cmd/devcontainer/src/commands/configuration/tests/read.rs`<br>`cmd/devcontainer/src/commands/collections/tests/features.rs` | Native coverage now includes prefix matching plus command-level failures for read-configuration and features resolve-dependencies. |
