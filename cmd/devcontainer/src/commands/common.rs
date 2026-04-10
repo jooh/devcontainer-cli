@@ -13,6 +13,9 @@ pub(crate) struct RuntimeOptions {
     pub(crate) log_level: ProcessLogLevel,
     pub(crate) terminal_columns: Option<String>,
     pub(crate) terminal_rows: Option<String>,
+    pub(crate) dotfiles_repository: Option<String>,
+    pub(crate) dotfiles_install_command: Option<String>,
+    pub(crate) dotfiles_target_path: Option<String>,
     pub(crate) user_data_folder: Option<String>,
     pub(crate) container_data_folder: Option<String>,
     pub(crate) container_system_data_folder: Option<String>,
@@ -43,6 +46,9 @@ pub(crate) fn runtime_options(args: &[String]) -> RuntimeOptions {
         },
         terminal_columns: parse_option_value(args, "--terminal-columns"),
         terminal_rows: parse_option_value(args, "--terminal-rows"),
+        dotfiles_repository: parse_option_value(args, "--dotfiles-repository"),
+        dotfiles_install_command: parse_option_value(args, "--dotfiles-install-command"),
+        dotfiles_target_path: parse_option_value(args, "--dotfiles-target-path"),
         user_data_folder: parse_option_value(args, "--user-data-folder"),
         container_data_folder: parse_option_value(args, "--container-data-folder"),
         container_system_data_folder: parse_option_value(args, "--container-system-data-folder"),
@@ -451,6 +457,12 @@ mod tests {
             "120".to_string(),
             "--terminal-rows".to_string(),
             "40".to_string(),
+            "--dotfiles-repository".to_string(),
+            "./dotfiles".to_string(),
+            "--dotfiles-install-command".to_string(),
+            "install.sh".to_string(),
+            "--dotfiles-target-path".to_string(),
+            "./applied-dotfiles".to_string(),
             "--user-data-folder".to_string(),
             "/tmp/user-data".to_string(),
             "--container-data-folder".to_string(),
@@ -466,6 +478,15 @@ mod tests {
         assert_eq!(options.log_level, ProcessLogLevel::Trace);
         assert_eq!(options.terminal_columns.as_deref(), Some("120"));
         assert_eq!(options.terminal_rows.as_deref(), Some("40"));
+        assert_eq!(options.dotfiles_repository.as_deref(), Some("./dotfiles"));
+        assert_eq!(
+            options.dotfiles_install_command.as_deref(),
+            Some("install.sh")
+        );
+        assert_eq!(
+            options.dotfiles_target_path.as_deref(),
+            Some("./applied-dotfiles")
+        );
         assert_eq!(options.user_data_folder.as_deref(), Some("/tmp/user-data"));
         assert_eq!(
             options.container_data_folder.as_deref(),

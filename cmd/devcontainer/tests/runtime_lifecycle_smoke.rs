@@ -2,8 +2,35 @@ mod support;
 
 use serde_json::json;
 use std::fs;
+use std::path::Path;
+use std::process::Command;
 
 use support::runtime_harness::{write_devcontainer_config, RuntimeHarness};
+
+fn init_dotfiles_repo(root: &Path, install_script: &str) {
+    fs::create_dir_all(root).expect("dotfiles repo dir");
+    fs::write(root.join("install.sh"), install_script).expect("install script");
+
+    run_git(root, &["init", "-q"]);
+    run_git(root, &["config", "user.name", "Codex Test"]);
+    run_git(root, &["config", "user.email", "codex@example.com"]);
+    run_git(root, &["add", "."]);
+    run_git(root, &["commit", "-qm", "init"]);
+}
+
+fn run_git(cwd: &Path, args: &[&str]) {
+    let status = Command::new("git")
+        .args(args)
+        .current_dir(cwd)
+        .status()
+        .expect("git command");
+    assert!(
+        status.success(),
+        "git {:?} failed in {}",
+        args,
+        cwd.display()
+    );
+}
 
 #[test]
 fn run_user_commands_resolves_container_ids_from_headered_ps_output() {
@@ -35,6 +62,121 @@ fn run_user_commands_resolves_container_ids_from_headered_ps_output() {
     assert!(invocations.contains("ps -q "));
     let exec_log = harness.read_exec_log();
     assert!(exec_log.contains("/bin/sh -lc echo post-create"));
+}
+
+#[test]
+fn up_installs_dotfiles_between_post_create_and_post_start() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let dotfiles_repo = workspace.join("dotfiles-repo");
+    let order_log = workspace.join("order.log");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    init_dotfiles_repo(
+        &dotfiles_repo,
+        "#!/bin/sh\nset -eu\nprintf 'dotfiles\\n' >> ../order.log\n",
+    );
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"printf 'post-create\\\\n' > /workspaces/workspace/order.log\",\n  \"postStartCommand\": \"printf 'post-start\\\\n' >> /workspaces/workspace/order.log\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--dotfiles-repository",
+            "./dotfiles-repo",
+            "--dotfiles-target-path",
+            "./applied-dotfiles",
+            "--container-data-folder",
+            "./.devcontainer-data",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    assert_eq!(
+        fs::read_to_string(order_log).expect("order log"),
+        "post-create\ndotfiles\npost-start\n"
+    );
+    let exec_log = harness.read_exec_log();
+    assert!(
+        exec_log.contains("/bin/sh -lc printf 'post-create\\n' > /workspaces/workspace/order.log")
+    );
+    assert!(exec_log.contains("git clone --depth 1"));
+    assert!(exec_log.contains("./dotfiles-repo"));
+    assert!(exec_log.contains("./applied-dotfiles"));
+    assert!(exec_log.contains("printf 'post-start\\n' >> /workspaces/workspace/order.log"));
+}
+
+#[test]
+fn dotfiles_marker_skips_reinstall_on_followup_lifecycle_runs() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let dotfiles_repo = workspace.join("dotfiles-repo");
+    let marker_file = workspace.join(".devcontainer-data").join(".dotfilesMarker");
+    let order_log = workspace.join("order.log");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    init_dotfiles_repo(
+        &dotfiles_repo,
+        "#!/bin/sh\nset -eu\nprintf 'dotfiles\\n' >> ../order.log\n",
+    );
+    let config_path = write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"postCreateCommand\": \"printf 'post-create\\\\n' >> order.log\",\n  \"postAttachCommand\": \"printf 'post-attach\\\\n' >> order.log\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let set_up_output = harness.run_in_dir(
+        &[
+            "set-up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--container-id",
+            "fake-container-id",
+            "--config",
+            config_path.to_string_lossy().as_ref(),
+            "--dotfiles-repository",
+            "./dotfiles-repo",
+            "--dotfiles-target-path",
+            "./applied-dotfiles",
+            "--container-data-folder",
+            "./.devcontainer-data",
+        ],
+        &[],
+        Some(&workspace),
+    );
+    assert!(set_up_output.status.success(), "{set_up_output:?}");
+
+    let run_user_commands_output = harness.run_in_dir(
+        &[
+            "run-user-commands",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--dotfiles-repository",
+            "./dotfiles-repo",
+            "--dotfiles-target-path",
+            "./applied-dotfiles",
+            "--container-data-folder",
+            "./.devcontainer-data",
+        ],
+        &[("FAKE_PODMAN_PS_OUTPUT", "fake-container-id")],
+        Some(&workspace),
+    );
+    assert!(
+        run_user_commands_output.status.success(),
+        "{run_user_commands_output:?}"
+    );
+
+    let order = fs::read_to_string(order_log).expect("order log");
+    assert_eq!(order.matches("dotfiles\n").count(), 1, "{order}");
+    assert!(marker_file.is_file(), "expected {}", marker_file.display());
 }
 
 #[test]

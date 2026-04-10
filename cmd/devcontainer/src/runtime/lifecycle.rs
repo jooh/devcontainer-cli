@@ -23,6 +23,11 @@ enum LifecycleCommand {
     Exec(Vec<String>),
 }
 
+enum LifecycleStep {
+    CommandGroup(Vec<LifecycleCommand>),
+    InstallDotfiles,
+}
+
 pub(crate) fn run_lifecycle_commands(
     container_id: &str,
     args: &[String],
@@ -30,17 +35,36 @@ pub(crate) fn run_lifecycle_commands(
     remote_workspace_folder: &str,
     mode: LifecycleMode,
 ) -> Result<(), String> {
-    for command_group in selected_lifecycle_commands(configuration, args, mode) {
-        run_process_group(command_group, |command| {
-            lifecycle_exec_args(
-                args,
-                configuration,
-                remote_workspace_folder,
-                container_id,
-                command,
-            )
-            .map(|engine_args| engine::engine_request(args, engine_args))
-        })?;
+    for step in selected_lifecycle_steps(configuration, args, mode) {
+        match step {
+            LifecycleStep::CommandGroup(command_group) => {
+                run_process_group(command_group, |command| {
+                    lifecycle_exec_args(
+                        args,
+                        configuration,
+                        remote_workspace_folder,
+                        container_id,
+                        command,
+                    )
+                    .map(|engine_args| engine::engine_request(args, engine_args))
+                })?;
+            }
+            LifecycleStep::InstallDotfiles => {
+                let Some(command) = dotfiles_install_command(args) else {
+                    continue;
+                };
+                run_process_group(vec![LifecycleCommand::Shell(command)], |command| {
+                    lifecycle_exec_args(
+                        args,
+                        configuration,
+                        remote_workspace_folder,
+                        container_id,
+                        command,
+                    )
+                    .map(|engine_args| engine::engine_request(args, engine_args))
+                })?;
+            }
+        }
     }
 
     Ok(())
@@ -118,11 +142,11 @@ fn run_process_group(
     Ok(())
 }
 
-fn selected_lifecycle_commands(
+fn selected_lifecycle_steps(
     configuration: &Value,
     args: &[String],
     mode: LifecycleMode,
-) -> Vec<Vec<LifecycleCommand>> {
+) -> Vec<LifecycleStep> {
     let skip_post_create = common::has_flag(args, "--skip-post-create");
     let skip_post_attach = common::has_flag(args, "--skip-post-attach");
     let skip_non_blocking = common::has_flag(args, "--skip-non-blocking-commands");
@@ -139,7 +163,7 @@ fn selected_lifecycle_commands(
         return Vec::new();
     }
 
-    let mut commands = Vec::new();
+    let mut steps = Vec::new();
     let lifecycle_stages = [
         (
             "onCreateCommand",
@@ -168,15 +192,21 @@ fn selected_lifecycle_commands(
     for (stage, command_group) in lifecycle_stages {
         if lifecycle_stage_runs_in_mode(stage, mode) {
             if let Some(command_group) = command_group {
-                commands.push(command_group);
+                steps.push(LifecycleStep::CommandGroup(command_group));
             }
         }
         if skip_non_blocking && stage == wait_for {
             break;
         }
+        if stage == "postCreateCommand"
+            && lifecycle_stage_runs_in_mode(stage, mode)
+            && dotfiles_install_command(args).is_some()
+        {
+            steps.push(LifecycleStep::InstallDotfiles);
+        }
     }
 
-    commands
+    steps
 }
 
 fn lifecycle_stage_runs_in_mode(stage: &str, mode: LifecycleMode) -> bool {
@@ -268,6 +298,138 @@ fn lifecycle_exec_args(
     Ok(engine_args)
 }
 
+fn dotfiles_install_command(args: &[String]) -> Option<String> {
+    let options = common::runtime_options(args);
+    let repository = normalize_dotfiles_repository(options.dotfiles_repository.as_deref()?);
+    let target_path = options
+        .dotfiles_target_path
+        .unwrap_or_else(|| "~/dotfiles".to_string());
+    let marker_file = format!(
+        "{}/.dotfilesMarker",
+        options
+            .container_data_folder
+            .unwrap_or_else(|| "~/.devcontainer".to_string())
+            .trim_end_matches('/')
+    );
+
+    let mut script = vec![
+        format!(
+            "{} || (echo dotfiles marker found && exit 1) || exit 0",
+            create_file_command(&marker_file)
+        ),
+        "command -v git >/dev/null 2>&1 || (echo git not found && exit 1) || exit 0".to_string(),
+        format!(
+            "[ -e {} ] || git clone --depth 1 {} {} || exit $?",
+            shell_path_argument(&target_path),
+            shell_single_quote(&repository),
+            shell_path_argument(&target_path)
+        ),
+        format!("echo Setting current directory to {}", target_path),
+        format!("cd {}", shell_path_argument(&target_path)),
+    ];
+
+    if let Some(install_command) = options.dotfiles_install_command {
+        script.extend(dotfiles_explicit_install_commands(&install_command));
+    } else {
+        script.extend(dotfiles_default_install_commands());
+    }
+
+    Some(script.join("\n"))
+}
+
+fn normalize_dotfiles_repository(repository: &str) -> String {
+    if repository.contains(':')
+        || repository.starts_with("./")
+        || repository.starts_with("../")
+        || repository.starts_with('/')
+    {
+        repository.to_string()
+    } else {
+        format!("https://github.com/{repository}.git")
+    }
+}
+
+fn create_file_command(location: &str) -> String {
+    format!(
+        "test ! -f {location} && set -o noclobber && mkdir -p {parent} && {{ > {location} ; }} 2> /dev/null",
+        location = shell_path_argument(location),
+        parent = shell_path_argument(shell_parent(location))
+    )
+}
+
+fn shell_parent(path: &str) -> &str {
+    path.rsplit_once('/')
+        .map(|(parent, _)| parent)
+        .unwrap_or(".")
+}
+
+fn shell_single_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', "'\"'\"'"))
+}
+
+fn shell_path_argument(value: &str) -> String {
+    if value.starts_with("~/") {
+        value.to_string()
+    } else {
+        shell_single_quote(value)
+    }
+}
+
+fn dotfiles_explicit_install_commands(install_command: &str) -> Vec<String> {
+    let quoted = shell_single_quote(install_command);
+    let dotted = shell_single_quote(&format!("./{install_command}"));
+    vec![
+        format!("if [ -f {dotted} ]", dotted = dotted),
+        "then".to_string(),
+        format!("  install_path={dotted}", dotted = dotted),
+        format!("elif [ -f {quoted} ]", quoted = quoted),
+        "then".to_string(),
+        format!("  install_path={quoted}", quoted = quoted),
+        "else".to_string(),
+        format!("  echo Could not locate {quoted}", quoted = quoted),
+        "  exit 126".to_string(),
+        "fi".to_string(),
+        "if [ ! -x \"$install_path\" ]".to_string(),
+        "then".to_string(),
+        "  chmod +x \"$install_path\"".to_string(),
+        "fi".to_string(),
+        "echo Executing command \"$install_path\"...".to_string(),
+        "\"$install_path\"".to_string(),
+    ]
+}
+
+fn dotfiles_default_install_commands() -> Vec<String> {
+    vec![
+        "install_path=''".to_string(),
+        "for f in install.sh install bootstrap.sh bootstrap script/bootstrap setup.sh setup script/setup".to_string(),
+        "do".to_string(),
+        "  if [ -e \"$f\" ]".to_string(),
+        "  then".to_string(),
+        "    install_path=\"$f\"".to_string(),
+        "    break".to_string(),
+        "  fi".to_string(),
+        "done".to_string(),
+        "if [ -z \"$install_path\" ]".to_string(),
+        "then".to_string(),
+        "  dotfiles=$(find \"$(pwd)\" -mindepth 1 -maxdepth 1 -name '.*' ! -name '.git' -print)".to_string(),
+        "  if [ ! -z \"$dotfiles\" ]".to_string(),
+        "  then".to_string(),
+        "    echo Linking dotfiles: $dotfiles".to_string(),
+        "    ln -sf $dotfiles ~ 2>/dev/null".to_string(),
+        "  else".to_string(),
+        "    echo No dotfiles found.".to_string(),
+        "  fi".to_string(),
+        "else".to_string(),
+        "  if [ ! -x \"$install_path\" ]".to_string(),
+        "  then".to_string(),
+        "    chmod +x \"$install_path\"".to_string(),
+        "  fi".to_string(),
+        "  echo Executing command \"$install_path\"...".to_string(),
+        "  ./\"$install_path\"".to_string(),
+        "fi".to_string(),
+    ]
+}
+
 fn host_lifecycle_request(
     args: &[String],
     workspace_folder: &Path,
@@ -297,8 +459,8 @@ mod tests {
     use serde_json::json;
 
     use super::{
-        lifecycle_command_group, lifecycle_exec_args, selected_lifecycle_commands,
-        LifecycleCommand, LifecycleMode,
+        dotfiles_install_command, lifecycle_command_group, lifecycle_exec_args,
+        selected_lifecycle_steps, LifecycleCommand, LifecycleMode, LifecycleStep,
     };
 
     #[test]
@@ -313,8 +475,8 @@ mod tests {
     }
 
     #[test]
-    fn selected_lifecycle_commands_respect_mode_and_wait_for() {
-        let commands = selected_lifecycle_commands(
+    fn selected_lifecycle_steps_respect_mode_and_wait_for() {
+        let steps = selected_lifecycle_steps(
             &json!({
                 "onCreateCommand": "echo on-create",
                 "updateContentCommand": "echo update",
@@ -327,9 +489,9 @@ mod tests {
             LifecycleMode::RunUserCommands,
         );
 
-        assert_eq!(commands.len(), 4);
+        assert_eq!(steps.len(), 4);
 
-        let reused = selected_lifecycle_commands(
+        let reused = selected_lifecycle_steps(
             &json!({
                 "postStartCommand": "echo post-start",
                 "postAttachCommand": "echo post-attach"
@@ -339,6 +501,25 @@ mod tests {
         );
 
         assert_eq!(reused.len(), 1);
+    }
+
+    #[test]
+    fn selected_lifecycle_steps_insert_dotfiles_after_post_create() {
+        let steps = selected_lifecycle_steps(
+            &json!({
+                "postCreateCommand": "echo post-create",
+                "postStartCommand": "echo post-start"
+            }),
+            &[
+                "--dotfiles-repository".to_string(),
+                "./dotfiles".to_string(),
+            ],
+            LifecycleMode::RunUserCommands,
+        );
+
+        assert!(matches!(steps[0], LifecycleStep::CommandGroup(_)));
+        assert!(matches!(steps[1], LifecycleStep::InstallDotfiles));
+        assert!(matches!(steps[2], LifecycleStep::CommandGroup(_)));
     }
 
     #[test]
@@ -356,5 +537,18 @@ mod tests {
             args.contains(&"/bin/sh".to_string()),
             "expected lifecycle shell command to use /bin/sh: {args:?}"
         );
+    }
+
+    #[test]
+    fn dotfiles_install_command_defaults_target_path_and_marker_folder() {
+        let command = dotfiles_install_command(&[
+            "--dotfiles-repository".to_string(),
+            "owner/repo".to_string(),
+        ])
+        .expect("dotfiles command");
+
+        assert!(command.contains("https://github.com/owner/repo.git"));
+        assert!(command.contains("~/.devcontainer/.dotfilesMarker"));
+        assert!(command.contains("~/dotfiles"));
     }
 }
