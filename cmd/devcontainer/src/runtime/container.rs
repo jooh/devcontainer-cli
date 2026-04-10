@@ -1,10 +1,11 @@
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 
 use crate::commands::common;
 
@@ -21,6 +22,13 @@ pub(crate) struct UpContainer {
 
 static NEXT_UID_UPDATE_BUILD_ID: AtomicU64 = AtomicU64::new(0);
 
+#[derive(Debug, Eq, PartialEq)]
+struct UidUpdateDetails {
+    remote_user: String,
+    image_user: String,
+    updated_image_name: String,
+}
+
 pub(crate) fn prepare_up_image(
     resolved: &ResolvedConfig,
     args: &[String],
@@ -34,16 +42,16 @@ pub(crate) fn prepare_up_image(
         return Ok(image_name.to_string());
     }
 
-    let remote_user = configured_updatable_user(&resolved.configuration)
-        .ok_or_else(|| "Expected a non-root remote user for UID update".to_string())?;
-    let image_user = resolved
-        .configuration
-        .get("containerUser")
-        .or_else(|| resolved.configuration.get("remoteUser"))
-        .and_then(Value::as_str)
-        .unwrap_or("root");
+    let image_user = inspect_image_user(args, image_name)?;
+    let Some(update) = uid_update_details(
+        &resolved.configuration,
+        &resolved.workspace_folder,
+        image_name,
+        &image_user,
+    ) else {
+        return Ok(image_name.to_string());
+    };
     let (new_uid, new_gid) = host_uid_gid()?;
-    let updated_image_name = format!("{image_name}-uid");
     let build_context = unique_uid_update_build_context();
     fs::create_dir_all(&build_context).map_err(|error| error.to_string())?;
     let dockerfile = uid_update_dockerfile_path();
@@ -52,15 +60,15 @@ pub(crate) fn prepare_up_image(
         "--build-arg".to_string(),
         format!("BASE_IMAGE={image_name}"),
         "--build-arg".to_string(),
-        format!("REMOTE_USER={remote_user}"),
+        format!("REMOTE_USER={}", update.remote_user),
         "--build-arg".to_string(),
         format!("NEW_UID={new_uid}"),
         "--build-arg".to_string(),
         format!("NEW_GID={new_gid}"),
         "--build-arg".to_string(),
-        format!("IMAGE_USER={image_user}"),
+        format!("IMAGE_USER={}", update.image_user),
         "-t".to_string(),
-        updated_image_name.clone(),
+        update.updated_image_name.clone(),
         "-f".to_string(),
         dockerfile.display().to_string(),
         build_context.display().to_string(),
@@ -72,7 +80,7 @@ pub(crate) fn prepare_up_image(
         return Err(engine::stderr_or_stdout(&result));
     }
 
-    Ok(updated_image_name)
+    Ok(update.updated_image_name)
 }
 
 pub(crate) fn ensure_up_container(
@@ -423,7 +431,7 @@ pub(crate) fn should_update_remote_user_uid(
         return false;
     }
 
-    configured_updatable_user(configuration).is_some()
+    configuration.is_object()
 }
 
 fn detect_gpu_support(args: &[String]) -> Result<bool, String> {
@@ -441,12 +449,82 @@ fn detect_gpu_support(args: &[String]) -> Result<bool, String> {
     Ok(result.stdout.contains("nvidia-container-runtime"))
 }
 
-fn configured_updatable_user(configuration: &Value) -> Option<&str> {
-    configuration
+fn uid_update_details(
+    configuration: &Value,
+    workspace_folder: &Path,
+    image_name: &str,
+    image_user: &str,
+) -> Option<UidUpdateDetails> {
+    let remote_user = uid_update_remote_user(configuration, image_user)?;
+    Some(UidUpdateDetails {
+        remote_user: remote_user.to_string(),
+        image_user: image_user.to_string(),
+        updated_image_name: uid_update_image_name(workspace_folder, image_name),
+    })
+}
+
+fn uid_update_remote_user<'a>(configuration: &'a Value, image_user: &'a str) -> Option<&'a str> {
+    let user = configuration
         .get("remoteUser")
         .or_else(|| configuration.get("containerUser"))
         .and_then(Value::as_str)
-        .filter(|user| *user != "root" && !user.chars().all(|character| character.is_ascii_digit()))
+        .unwrap_or(image_user);
+    is_updatable_user(user).then_some(user)
+}
+
+fn is_updatable_user(user: &str) -> bool {
+    user != "root" && !user.chars().all(|character| character.is_ascii_digit())
+}
+
+fn inspect_image_user(args: &[String], image_name: &str) -> Result<String, String> {
+    let result = engine::run_engine(
+        args,
+        vec![
+            "image".to_string(),
+            "inspect".to_string(),
+            "--format".to_string(),
+            "{{.Config.User}}".to_string(),
+            image_name.to_string(),
+        ],
+    )?;
+    if result.status_code != 0 {
+        return Err(engine::stderr_or_stdout(&result));
+    }
+    let user = result.stdout.trim();
+    if user.is_empty() {
+        Ok("root".to_string())
+    } else {
+        Ok(user.to_string())
+    }
+}
+
+fn uid_update_image_name(workspace_folder: &Path, image_name: &str) -> String {
+    let local_image_name = uid_update_local_image_name(workspace_folder);
+    let base_image_name = if image_name.starts_with(&local_image_name) {
+        image_name
+    } else {
+        local_image_name.as_str()
+    };
+    format!("{base_image_name}-uid")
+}
+
+fn uid_update_local_image_name(workspace_folder: &Path) -> String {
+    let basename = workspace_folder
+        .file_name()
+        .and_then(|value| value.to_str())
+        .unwrap_or("workspace")
+        .chars()
+        .flat_map(|character| character.to_lowercase())
+        .map(|character| {
+            if character.is_ascii_lowercase() || character.is_ascii_digit() {
+                character
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    let hash = Sha256::digest(workspace_folder.to_string_lossy().as_bytes());
+    format!("vsc-{basename}-{hash:x}")
 }
 
 fn is_uid_update_platform_supported() -> bool {
@@ -635,9 +713,11 @@ fn target_container_labels(
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use serde_json::json;
 
-    use super::{mount_argument, should_update_remote_user_uid};
+    use super::{mount_argument, should_update_remote_user_uid, uid_update_details};
 
     #[test]
     fn mount_argument_preserves_read_only_and_alias_keys() {
@@ -684,6 +764,11 @@ mod tests {
     }
 
     #[test]
+    fn remote_user_uid_update_can_inspect_image_user_when_config_omits_users() {
+        assert!(should_update_remote_user_uid(&json!({}), &[], true));
+    }
+
+    #[test]
     fn remote_user_uid_update_respects_option_and_config_overrides() {
         assert!(!should_update_remote_user_uid(
             &json!({
@@ -710,5 +795,58 @@ mod tests {
             &[],
             false,
         ));
+    }
+
+    #[test]
+    fn uid_update_details_fall_back_to_the_image_user() {
+        let details = uid_update_details(
+            &json!({}),
+            Path::new("/tmp/example-workspace"),
+            "ghcr.io/example/app:latest",
+            "node",
+        )
+        .expect("uid update details");
+
+        assert_eq!(details.remote_user, "node");
+        assert_eq!(details.image_user, "node");
+        assert!(details
+            .updated_image_name
+            .starts_with("vsc-example-workspace-"));
+        assert!(details.updated_image_name.ends_with("-uid"));
+    }
+
+    #[test]
+    fn uid_update_details_preserve_the_image_user_when_remote_user_is_overridden() {
+        let details = uid_update_details(
+            &json!({
+                "remoteUser": "vscode"
+            }),
+            Path::new("/tmp/example-workspace"),
+            "ghcr.io/example/app:latest",
+            "node",
+        )
+        .expect("uid update details");
+
+        assert_eq!(details.remote_user, "vscode");
+        assert_eq!(details.image_user, "node");
+    }
+
+    #[test]
+    fn uid_update_details_use_a_local_tag_for_digest_pinned_images() {
+        let details = uid_update_details(
+            &json!({
+                "remoteUser": "vscode"
+            }),
+            Path::new("/tmp/example-workspace"),
+            "ghcr.io/example/app@sha256:0123456789abcdef",
+            "node",
+        )
+        .expect("uid update details");
+
+        assert!(details
+            .updated_image_name
+            .starts_with("vsc-example-workspace-"));
+        assert!(details.updated_image_name.ends_with("-uid"));
+        assert!(!details.updated_image_name.contains('@'));
     }
 }
