@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 195,
-		"optionsMissing": 5
+		"optionsReferenced": 198,
+		"optionsMissing": 2
 	},
 	"commands": [
 		{
@@ -16,8 +16,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 43,
-				"referenced": 40,
-				"missing": 3
+				"referenced": 43,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -171,8 +171,11 @@
 				},
 				{
 					"name": "gpu-availability",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs"
+					]
 				},
 				{
 					"name": "id-label",
@@ -249,8 +252,10 @@
 				},
 				{
 					"name": "omit-config-remote-env-from-metadata",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "omit-syntax-directive",
@@ -343,8 +348,11 @@
 				},
 				{
 					"name": "update-remote-user-uid-default",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/container.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",
