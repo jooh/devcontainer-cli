@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 136,
-		"optionsMissing": 64
+		"optionsReferenced": 178,
+		"optionsMissing": 22
 	},
 	"commands": [
 		{
@@ -16,8 +16,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 43,
-				"referenced": 27,
-				"missing": 16
+				"referenced": 35,
+				"missing": 8
 			},
 			"options": [
 				{
@@ -73,23 +73,35 @@
 				},
 				{
 					"name": "container-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "container-session-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "container-system-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "default-user-env-probe",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "docker-compose-path",
@@ -189,8 +201,12 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "mount",
@@ -296,13 +312,21 @@
 				},
 				{
 					"name": "terminal-columns",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "terminal-rows",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "update-remote-user-uid-default",
@@ -311,8 +335,11 @@
 				},
 				{
 					"name": "user-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",
@@ -352,8 +379,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 20,
-				"referenced": 9,
-				"missing": 11
+				"referenced": 17,
+				"missing": 3
 			},
 			"options": [
 				{
@@ -368,8 +395,11 @@
 				},
 				{
 					"name": "container-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "container-id",
@@ -382,18 +412,27 @@
 				},
 				{
 					"name": "container-session-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "container-system-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "default-user-env-probe",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "docker-path",
@@ -442,8 +481,12 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "remote-env",
@@ -469,18 +512,29 @@
 				},
 				{
 					"name": "terminal-columns",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "terminal-rows",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				}
 			],
 			"knownGaps": [
@@ -494,8 +548,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 22,
-				"referenced": 17,
-				"missing": 5
+				"referenced": 19,
+				"missing": 3
 			},
 			"options": [
 				{
@@ -602,8 +656,12 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "no-cache",
@@ -656,8 +714,11 @@
 				},
 				{
 					"name": "user-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",
@@ -687,8 +748,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 27,
-				"referenced": 14,
-				"missing": 13
+				"referenced": 22,
+				"missing": 5
 			},
 			"options": [
 				{
@@ -703,8 +764,11 @@
 				},
 				{
 					"name": "container-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "container-id",
@@ -717,18 +781,27 @@
 				},
 				{
 					"name": "container-session-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "container-system-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "default-user-env-probe",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "docker-compose-path",
@@ -781,8 +854,12 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "mount-git-worktree-common-dir",
@@ -850,18 +927,29 @@
 				},
 				{
 					"name": "terminal-columns",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "terminal-rows",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",
@@ -886,8 +974,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 18,
-				"referenced": 14,
-				"missing": 4
+				"referenced": 18,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -980,8 +1068,12 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "mount-git-worktree-common-dir",
@@ -1022,18 +1114,29 @@
 				},
 				{
 					"name": "terminal-columns",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "terminal-rows",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",
@@ -1063,8 +1166,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 8,
-				"referenced": 4,
-				"missing": 4
+				"referenced": 8,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -1087,8 +1190,10 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "output-format",
@@ -1099,18 +1204,24 @@
 				},
 				{
 					"name": "terminal-columns",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "terminal-rows",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",
@@ -1136,8 +1247,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 8,
-				"referenced": 7,
-				"missing": 1
+				"referenced": 8,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -1182,8 +1293,10 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs"
+					]
 				},
 				{
 					"name": "target-version",
@@ -1269,7 +1382,8 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/mod.rs"
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/common.rs"
 					]
 				},
 				{
@@ -1376,7 +1490,8 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/mod.rs"
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/common.rs"
 					]
 				},
 				{
@@ -1406,7 +1521,8 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/mod.rs"
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/common.rs"
 					]
 				},
 				{
@@ -1454,7 +1570,8 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/mod.rs"
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/common.rs"
 					]
 				},
 				{
@@ -1527,7 +1644,8 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/mod.rs"
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/common.rs"
 					]
 				},
 				{
@@ -1607,7 +1725,8 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/mod.rs"
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/common.rs"
 					]
 				}
 			],
@@ -1644,7 +1763,8 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/mod.rs"
+						"cmd/devcontainer/src/commands/collections/mod.rs",
+						"cmd/devcontainer/src/commands/common.rs"
 					]
 				},
 				{
@@ -1667,8 +1787,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 19,
-				"referenced": 11,
-				"missing": 8
+				"referenced": 18,
+				"missing": 1
 			},
 			"options": [
 				{
@@ -1683,8 +1803,11 @@
 				},
 				{
 					"name": "container-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "container-id",
@@ -1697,13 +1820,19 @@
 				},
 				{
 					"name": "container-system-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "default-user-env-probe",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "docker-compose-path",
@@ -1741,8 +1870,12 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "mount-git-worktree-common-dir",
@@ -1783,18 +1916,29 @@
 				},
 				{
 					"name": "terminal-columns",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "terminal-rows",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/engine.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common.rs",
+						"cmd/devcontainer/src/runtime/exec.rs"
+					]
 				},
 				{
 					"name": "workspace-folder",
