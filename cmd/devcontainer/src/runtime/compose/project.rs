@@ -1,3 +1,5 @@
+//! Compose project-name and environment interpolation helpers.
+
 use std::env;
 use std::path::{Path, PathBuf};
 

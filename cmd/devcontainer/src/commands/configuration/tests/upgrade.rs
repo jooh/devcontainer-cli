@@ -1,3 +1,5 @@
+//! Unit tests for configuration upgrade and lockfile behavior.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

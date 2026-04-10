@@ -1,3 +1,5 @@
+//! Process request and result types shared across runtime execution helpers.
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Command;

@@ -1,3 +1,5 @@
+//! Unit tests for feature publishing helpers.
+
 use std::fs;
 
 use super::support::unique_temp_dir;

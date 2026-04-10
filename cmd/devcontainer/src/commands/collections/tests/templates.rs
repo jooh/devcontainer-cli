@@ -1,3 +1,5 @@
+//! Unit tests for template collection helpers.
+
 use std::fs;
 
 use serde_json::json;

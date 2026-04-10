@@ -1,3 +1,5 @@
+//! Unit tests for read-configuration behavior.
+
 use std::fs;
 
 use serde_json::json;

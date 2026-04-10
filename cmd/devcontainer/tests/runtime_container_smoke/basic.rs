@@ -1,3 +1,5 @@
+//! Runtime container smoke tests for basic up and workspace-mount behavior.
+
 use std::fs;
 use std::process::Command;
 

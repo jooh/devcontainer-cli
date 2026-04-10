@@ -1,3 +1,5 @@
+//! CLI smoke tests for lockfile and upgrade commands.
+
 use std::fs;
 
 use serde_json::Value;

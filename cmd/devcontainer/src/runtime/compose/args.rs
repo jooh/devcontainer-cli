@@ -1,3 +1,5 @@
+//! Compose-specific argument parsing helpers for runtime flows.
+
 use std::path::PathBuf;
 
 use crate::commands::common;

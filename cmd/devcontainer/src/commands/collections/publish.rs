@@ -1,3 +1,5 @@
+//! Feature publishing command helpers for collection workflows.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

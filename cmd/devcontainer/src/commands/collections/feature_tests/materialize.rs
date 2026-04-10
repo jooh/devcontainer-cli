@@ -1,3 +1,5 @@
+//! Feature test materialization and build context helpers.
+
 use std::fs;
 use std::path::Component;
 use std::path::{Path, PathBuf};

@@ -1,3 +1,5 @@
+//! Unit tests for feature test collection helpers.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 

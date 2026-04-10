@@ -1,3 +1,5 @@
+//! CLI smoke tests for read-configuration flows.
+
 use std::fs;
 use std::process::Command;
 

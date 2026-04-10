@@ -1,3 +1,5 @@
+//! Command-line parsing and top-level dispatch for the devcontainer binary.
+
 use crate::output::{self, LogFormat};
 
 pub const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 10] = [

@@ -1,3 +1,5 @@
+//! Registry lookup helpers for bundled collections and published features.
+
 use std::env;
 use std::path::PathBuf;
 

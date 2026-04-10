@@ -1,3 +1,5 @@
+//! Shared types and entrypoints for feature test subcommands.
+
 mod discovery;
 mod materialize;
 mod runtime;

@@ -1,3 +1,5 @@
+//! Collection-oriented command entrypoints and shared helpers.
+
 mod feature_tests;
 mod features;
 mod publish;

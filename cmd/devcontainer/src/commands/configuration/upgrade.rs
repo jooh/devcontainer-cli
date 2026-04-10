@@ -1,3 +1,5 @@
+//! Configuration upgrade, lockfile, and outdated command helpers.
+
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;

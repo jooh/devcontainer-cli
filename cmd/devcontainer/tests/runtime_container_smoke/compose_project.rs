@@ -1,3 +1,5 @@
+//! Runtime container smoke tests for compose project-name behavior.
+
 use std::fs;
 
 use crate::support::runtime_harness::{write_devcontainer_config, RuntimeHarness};

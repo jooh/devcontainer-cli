@@ -1,3 +1,5 @@
+//! Configuration loading helpers for command entrypoints.
+
 use std::fs;
 
 use super::LoadedConfig;

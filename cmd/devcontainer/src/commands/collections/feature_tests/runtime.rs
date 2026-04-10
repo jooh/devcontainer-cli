@@ -1,3 +1,5 @@
+//! Runtime execution helpers for feature test commands.
+
 use std::fs;
 use std::path::Path;
 

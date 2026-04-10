@@ -1,3 +1,5 @@
+//! Container engine invocation helpers for native runtime commands.
+
 use crate::commands::common;
 use crate::process_runner::{self, ProcessRequest, ProcessResult};
 

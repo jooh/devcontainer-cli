@@ -1,3 +1,5 @@
+//! Runtime smoke tests for exec command behavior.
+
 mod support;
 
 use serde_json::json;

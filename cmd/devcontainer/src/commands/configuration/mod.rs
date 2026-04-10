@@ -1,3 +1,5 @@
+//! Configuration command entrypoints and shared configuration helpers.
+
 mod catalog;
 mod features;
 mod inspect;
