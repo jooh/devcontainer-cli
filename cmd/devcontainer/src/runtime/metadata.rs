@@ -2,6 +2,8 @@
 
 use serde_json::{Map, Value};
 
+use crate::config::{flatten_lifecycle_value, lifecycle_value_from_flattened};
+
 pub(crate) fn merged_container_metadata(metadata_label: Option<&str>) -> Value {
     let entries = metadata_entries(metadata_label);
 
@@ -105,30 +107,9 @@ fn merged_metadata_lifecycle_values(entries: &[Value], key: &str) -> Option<Valu
     let commands = entries
         .iter()
         .filter_map(|entry| entry.get(key))
-        .flat_map(flatten_lifecycle_values)
+        .flat_map(flatten_lifecycle_value)
         .collect::<Vec<_>>();
-    match commands.len() {
-        0 => None,
-        1 => commands.into_iter().next(),
-        _ => Some(Value::Object(
-            commands
-                .into_iter()
-                .enumerate()
-                .map(|(index, value)| (index.to_string(), value))
-                .collect(),
-        )),
-    }
-}
-
-fn flatten_lifecycle_values(value: &Value) -> Vec<Value> {
-    match value {
-        Value::String(_) | Value::Array(_) => vec![value.clone()],
-        Value::Object(entries) => entries
-            .values()
-            .flat_map(flatten_lifecycle_values)
-            .collect(),
-        _ => Vec::new(),
-    }
+    lifecycle_value_from_flattened(commands)
 }
 
 #[cfg(test)]

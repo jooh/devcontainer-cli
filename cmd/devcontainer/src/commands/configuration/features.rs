@@ -11,6 +11,7 @@ use crate::commands::collections::registry::{
     published_feature_manifest,
 };
 use crate::commands::common;
+use crate::config::{flatten_lifecycle_value, lifecycle_value_from_flattened};
 use crate::runtime::mounts::mount_option_target;
 
 #[derive(Clone, Debug)]
@@ -618,37 +619,8 @@ fn merge_lifecycle_value(merged: &mut Map<String, Value>, metadata: &Value, key:
         .into_iter()
         .chain(flatten_lifecycle_value(value))
         .collect::<Vec<_>>();
-    match combined.len() {
-        0 => {}
-        1 => {
-            merged.insert(
-                key.to_string(),
-                combined
-                    .into_iter()
-                    .next()
-                    .expect("single lifecycle command"),
-            );
-        }
-        _ => {
-            merged.insert(
-                key.to_string(),
-                Value::Object(
-                    combined
-                        .into_iter()
-                        .enumerate()
-                        .map(|(index, value)| (index.to_string(), value))
-                        .collect(),
-                ),
-            );
-        }
-    }
-}
-
-fn flatten_lifecycle_value(value: &Value) -> Vec<Value> {
-    match value {
-        Value::String(_) | Value::Array(_) => vec![value.clone()],
-        Value::Object(entries) => entries.values().flat_map(flatten_lifecycle_value).collect(),
-        _ => Vec::new(),
+    if let Some(value) = lifecycle_value_from_flattened(combined) {
+        merged.insert(key.to_string(), value);
     }
 }
 
