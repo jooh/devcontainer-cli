@@ -83,10 +83,10 @@ fn feature_info_reads_published_catalog_oci_manifest() {
         build_feature_info_payload("manifest", "ghcr.io/devcontainers/features/azure-cli:1")
             .expect("feature info");
 
-    assert!(payload["canonicalId"]
-        .as_str()
-        .expect("canonical id")
-        .starts_with("ghcr.io/devcontainers/features/azure-cli@sha256:"));
+    assert_eq!(
+        payload["canonicalId"],
+        "ghcr.io/devcontainers/features/azure-cli@sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134"
+    );
     let manifest = &payload["manifest"];
     assert_eq!(manifest["schemaVersion"], 2);
     assert_eq!(
@@ -128,6 +128,10 @@ fn feature_info_supports_digest_pinned_catalog_refs() {
     )
     .expect("feature info");
 
+    assert_eq!(
+        payload["canonicalId"],
+        "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c"
+    );
     assert_eq!(
         payload["manifest"]["layers"][0]["annotations"]["org.opencontainers.image.title"],
         "devcontainer-feature-git-lfs.tgz"

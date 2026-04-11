@@ -1,6 +1,8 @@
 //! CLI smoke tests for read-configuration flows.
 
+use std::env;
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde_json::Value;
@@ -18,6 +20,15 @@ fn run_read_configuration(
     let stdout = String::from_utf8(output.stdout.clone()).expect("utf8 stdout");
     let parsed = serde_json::from_str(&stdout).expect("json stdout");
     (output, parsed)
+}
+
+fn default_user_data_folder(root: &Path) -> PathBuf {
+    if cfg!(target_os = "linux") {
+        let username = env::var("USER").unwrap_or_else(|_| "unknown".to_string());
+        root.join(format!("devcontainercli-{username}"))
+    } else {
+        root.join("devcontainercli")
+    }
 }
 
 #[test]
@@ -61,6 +72,51 @@ fn read_configuration_command_returns_configuration_payload() {
     assert!(stdout.contains("\"workspace\""));
 
     let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn read_configuration_loads_default_control_manifest_without_user_data_flag() {
+    let root = unique_temp_dir("devcontainer-cli-smoke");
+    let temp_root = unique_temp_dir("devcontainer-cli-smoke");
+    let config_dir = root.join(".devcontainer");
+    let user_data = default_user_data_folder(&temp_root);
+    fs::create_dir_all(&config_dir).expect("config dir");
+    fs::create_dir_all(&user_data).expect("user data dir");
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/problematic-feature:1\": {}\n  }\n}\n",
+    )
+    .expect("config write");
+    fs::write(
+        user_data.join("control-manifest.json"),
+        serde_json::json!({
+            "disallowedFeatures": [{
+                "featureIdPrefix": "ghcr.io/devcontainers/features/problematic-feature",
+                "documentationURL": "https://containers.dev/"
+            }],
+            "featureAdvisories": []
+        })
+        .to_string(),
+    )
+    .expect("control manifest");
+
+    let output = devcontainer_command(None)
+        .env("TMPDIR", &temp_root)
+        .args([
+            "read-configuration",
+            "--workspace-folder",
+            root.to_string_lossy().as_ref(),
+            "--include-features-configuration",
+        ])
+        .output()
+        .expect("read-configuration should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.contains("problematic-feature:1"), "{stderr}");
+
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(temp_root);
 }
 
 #[test]
