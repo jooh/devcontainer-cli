@@ -96,12 +96,12 @@ pub(crate) fn feature_advisories_for_oci_features(
 
 fn control_manifest(args: &[String]) -> Result<DevContainerControlManifest, String> {
     let Some(user_data_folder) = common::parse_option_value(args, "--user-data-folder") else {
-        return Ok(fixture_control_manifest());
+        return Ok(DevContainerControlManifest::default());
     };
 
     let manifest_path = PathBuf::from(user_data_folder).join("control-manifest.json");
     if !manifest_path.is_file() {
-        return Ok(fixture_control_manifest());
+        return Ok(DevContainerControlManifest::default());
     }
 
     let raw = fs::read_to_string(&manifest_path).map_err(|error| error.to_string())?;
@@ -151,22 +151,6 @@ fn sanitize_control_manifest(value: &Value) -> DevContainerControlManifest {
                 })
             })
             .collect(),
-    }
-}
-
-fn fixture_control_manifest() -> DevContainerControlManifest {
-    DevContainerControlManifest {
-        disallowed_features: vec![DisallowedFeature {
-            feature_id_prefix: "ghcr.io/devcontainers/features/problematic-feature".to_string(),
-            documentation_url: Some("https://containers.dev/".to_string()),
-        }],
-        feature_advisories: vec![FeatureAdvisory {
-            feature_id: "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
-            introduced_in_version: "1.0.7".to_string(),
-            fixed_in_version: "1.1.10".to_string(),
-            description: "Fixture advisory entry for native parity testing.".to_string(),
-            documentation_url: Some("https://containers.dev/".to_string()),
-        }],
     }
 }
 
@@ -236,7 +220,7 @@ mod tests {
         ensure_no_disallowed_features, feature_advisories_for_oci_features, feature_matches_prefix,
         sanitize_control_manifest,
     };
-    use crate::test_support::unique_temp_dir;
+    use crate::test_support::{unique_temp_dir, write_test_control_manifest};
 
     #[test]
     fn disallowed_feature_matching_accepts_exact_ids_and_supported_separators() {
@@ -277,35 +261,44 @@ mod tests {
     }
 
     #[test]
-    fn ensure_no_disallowed_features_rejects_fixture_disallowed_features() {
+    fn ensure_no_disallowed_features_defaults_to_an_empty_manifest() {
         let features = Map::from_iter([(
             "ghcr.io/devcontainers/features/problematic-feature:1".to_string(),
             Value::Object(Map::new()),
         )]);
 
-        let error = ensure_no_disallowed_features(&[], &features).expect_err("disallowed feature");
-        assert!(error.contains("problematic-feature:1"), "{error}");
-        assert!(error.contains("https://containers.dev/"), "{error}");
+        ensure_no_disallowed_features(&[], &features).expect("empty default control manifest");
+    }
+
+    #[test]
+    fn ensure_no_disallowed_features_defaults_to_empty_when_manifest_file_is_missing() {
+        let root = unique_temp_dir("devcontainer-control-manifest-test");
+        let user_data = root.join("user-data");
+        std::fs::create_dir_all(&user_data).expect("user data dir");
+        let features = Map::from_iter([(
+            "ghcr.io/devcontainers/features/problematic-feature:1".to_string(),
+            Value::Object(Map::new()),
+        )]);
+
+        ensure_no_disallowed_features(
+            &[
+                "--user-data-folder".to_string(),
+                user_data.display().to_string(),
+            ],
+            &features,
+        )
+        .expect("missing control manifest should behave as empty");
+
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
     fn ensure_no_disallowed_features_supports_user_data_folder_override() {
         let root = unique_temp_dir("devcontainer-control-manifest-test");
         let user_data = root.join("user-data");
-        std::fs::create_dir_all(&user_data).expect("user data dir");
-        std::fs::write(
-            user_data.join("control-manifest.json"),
-            json!({
-                "disallowedFeatures": [{
-                    "featureIdPrefix": "ghcr.io/devcontainers/features/git",
-                    "documentationURL": "https://example.invalid/disallowed"
-                }]
-            })
-            .to_string(),
-        )
-        .expect("control manifest");
+        write_test_control_manifest(&user_data);
         let features = Map::from_iter([(
-            "ghcr.io/devcontainers/features/git:1".to_string(),
+            "ghcr.io/devcontainers/features/problematic-feature:1".to_string(),
             Value::Object(Map::new()),
         )]);
 
@@ -318,17 +311,36 @@ mod tests {
         )
         .expect_err("user-data control manifest");
 
-        assert!(
-            error.contains("https://example.invalid/disallowed"),
-            "{error}"
-        );
+        assert!(error.contains("problematic-feature:1"), "{error}");
+        assert!(error.contains("https://containers.dev/"), "{error}");
         let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
-    fn feature_advisories_match_versions_in_range() {
+    fn feature_advisories_are_empty_without_a_control_manifest() {
         let advisories = feature_advisories_for_oci_features(
             &[],
+            &[(
+                "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
+                "1.0.9".to_string(),
+            )],
+        )
+        .expect("advisories");
+
+        assert!(advisories.is_empty());
+    }
+
+    #[test]
+    fn feature_advisories_match_versions_in_range() {
+        let root = unique_temp_dir("devcontainer-control-manifest-test");
+        let user_data = root.join("user-data");
+        write_test_control_manifest(&user_data);
+        let args = vec![
+            "--user-data-folder".to_string(),
+            user_data.display().to_string(),
+        ];
+        let advisories = feature_advisories_for_oci_features(
+            &args,
             &[(
                 "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
                 "1.0.9".to_string(),
@@ -355,7 +367,7 @@ mod tests {
         assert_eq!(advisories[0]["advisories"][0]["fixedInVersion"], "1.1.10");
 
         let advisories = feature_advisories_for_oci_features(
-            &[],
+            &args,
             &[(
                 "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
                 "1.1.5".to_string(),
@@ -365,12 +377,20 @@ mod tests {
 
         assert_eq!(advisories.len(), 1);
         assert_eq!(advisories[0]["feature"]["version"], "1.1.5");
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
     fn feature_advisories_skip_versions_outside_range() {
+        let root = unique_temp_dir("devcontainer-control-manifest-test");
+        let user_data = root.join("user-data");
+        write_test_control_manifest(&user_data);
+        let args = vec![
+            "--user-data-folder".to_string(),
+            user_data.display().to_string(),
+        ];
         let advisories = feature_advisories_for_oci_features(
-            &[],
+            &args,
             &[(
                 "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
                 "1.0.6".to_string(),
@@ -380,7 +400,7 @@ mod tests {
         assert!(advisories.is_empty());
 
         let advisories = feature_advisories_for_oci_features(
-            &[],
+            &args,
             &[(
                 "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
                 "1.1.10".to_string(),
@@ -390,7 +410,7 @@ mod tests {
         assert!(advisories.is_empty());
 
         let advisories = feature_advisories_for_oci_features(
-            &[],
+            &args,
             &[(
                 "ghcr.io/devcontainers/features/other-feature".to_string(),
                 "1.0.9".to_string(),
@@ -398,6 +418,7 @@ mod tests {
         )
         .expect("advisories");
         assert!(advisories.is_empty());
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

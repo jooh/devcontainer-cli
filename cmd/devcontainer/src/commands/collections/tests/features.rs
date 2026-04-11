@@ -6,6 +6,7 @@ use super::support::unique_temp_dir;
 use crate::commands::collections::features::{
     build_feature_info_payload, build_features_resolve_dependencies_payload,
 };
+use crate::test_support::write_test_control_manifest;
 
 #[test]
 fn feature_dependency_resolution_respects_override_order() {
@@ -36,7 +37,9 @@ fn feature_dependency_resolution_respects_override_order() {
 fn feature_dependency_resolution_rejects_disallowed_features() {
     let root = unique_temp_dir();
     let config_dir = root.join(".devcontainer");
+    let user_data = root.join("user-data");
     fs::create_dir_all(&config_dir).expect("failed to create config directory");
+    write_test_control_manifest(&user_data);
     fs::write(
         config_dir.join("devcontainer.json"),
         "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/problematic-feature:1\": {}\n  }\n}\n",
@@ -46,6 +49,8 @@ fn feature_dependency_resolution_rejects_disallowed_features() {
     let error = build_features_resolve_dependencies_payload(&[
         "--workspace-folder".to_string(),
         root.display().to_string(),
+        "--user-data-folder".to_string(),
+        user_data.display().to_string(),
     ])
     .expect_err("disallowed feature should fail");
 
