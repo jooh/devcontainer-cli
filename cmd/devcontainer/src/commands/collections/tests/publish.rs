@@ -144,6 +144,103 @@ fn publish_updates_moving_semantic_tags_for_new_patch_versions() {
 }
 
 #[test]
+fn publish_rewrites_existing_layout_for_same_version_republishes() {
+    let root = unique_temp_dir();
+    let output_dir = unique_temp_dir();
+    fs::create_dir_all(&root).expect("feature root");
+    let manifest_path = root.join("devcontainer-feature.json");
+    fs::write(
+        &manifest_path,
+        "{\n  \"id\": \"published-feature\",\n  \"name\": \"Published Feature\",\n  \"version\": \"1.0.0\",\n  \"description\": \"first\"\n}\n",
+    )
+    .expect("manifest");
+
+    let first_payload = publish_collection_target_to_oci(
+        &root,
+        "devcontainer-feature.json",
+        "feature",
+        "features publish",
+        &["--output-dir".to_string(), output_dir.display().to_string()],
+    )
+    .expect("first publish payload");
+
+    fs::write(
+        &manifest_path,
+        "{\n  \"id\": \"published-feature\",\n  \"name\": \"Published Feature\",\n  \"version\": \"1.0.0\",\n  \"description\": \"second\"\n}\n",
+    )
+    .expect("updated manifest");
+
+    let second_payload = publish_collection_target_to_oci(
+        &root,
+        "devcontainer-feature.json",
+        "feature",
+        "features publish",
+        &["--output-dir".to_string(), output_dir.display().to_string()],
+    )
+    .expect("second publish payload");
+
+    assert_eq!(second_payload["published"], true);
+    assert_ne!(first_payload["digest"], second_payload["digest"]);
+
+    let index: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(output_dir.join("index.json")).expect("index"))
+            .expect("index json");
+    let published_manifest = index["manifests"]
+        .as_array()
+        .expect("manifests")
+        .iter()
+        .find(|entry| entry["annotations"]["org.opencontainers.image.ref.name"] == "1.0.0")
+        .expect("1.0.0 tag");
+
+    assert_eq!(published_manifest["digest"], second_payload["digest"]);
+
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(output_dir);
+}
+
+#[test]
+fn publish_versionless_manifests_as_latest() {
+    let root = unique_temp_dir();
+    let output_dir = unique_temp_dir();
+    fs::create_dir_all(&root).expect("feature root");
+    fs::write(
+        root.join("devcontainer-feature.json"),
+        "{\n  \"id\": \"published-feature\",\n  \"name\": \"Published Feature\"\n}\n",
+    )
+    .expect("manifest");
+
+    let payload = publish_collection_target_to_oci(
+        &root,
+        "devcontainer-feature.json",
+        "feature",
+        "features publish",
+        &["--output-dir".to_string(), output_dir.display().to_string()],
+    )
+    .expect("publish payload");
+
+    assert_eq!(payload["published"], true);
+    assert_eq!(payload["version"], "latest");
+    assert_eq!(payload["publishedTags"], serde_json::json!(["latest"]));
+    assert!(output_dir.join("oci-layout").is_file());
+    assert!(output_dir.join("index.json").is_file());
+
+    let index: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(output_dir.join("index.json")).expect("index"))
+            .expect("index json");
+    let tags = index["manifests"]
+        .as_array()
+        .expect("manifests")
+        .iter()
+        .filter_map(|entry| entry["annotations"]["org.opencontainers.image.ref.name"].as_str())
+        .collect::<Vec<_>>();
+
+    assert_eq!(tags, vec!["latest"]);
+
+    let _ = fs::remove_dir_all(root);
+    let _ = fs::remove_dir_all(output_dir);
+}
+
+#[test]
 fn generate_feature_docs_include_collection_and_repository_metadata() {
     let root = unique_temp_dir();
     fs::create_dir_all(&root).expect("failed to create docs root");

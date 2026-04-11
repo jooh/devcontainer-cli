@@ -40,44 +40,36 @@ pub(super) fn publish_collection_target_to_oci(
     });
     let existing_tags = published_tags_from_layout(&output_dir)?;
     let published_tags = semantic_tags_for_version(version, &existing_tags);
-    let digest = if let Some(tags) = published_tags.as_ref() {
-        Some(write_oci_layout(
-            &output_dir,
-            &archive,
-            &manifest,
-            resource.as_deref(),
-            tags,
-        )?)
-    } else {
-        None
-    };
+    let digest = write_oci_layout(
+        &output_dir,
+        &archive,
+        &manifest,
+        resource.as_deref(),
+        &published_tags,
+    )?;
     let mut payload = json!({
         "outcome": "success",
         "command": command,
         "archive": archive,
-        "published": published_tags.is_some(),
+        "published": true,
         "layout": output_dir,
         "mode": "local-oci-layout",
         "registry": registry,
         "namespace": namespace,
         "resource": resource,
     });
-    if let Some(digest) = digest {
-        payload
-            .as_object_mut()
-            .expect("payload object")
-            .insert("digest".to_string(), Value::String(digest));
-    }
-    if let Some(tags) = published_tags {
-        payload
-            .as_object_mut()
-            .expect("payload object")
-            .insert("publishedTags".to_string(), json!(tags));
-        payload
-            .as_object_mut()
-            .expect("payload object")
-            .insert("version".to_string(), Value::String(version.to_string()));
-    }
+    payload
+        .as_object_mut()
+        .expect("payload object")
+        .insert("digest".to_string(), Value::String(digest));
+    payload
+        .as_object_mut()
+        .expect("payload object")
+        .insert("publishedTags".to_string(), json!(published_tags));
+    payload
+        .as_object_mut()
+        .expect("payload object")
+        .insert("version".to_string(), Value::String(version.to_string()));
     Ok(payload)
 }
 
@@ -213,12 +205,10 @@ fn existing_index_manifests(output_dir: &Path) -> Result<Vec<Value>, String> {
         .unwrap_or_default())
 }
 
-fn semantic_tags_for_version(version: &str, existing_tags: &[String]) -> Option<Vec<String>> {
-    let parsed = parse_semver(version)?;
-    if existing_tags.iter().any(|tag| tag == version) {
-        return None;
-    }
-
+fn semantic_tags_for_version(version: &str, existing_tags: &[String]) -> Vec<String> {
+    let Some(parsed) = parse_semver(version) else {
+        return vec![version.to_string()];
+    };
     let mut tags = Vec::new();
     if should_publish_tag(existing_tags, parsed, |candidate| {
         candidate.major == parsed.major
@@ -234,7 +224,7 @@ fn semantic_tags_for_version(version: &str, existing_tags: &[String]) -> Option<
     if should_publish_tag(existing_tags, parsed, |_| true) {
         tags.push("latest".to_string());
     }
-    Some(tags)
+    tags
 }
 
 fn should_publish_tag<F>(existing_tags: &[String], version: SemVer, matches_range: F) -> bool
@@ -246,7 +236,7 @@ where
         .filter_map(|tag| parse_semver(tag))
         .filter(|candidate| matches_range(*candidate))
         .max()
-        .is_none_or(|published_max| version > published_max)
+        .is_none_or(|published_max| version >= published_max)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
