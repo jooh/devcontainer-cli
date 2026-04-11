@@ -1,8 +1,10 @@
 //! CLI smoke tests for lockfile and upgrade commands.
 
 use std::fs;
+use std::path::Path;
 
-use serde_json::Value;
+use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 
 use crate::support::test_support::{
     copy_recursive, devcontainer_command, repo_root, unique_temp_dir,
@@ -217,4 +219,123 @@ fn upgrade_supports_upstream_dependson_lockfile_fixture() {
     );
 
     let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn upgrade_reads_workspace_oci_layout_mirror() {
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
+    fs::create_dir_all(&workspace).expect("workspace");
+    write_workspace_layout_version(
+        &workspace,
+        "ghcr.io/acme/features/published-feature",
+        "1.0.0",
+        None,
+    );
+    let latest_digest = write_workspace_layout_version(
+        &workspace,
+        "ghcr.io/acme/features/published-feature",
+        "1.1.0",
+        Some(&["ghcr.io/acme/features/dependency"]),
+    );
+    fs::write(
+        workspace.join(".devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/acme/features/published-feature:1\": {}\n  }\n}\n",
+    )
+    .expect("config");
+
+    let output = devcontainer_command(None)
+        .args([
+            "upgrade",
+            "--dry-run",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ])
+        .output()
+        .expect("upgrade should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("dry-run lockfile");
+    assert_eq!(
+        payload["features"]["ghcr.io/acme/features/published-feature:1"]["version"],
+        "1.1.0"
+    );
+    assert_eq!(
+        payload["features"]["ghcr.io/acme/features/published-feature:1"]["resolved"],
+        format!("ghcr.io/acme/features/published-feature@sha256:{latest_digest}")
+    );
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+fn write_workspace_layout_version(
+    workspace_root: &Path,
+    base: &str,
+    version: &str,
+    depends_on: Option<&[&str]>,
+) -> String {
+    let layout_dir = workspace_root
+        .join(".devcontainer")
+        .join("oci-layouts")
+        .join(base);
+    fs::create_dir_all(layout_dir.join("blobs").join("sha256")).expect("layout blobs");
+    fs::write(
+        layout_dir.join("oci-layout"),
+        "{\n  \"imageLayoutVersion\": \"1.0.0\"\n}\n",
+    )
+    .expect("layout marker");
+
+    let metadata = json!({
+        "id": "published-feature",
+        "version": version,
+        "dependsOn": depends_on.map(|entries| entries.iter().copied().collect::<Vec<_>>()),
+    });
+    let manifest = json!({
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "annotations": {
+            "dev.containers.metadata": metadata.to_string(),
+        }
+    });
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("manifest bytes");
+    let digest = sha256_digest(&manifest_bytes);
+    fs::write(
+        layout_dir.join("blobs").join("sha256").join(&digest),
+        &manifest_bytes,
+    )
+    .expect("manifest blob");
+
+    let mut manifests = if layout_dir.join("index.json").is_file() {
+        let index: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(layout_dir.join("index.json")).expect("index"),
+        )
+        .expect("index json");
+        index["manifests"].as_array().cloned().unwrap_or_default()
+    } else {
+        Vec::new()
+    };
+    manifests.push(json!({
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "digest": format!("sha256:{digest}"),
+        "size": manifest_bytes.len(),
+        "annotations": {
+            "org.opencontainers.image.ref.name": version,
+        }
+    }));
+    fs::write(
+        layout_dir.join("index.json"),
+        serde_json::to_string_pretty(&json!({
+            "schemaVersion": 2,
+            "manifests": manifests,
+        }))
+        .expect("index payload"),
+    )
+    .expect("index write");
+
+    digest
+}
+
+fn sha256_digest(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
 }

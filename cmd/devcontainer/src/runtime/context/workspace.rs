@@ -211,7 +211,27 @@ fn normalize_path(path: PathBuf) -> PathBuf {
     fs::canonicalize(&path)
         .ok()
         .or_else(|| path.exists().then_some(path.clone()))
-        .unwrap_or(path)
+        .unwrap_or_else(|| lexically_normalize_path(&path))
+}
+
+fn lexically_normalize_path(path: &Path) -> PathBuf {
+    let mut normalized = PathBuf::new();
+    for component in path.components() {
+        match component {
+            std::path::Component::Prefix(prefix) => normalized.push(prefix.as_os_str()),
+            std::path::Component::RootDir => {
+                normalized.push(std::path::MAIN_SEPARATOR.to_string());
+            }
+            std::path::Component::CurDir => {}
+            std::path::Component::ParentDir => {
+                if !normalized.pop() {
+                    normalized.push("..");
+                }
+            }
+            std::path::Component::Normal(segment) => normalized.push(segment),
+        }
+    }
+    normalized
 }
 
 fn join_container_path(base: &str, relative: &Path) -> String {
@@ -254,4 +274,68 @@ fn find_git_root_folder(workspace_folder: &Path) -> Option<PathBuf> {
             let candidate = workspace_folder.join(&cdup);
             candidate.exists().then_some(candidate)
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::fs;
+
+    use super::{git_worktree_common_dir_mount, normalize_path};
+    use crate::test_support::unique_temp_dir;
+
+    #[test]
+    fn normalize_path_collapses_parent_segments_without_existing_paths() {
+        let root = unique_temp_dir("devcontainer-workspace-test");
+        let unresolved = root
+            .join("worktrees")
+            .join("feature")
+            .join("..")
+            .join("..")
+            .join("repo")
+            .join(".git");
+
+        assert_eq!(normalize_path(unresolved), root.join("repo").join(".git"));
+    }
+
+    #[test]
+    fn git_worktree_common_dir_mount_normalizes_nonexistent_relative_gitdir_targets() {
+        let root = unique_temp_dir("devcontainer-workspace-test");
+        let worktree = root.join("worktrees").join("feature");
+        fs::create_dir_all(&worktree).expect("worktree dir");
+        fs::write(
+            worktree.join(".git"),
+            "gitdir: ../../repo/.git/worktrees/feature\n",
+        )
+        .expect("git file");
+
+        let (_, additional_mount) =
+            git_worktree_common_dir_mount(&worktree, &[], "/workspaces/feature")
+                .expect("additional mount");
+
+        assert_eq!(
+            additional_mount,
+            format!(
+                "type=bind,source={},target=/workspaces/repo/.git",
+                root.join("repo").join(".git").display()
+            )
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn git_worktree_common_dir_mount_skips_absolute_gitdir_targets() {
+        let root = unique_temp_dir("devcontainer-workspace-test");
+        let worktree = root.join("worktrees").join("feature");
+        fs::create_dir_all(&worktree).expect("worktree dir");
+        fs::write(
+            worktree.join(".git"),
+            "gitdir: /absolute/repo/.git/worktrees/feature\n",
+        )
+        .expect("git file");
+
+        assert!(git_worktree_common_dir_mount(&worktree, &[], "/workspaces/feature").is_none());
+
+        let _ = fs::remove_dir_all(root);
+    }
 }

@@ -9,9 +9,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::{json, Map, Value};
 
 use super::registry::{
-    embedded_template_source_dir, normalize_collection_reference, published_template_manifest,
+    embedded_template_source_dir, local_oci_artifact, normalize_collection_reference,
+    published_template_manifest_with_workspace,
 };
 use crate::commands::common;
+use crate::process_runner::{self, ProcessLogLevel, ProcessRequest};
 
 const DEFAULT_PUBLISHED_TEMPLATE_BASE_IMAGE: &str = "docker.io/library/debian:bookworm-slim";
 static NEXT_TEMPLATE_TMP_ID: AtomicU64 = AtomicU64::new(0);
@@ -40,9 +42,12 @@ fn apply_template_target_with_options(
     }))
 }
 
-pub(super) fn build_template_metadata_payload(template_path: &str) -> Result<Value, String> {
+pub(super) fn build_template_metadata_payload(
+    template_path: &str,
+    workspace_folder: Option<&Path>,
+) -> Result<Value, String> {
     let manifest = if template_path.starts_with("ghcr.io/") {
-        published_template_manifest(template_path)
+        published_template_manifest_with_workspace(template_path, workspace_folder)
             .ok_or_else(|| format!("Unknown published template: {template_path}"))?
     } else {
         common::parse_manifest(Path::new(template_path), "devcontainer-template.json")?
@@ -103,7 +108,7 @@ fn apply_catalog_template_with_options(
     omit_paths: &[String],
     tmp_dir: Option<&Path>,
 ) -> Result<Value, String> {
-    let manifest = published_template_manifest(template_id)
+    let manifest = published_template_manifest_with_workspace(template_id, Some(workspace_root))
         .ok_or_else(|| format!("Unknown published template: {template_id}"))?;
     let template_args = common::parse_option_value(args, "--template-args")
         .map(|value| crate::config::parse_jsonc_value(&value))
@@ -113,6 +118,20 @@ fn apply_catalog_template_with_options(
         .map(|value| crate::config::parse_jsonc_value(&value))
         .transpose()?
         .unwrap_or_else(|| json!([]));
+
+    if let Some(source_root) =
+        extract_local_published_template_source_root(template_id, workspace_root, tmp_dir)?
+    {
+        return apply_embedded_published_template(
+            &manifest,
+            &source_root,
+            workspace_root,
+            &template_args,
+            extra_features,
+            omit_paths,
+            None,
+        );
+    }
 
     let normalized_template_id = normalize_collection_reference(template_id);
     if normalized_template_id != "ghcr.io/devcontainers/templates/docker-from-docker" {
@@ -174,6 +193,49 @@ fn apply_catalog_template_with_options(
     Ok(json!({
         "files": ["./.devcontainer/devcontainer.json"],
     }))
+}
+
+fn extract_local_published_template_source_root(
+    template_id: &str,
+    workspace_root: &Path,
+    tmp_dir: Option<&Path>,
+) -> Result<Option<PathBuf>, String> {
+    let Some(artifact) = local_oci_artifact(template_id, Some(workspace_root)) else {
+        return Ok(None);
+    };
+    let Some(layer_path) = artifact.layer_path else {
+        return Err(format!(
+            "Published template OCI manifest is missing a layer: {template_id}"
+        ));
+    };
+
+    let extraction_root = tmp_dir
+        .map(Path::to_path_buf)
+        .unwrap_or_else(std::env::temp_dir)
+        .join(unique_template_tmp_name());
+    fs::create_dir_all(&extraction_root).map_err(|error| error.to_string())?;
+    let result = process_runner::run_process(&ProcessRequest {
+        program: "tar".to_string(),
+        args: vec![
+            "-xzf".to_string(),
+            layer_path.display().to_string(),
+            "-C".to_string(),
+            extraction_root.display().to_string(),
+        ],
+        cwd: None,
+        env: std::collections::HashMap::new(),
+        log_level: ProcessLogLevel::Info,
+    })?;
+    if result.status_code != 0 {
+        return Err(result.stderr);
+    }
+
+    let source_root = if extraction_root.join("src").is_dir() {
+        extraction_root.join("src")
+    } else {
+        extraction_root
+    };
+    Ok(Some(source_root))
 }
 
 fn apply_embedded_published_template(

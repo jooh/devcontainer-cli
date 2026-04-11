@@ -1,5 +1,6 @@
 //! Facade for feature resolution, materialization, and metadata merge helpers.
 
+mod control;
 mod install;
 mod metadata;
 mod options;

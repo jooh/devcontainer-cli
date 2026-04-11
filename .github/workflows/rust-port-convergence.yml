@@ -62,6 +62,21 @@ jobs:
       - name: No Node runtime bridge
         run: node build/check-no-node-runtime.js
 
+  network-smoke:
+    name: Outbound Network Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: GHCR network smoke tests
+        run: cargo test --manifest-path cmd/devcontainer/Cargo.toml --test network_smoke -- --ignored
+
   upstream-convergence:
     name: Upstream Convergence Baseline
     runs-on: ubuntu-latest

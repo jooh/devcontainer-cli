@@ -57,6 +57,23 @@ pub(super) fn build_read_configuration_payload(args: &[String]) -> Result<Value,
         );
     }
 
+    if (include_features || include_merged)
+        && resolved_features
+            .as_ref()
+            .is_some_and(|resolved| !resolved.feature_advisories.is_empty())
+    {
+        payload.insert(
+            "featureAdvisories".to_string(),
+            Value::Array(
+                resolved_features
+                    .as_ref()
+                    .expect("advisories present when features are resolved")
+                    .feature_advisories
+                    .clone(),
+            ),
+        );
+    }
+
     if include_merged {
         payload.insert(
             "mergedConfiguration".to_string(),

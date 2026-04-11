@@ -10,6 +10,7 @@ use crate::commands::configuration::merge::merge_configuration;
 use crate::commands::configuration::{
     apply_feature_metadata, build_read_configuration_payload, should_use_native_read_configuration,
 };
+use crate::test_support::write_test_control_manifest;
 
 #[test]
 fn resolves_modern_config_path_from_workspace_folder() {
@@ -262,6 +263,73 @@ fn read_configuration_resolves_feature_sets_and_feature_metadata() {
         "present"
     );
     assert_eq!(payload["mergedConfiguration"]["init"], true);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn read_configuration_rejects_disallowed_published_features() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    let user_data = root.join("user-data");
+    fs::create_dir_all(&config_dir).expect("failed to create config directory");
+    write_test_control_manifest(&user_data);
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/problematic-feature:1\": {}\n  }\n}\n",
+    )
+    .expect("failed to write config");
+
+    let error = build_read_configuration_payload(&[
+        "--workspace-folder".to_string(),
+        root.display().to_string(),
+        "--user-data-folder".to_string(),
+        user_data.display().to_string(),
+        "--include-features-configuration".to_string(),
+    ])
+    .expect_err("disallowed feature should fail");
+
+    assert!(error.contains("problematic-feature:1"), "{error}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn read_configuration_reports_feature_advisories_for_published_features() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    let user_data = root.join("user-data");
+    fs::create_dir_all(&config_dir).expect("failed to create config directory");
+    write_test_control_manifest(&user_data);
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/feature-with-advisory:1\": {}\n  }\n}\n",
+    )
+    .expect("failed to write config");
+
+    let payload = build_read_configuration_payload(&[
+        "--workspace-folder".to_string(),
+        root.display().to_string(),
+        "--user-data-folder".to_string(),
+        user_data.display().to_string(),
+        "--include-features-configuration".to_string(),
+    ])
+    .expect("payload");
+
+    let advisories = payload["featureAdvisories"]
+        .as_array()
+        .expect("feature advisories");
+    assert_eq!(advisories.len(), 1);
+    assert_eq!(
+        advisories[0]["feature"],
+        json!({
+            "id": "ghcr.io/devcontainers/features/feature-with-advisory",
+            "version": "1.0.9"
+        })
+    );
+    assert_eq!(
+        advisories[0]["advisories"][0]["description"],
+        "Fixture advisory entry for native parity testing."
+    );
+
     let _ = fs::remove_dir_all(root);
 }
 

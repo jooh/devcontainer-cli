@@ -1,8 +1,10 @@
 //! CLI smoke tests for collection-oriented commands.
 
 use std::fs;
+use std::path::Path;
 
 use serde_json::Value;
+use sha2::Digest;
 
 use crate::support::runtime_harness::RuntimeHarness;
 use crate::support::test_support::{devcontainer_command, unique_temp_dir};
@@ -225,8 +227,19 @@ fn features_info_supports_additional_published_feature_ids() {
 
     assert!(output.status.success(), "{output:?}");
     let payload: Value = serde_json::from_slice(&output.stdout).expect("feature info payload");
-    assert_eq!(payload["id"], "node");
-    assert_eq!(payload["name"], "Node");
+    assert!(payload["canonicalId"]
+        .as_str()
+        .expect("canonical id")
+        .starts_with("ghcr.io/devcontainers/features/node@sha256:"));
+    assert_eq!(
+        payload["manifest"]["layers"][0]["annotations"]["org.opencontainers.image.title"],
+        "devcontainer-feature-node.tgz"
+    );
+    let metadata = payload["manifest"]["annotations"]["dev.containers.metadata"]
+        .as_str()
+        .expect("metadata string");
+    assert!(metadata.contains("\"id\":\"node\""), "{metadata}");
+    assert!(metadata.contains("\"name\":\"Node\""), "{metadata}");
 }
 
 #[test]
@@ -246,7 +259,7 @@ fn features_info_supports_text_output_for_verbose_mode() {
     assert!(output.status.success(), "{output:?}");
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     assert!(stdout.contains("\"feature\": \"ghcr.io/devcontainers/features/git\""));
-    assert!(stdout.contains("\"tags\""));
+    assert!(stdout.contains("\"publishedTags\""));
 }
 
 #[test]
@@ -299,4 +312,182 @@ fn templates_apply_supports_additional_published_template_ids() {
     assert!(file.contains("ghcr.io/devcontainers/features/git:1"));
 
     let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn templates_apply_reads_workspace_oci_layout_mirror() {
+    let template_root = unique_temp_dir("devcontainer-cli-smoke");
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
+    let layout_root = workspace
+        .join(".devcontainer")
+        .join("oci-layouts")
+        .join("ghcr.io")
+        .join("acme")
+        .join("templates")
+        .join("published-template");
+    fs::create_dir_all(template_root.join(".devcontainer")).expect("template files");
+    fs::create_dir_all(&workspace).expect("workspace");
+    fs::write(
+        template_root.join("devcontainer-template.json"),
+        "{\n  \"id\": \"published-template\",\n  \"name\": \"Published Template\",\n  \"description\": \"Workspace OCI template\",\n  \"version\": \"1.2.3\",\n  \"options\": {\n    \"channel\": { \"type\": \"string\", \"default\": \"stable\" }\n  }\n}\n",
+    )
+    .expect("manifest");
+    fs::write(
+        template_root
+            .join(".devcontainer")
+            .join("devcontainer.json"),
+        "{\n  \"name\": \"${templateOption:channel} template\"\n}\n",
+    )
+    .expect("template config");
+    publish_template_layout(&template_root, &layout_root);
+
+    let output = devcontainer_command(None)
+        .args([
+            "templates",
+            "apply",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--template-id",
+            "ghcr.io/acme/templates/published-template:latest",
+            "--template-args",
+            "{ \"channel\": \"beta\" }",
+            "--features",
+            "[{ \"id\": \"ghcr.io/devcontainers/features/git:1\", \"options\": {} }]",
+        ])
+        .output()
+        .expect("templates apply should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let file = fs::read_to_string(workspace.join(".devcontainer").join("devcontainer.json"))
+        .expect("devcontainer file");
+    assert!(file.contains("\"name\": \"beta template\""));
+    assert!(file.contains("ghcr.io/devcontainers/features/git:1"));
+
+    let _ = fs::remove_dir_all(template_root);
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn templates_metadata_reads_workspace_oci_layout_mirror() {
+    let workspace = unique_temp_dir("devcontainer-cli-smoke");
+    let layout_root = workspace
+        .join(".devcontainer")
+        .join("oci-layouts")
+        .join("ghcr.io")
+        .join("acme")
+        .join("templates")
+        .join("published-template");
+    fs::create_dir_all(&workspace).expect("workspace");
+    write_template_layout(
+        &layout_root,
+        serde_json::json!({
+            "id": "published-template",
+            "name": "Published Template",
+            "description": "Workspace OCI template",
+            "version": "1.2.3",
+        }),
+        None,
+        "1.2.3",
+    );
+
+    let output = devcontainer_command(None)
+        .args([
+            "templates",
+            "metadata",
+            "ghcr.io/acme/templates/published-template:1.2.3",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ])
+        .output()
+        .expect("templates metadata should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("metadata payload");
+    assert_eq!(payload["id"], "published-template");
+    assert_eq!(payload["name"], "Published Template");
+    assert_eq!(payload["description"], "Workspace OCI template");
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+fn publish_template_layout(template_root: &Path, layout_root: &Path) {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_devcontainer"))
+        .args([
+            "templates",
+            "publish",
+            template_root.to_string_lossy().as_ref(),
+            "--output-dir",
+            layout_root.to_string_lossy().as_ref(),
+        ])
+        .output()
+        .expect("templates publish");
+
+    assert!(output.status.success(), "{output:?}");
+}
+
+fn write_template_layout(
+    layout_root: &Path,
+    metadata: Value,
+    layer_bytes: Option<&[u8]>,
+    tag: &str,
+) {
+    fs::create_dir_all(layout_root.join("blobs").join("sha256")).expect("layout blobs");
+    fs::write(
+        layout_root.join("oci-layout"),
+        "{\n  \"imageLayoutVersion\": \"1.0.0\"\n}\n",
+    )
+    .expect("layout marker");
+
+    let layer_bytes = layer_bytes.unwrap_or(b"");
+    let layer_digest = sha256_digest(layer_bytes);
+    fs::write(
+        layout_root.join("blobs").join("sha256").join(&layer_digest),
+        layer_bytes,
+    )
+    .expect("layer blob");
+
+    let manifest = serde_json::json!({
+        "schemaVersion": 2,
+        "mediaType": "application/vnd.oci.image.manifest.v1+json",
+        "layers": [{
+            "mediaType": "application/vnd.devcontainers.layer.v1+tar+gzip",
+            "digest": format!("sha256:{layer_digest}"),
+            "size": layer_bytes.len(),
+        }],
+        "annotations": {
+            "dev.containers.metadata": metadata.to_string(),
+        }
+    });
+    let manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("manifest bytes");
+    let manifest_digest = sha256_digest(&manifest_bytes);
+    fs::write(
+        layout_root
+            .join("blobs")
+            .join("sha256")
+            .join(&manifest_digest),
+        &manifest_bytes,
+    )
+    .expect("manifest blob");
+    fs::write(
+        layout_root.join("index.json"),
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schemaVersion": 2,
+            "manifests": [{
+                "mediaType": "application/vnd.oci.image.manifest.v1+json",
+                "digest": format!("sha256:{manifest_digest}"),
+                "size": manifest_bytes.len(),
+                "annotations": {
+                    "org.opencontainers.image.ref.name": tag,
+                }
+            }]
+        }))
+        .expect("index payload"),
+    )
+    .expect("index write");
+}
+
+fn sha256_digest(bytes: &[u8]) -> String {
+    let mut hasher = sha2::Sha256::new();
+    hasher.update(bytes);
+    format!("{:x}", hasher.finalize())
 }

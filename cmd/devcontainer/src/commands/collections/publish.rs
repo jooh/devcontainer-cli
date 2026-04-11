@@ -17,6 +17,10 @@ pub(super) fn publish_collection_target_to_oci(
 ) -> Result<Value, String> {
     let manifest = common::parse_manifest(target, manifest_name)?;
     let archive = common::package_collection_target(target, manifest_name, prefix)?;
+    let version = manifest
+        .get("version")
+        .and_then(Value::as_str)
+        .unwrap_or("latest");
     let registry =
         common::parse_option_value(args, "--registry").unwrap_or_else(|| "ghcr.io".to_string());
     let namespace = common::parse_option_value(args, "--namespace");
@@ -34,19 +38,39 @@ pub(super) fn publish_collection_target_to_oci(
             .and_then(Value::as_str)
             .map(|id| format!("{registry}/{namespace}/{id}"))
     });
-    let digest = write_oci_layout(&output_dir, &archive, &manifest, resource.as_deref())?;
-    Ok(json!({
+    let existing_tags = published_tags_from_layout(&output_dir)?;
+    let published_tags = semantic_tags_for_version(version, &existing_tags);
+    let digest = write_oci_layout(
+        &output_dir,
+        &archive,
+        &manifest,
+        resource.as_deref(),
+        &published_tags,
+    )?;
+    let mut payload = json!({
         "outcome": "success",
         "command": command,
         "archive": archive,
         "published": true,
         "layout": output_dir,
-        "digest": digest,
         "mode": "local-oci-layout",
         "registry": registry,
         "namespace": namespace,
         "resource": resource,
-    }))
+    });
+    payload
+        .as_object_mut()
+        .expect("payload object")
+        .insert("digest".to_string(), Value::String(digest));
+    payload
+        .as_object_mut()
+        .expect("payload object")
+        .insert("publishedTags".to_string(), json!(published_tags));
+    payload
+        .as_object_mut()
+        .expect("payload object")
+        .insert("version".to_string(), Value::String(version.to_string()));
+    Ok(payload)
 }
 
 fn write_oci_layout(
@@ -54,6 +78,7 @@ fn write_oci_layout(
     archive: &Path,
     metadata: &Value,
     resource: Option<&str>,
+    published_tags: &[String],
 ) -> Result<String, String> {
     fs::create_dir_all(output_dir.join("blobs").join("sha256"))
         .map_err(|error| error.to_string())?;
@@ -118,22 +143,27 @@ fn write_oci_layout(
     )
     .map_err(|error| error.to_string())?;
 
-    let ref_name = metadata
-        .get("version")
-        .and_then(Value::as_str)
-        .unwrap_or("latest");
+    let mut manifests = existing_index_manifests(output_dir)?;
+    manifests.retain(|entry| {
+        entry["annotations"]["org.opencontainers.image.ref.name"]
+            .as_str()
+            .is_none_or(|tag| !published_tags.iter().any(|published| published == tag))
+    });
+    manifests.extend(published_tags.iter().map(|tag| {
+        json!({
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": format!("sha256:{manifest_digest}"),
+            "size": manifest_bytes.len(),
+            "annotations": {
+                "org.opencontainers.image.ref.name": tag,
+            }
+        })
+    }));
     fs::write(
         output_dir.join("index.json"),
         serde_json::to_string_pretty(&json!({
             "schemaVersion": 2,
-            "manifests": [{
-                "mediaType": "application/vnd.oci.image.manifest.v1+json",
-                "digest": format!("sha256:{manifest_digest}"),
-                "size": manifest_bytes.len(),
-                "annotations": {
-                    "org.opencontainers.image.ref.name": ref_name,
-                }
-            }]
+            "manifests": manifests
         }))
         .map_err(|error| error.to_string())?,
     )
@@ -146,4 +176,87 @@ fn sha256_digest(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);
     format!("{:x}", hasher.finalize())
+}
+
+fn published_tags_from_layout(output_dir: &Path) -> Result<Vec<String>, String> {
+    Ok(existing_index_manifests(output_dir)?
+        .into_iter()
+        .filter_map(|entry| {
+            entry["annotations"]["org.opencontainers.image.ref.name"]
+                .as_str()
+                .map(str::to_string)
+        })
+        .collect())
+}
+
+fn existing_index_manifests(output_dir: &Path) -> Result<Vec<Value>, String> {
+    let index_path = output_dir.join("index.json");
+    if !index_path.is_file() {
+        return Ok(Vec::new());
+    }
+
+    let index: Value =
+        serde_json::from_str(&fs::read_to_string(index_path).map_err(|error| error.to_string())?)
+            .map_err(|error| error.to_string())?;
+    Ok(index
+        .get("manifests")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default())
+}
+
+fn semantic_tags_for_version(version: &str, existing_tags: &[String]) -> Vec<String> {
+    let Some(parsed) = parse_semver(version) else {
+        return vec![version.to_string()];
+    };
+    let mut tags = Vec::new();
+    if should_publish_tag(existing_tags, parsed, |candidate| {
+        candidate.major == parsed.major
+    }) {
+        tags.push(parsed.major.to_string());
+    }
+    if should_publish_tag(existing_tags, parsed, |candidate| {
+        candidate.major == parsed.major && candidate.minor == parsed.minor
+    }) {
+        tags.push(format!("{}.{}", parsed.major, parsed.minor));
+    }
+    tags.push(version.to_string());
+    if should_publish_tag(existing_tags, parsed, |_| true) {
+        tags.push("latest".to_string());
+    }
+    tags
+}
+
+fn should_publish_tag<F>(existing_tags: &[String], version: SemVer, matches_range: F) -> bool
+where
+    F: Fn(SemVer) -> bool,
+{
+    existing_tags
+        .iter()
+        .filter_map(|tag| parse_semver(tag))
+        .filter(|candidate| matches_range(*candidate))
+        .max()
+        .is_none_or(|published_max| version >= published_max)
+}
+
+#[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
+struct SemVer {
+    major: u64,
+    minor: u64,
+    patch: u64,
+}
+
+fn parse_semver(input: &str) -> Option<SemVer> {
+    let mut parts = input.split('.');
+    let major = parts.next()?.parse().ok()?;
+    let minor = parts.next()?.parse().ok()?;
+    let patch = parts.next()?.parse().ok()?;
+    if parts.next().is_some() {
+        return None;
+    }
+    Some(SemVer {
+        major,
+        minor,
+        patch,
+    })
 }

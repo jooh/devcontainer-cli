@@ -5,7 +5,7 @@ Generated from the pinned upstream CLI command matrix and static source evidence
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped files: `200/200`
+- Upstream options with a native source reference in mapped files: `186/200`
 
 This report is a static inventory, not a semantic parity proof. A referenced option can still be only partially implemented, and command-level known gaps are called out explicitly below.
 
@@ -13,13 +13,13 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 | Command | Declared | Option refs | Missing refs | Known gaps |
 | --- | --- | --- | --- | --- |
-| `up` | yes | 43/43 | 0 | 2 |
-| `set-up` | yes | 20/20 | 0 | 1 |
-| `build` | yes | 22/22 | 0 | 2 |
-| `run-user-commands` | yes | 27/27 | 0 | 1 |
+| `up` | yes | 39/43 | 4 | 2 |
+| `set-up` | yes | 18/20 | 2 | 1 |
+| `build` | yes | 20/22 | 2 | 2 |
+| `run-user-commands` | yes | 25/27 | 2 | 1 |
 | `read-configuration` | yes | 18/18 | 0 | 2 |
-| `outdated` | yes | 8/8 | 0 | 1 |
-| `upgrade` | yes | 8/8 | 0 | 1 |
+| `outdated` | yes | 5/8 | 3 | 1 |
+| `upgrade` | yes | 7/8 | 1 | 1 |
 | `features` | yes | 0/0 | 0 | 1 |
 | `features test` | yes | 13/13 | 0 | 1 |
 | `features package` | yes | 0/0 | 0 | 1 |
@@ -38,32 +38,32 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Create and run dev container
 - Declared natively: yes
-- Option source references: 43/43
-- Missing option references: none
+- Option source references: 39/43
+- Missing option references: `dotfiles-install-command`, `dotfiles-target-path`, `omit-config-remote-env-from-metadata`, `omit-syntax-directive`
 - Known gaps: Native runtime now layers Features for image, dockerfile, and Docker Compose configs. Several upstream flags remain unimplemented or are only partially honored.
 
 ## `set-up`
 
 - Description: Set up an existing container as a dev container
 - Declared natively: yes
-- Option source references: 20/20
-- Missing option references: none
+- Option source references: 18/20
+- Missing option references: `dotfiles-install-command`, `dotfiles-target-path`
 - Known gaps: Lifecycle execution is native, but several upstream setup and dotfiles flags are still missing.
 
 ## `build`
 
 - Description: Build a dev container image
 - Declared natively: yes
-- Option source references: 22/22
-- Missing option references: none
+- Option source references: 20/22
+- Missing option references: `omit-syntax-directive`, `skip-persisting-customizations-from-features`
 - Known gaps: Native runtime now layers Features for image, dockerfile, and Docker Compose configs. Several upstream build flags are still unimplemented or are only partially honored.
 
 ## `run-user-commands`
 
 - Description: Run user commands
 - Declared natively: yes
-- Option source references: 27/27
-- Missing option references: none
+- Option source references: 25/27
+- Missing option references: `dotfiles-install-command`, `dotfiles-target-path`
 - Known gaps: Lifecycle execution is native, but several upstream runtime and dotfiles flags are still missing.
 
 ## `read-configuration`
@@ -78,16 +78,16 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Show current and available versions
 - Declared natively: yes
-- Option source references: 8/8
-- Missing option references: none
+- Option source references: 5/8
+- Missing option references: `log-level`, `terminal-columns`, `terminal-rows`
 - Known gaps: Backed by fixture/manual catalog data rather than real upstream registry resolution.
 
 ## `upgrade`
 
 - Description: Upgrade lockfile
 - Declared natively: yes
-- Option source references: 8/8
-- Missing option references: none
+- Option source references: 7/8
+- Missing option references: `log-level`
 - Known gaps: Backed by fixture/manual catalog data rather than real upstream registry resolution.
 
 ## `features`

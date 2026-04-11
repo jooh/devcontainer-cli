@@ -6,6 +6,7 @@ use super::support::unique_temp_dir;
 use crate::commands::collections::features::{
     build_feature_info_payload, build_features_resolve_dependencies_payload,
 };
+use crate::test_support::write_test_control_manifest;
 
 #[test]
 fn feature_dependency_resolution_respects_override_order() {
@@ -33,6 +34,31 @@ fn feature_dependency_resolution_respects_override_order() {
 }
 
 #[test]
+fn feature_dependency_resolution_rejects_disallowed_features() {
+    let root = unique_temp_dir();
+    let config_dir = root.join(".devcontainer");
+    let user_data = root.join("user-data");
+    fs::create_dir_all(&config_dir).expect("failed to create config directory");
+    write_test_control_manifest(&user_data);
+    fs::write(
+        config_dir.join("devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/problematic-feature:1\": {}\n  }\n}\n",
+    )
+    .expect("failed to write config");
+
+    let error = build_features_resolve_dependencies_payload(&[
+        "--workspace-folder".to_string(),
+        root.display().to_string(),
+        "--user-data-folder".to_string(),
+        user_data.display().to_string(),
+    ])
+    .expect_err("disallowed feature should fail");
+
+    assert!(error.contains("problematic-feature:1"), "{error}");
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn feature_info_reads_manifest_metadata() {
     let root = unique_temp_dir();
     fs::create_dir_all(&root).expect("failed to create feature root");
@@ -52,13 +78,30 @@ fn feature_info_reads_manifest_metadata() {
 }
 
 #[test]
-fn feature_info_reads_published_catalog_metadata() {
+fn feature_info_reads_published_catalog_oci_manifest() {
     let payload =
         build_feature_info_payload("manifest", "ghcr.io/devcontainers/features/azure-cli:1")
             .expect("feature info");
 
-    assert_eq!(payload["id"], "azure-cli");
-    assert_eq!(payload["name"], "Azure CLI");
+    assert_eq!(
+        payload["canonicalId"],
+        "ghcr.io/devcontainers/features/azure-cli@sha256:a00aa292592a8df58a940d6f6dfcf2bfd3efab145f62a17ccb12656528793134"
+    );
+    let manifest = &payload["manifest"];
+    assert_eq!(manifest["schemaVersion"], 2);
+    assert_eq!(
+        manifest["mediaType"],
+        "application/vnd.oci.image.manifest.v1+json"
+    );
+    assert_eq!(
+        manifest["layers"][0]["mediaType"],
+        "application/vnd.devcontainers.layer.v1+tar"
+    );
+    let metadata = manifest["annotations"]["dev.containers.metadata"]
+        .as_str()
+        .expect("metadata string");
+    assert!(metadata.contains("\"id\":\"azure-cli\""), "{metadata}");
+    assert!(metadata.contains("\"name\":\"Azure CLI\""), "{metadata}");
 }
 
 #[test]
@@ -66,9 +109,15 @@ fn feature_info_supports_generic_published_features() {
     let payload = build_feature_info_payload("manifest", "ghcr.io/devcontainers/features/node")
         .expect("feature info");
 
-    assert_eq!(payload["id"], "node");
-    assert_eq!(payload["name"], "Node");
-    assert_eq!(payload["version"], "latest");
+    assert_eq!(
+        payload["manifest"]["layers"][0]["annotations"]["org.opencontainers.image.title"],
+        "devcontainer-feature-node.tgz"
+    );
+    let metadata = payload["manifest"]["annotations"]["dev.containers.metadata"]
+        .as_str()
+        .expect("metadata string");
+    assert!(metadata.contains("\"id\":\"node\""), "{metadata}");
+    assert!(metadata.contains("\"version\":\"latest\""), "{metadata}");
 }
 
 #[test]
@@ -79,8 +128,19 @@ fn feature_info_supports_digest_pinned_catalog_refs() {
     )
     .expect("feature info");
 
-    assert_eq!(payload["id"], "git-lfs");
-    assert_eq!(payload["name"], "Git Lfs");
+    assert_eq!(
+        payload["canonicalId"],
+        "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c"
+    );
+    assert_eq!(
+        payload["manifest"]["layers"][0]["annotations"]["org.opencontainers.image.title"],
+        "devcontainer-feature-git-lfs.tgz"
+    );
+    let metadata = payload["manifest"]["annotations"]["dev.containers.metadata"]
+        .as_str()
+        .expect("metadata string");
+    assert!(metadata.contains("\"id\":\"git-lfs\""), "{metadata}");
+    assert!(metadata.contains("\"name\":\"Git Lfs\""), "{metadata}");
 }
 
 #[test]
@@ -115,7 +175,9 @@ fn feature_info_reads_catalog_tags_for_published_features() {
     let payload = build_feature_info_payload("tags", "ghcr.io/devcontainers/features/git:1")
         .expect("tags payload");
 
-    let tags = payload["tags"].as_array().expect("tags array");
+    let tags = payload["publishedTags"]
+        .as_array()
+        .expect("published tags array");
     assert_eq!(tags[0], "1.2.0");
     assert_eq!(tags[1], "1.1.5");
 }

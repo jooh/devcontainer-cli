@@ -1,6 +1,8 @@
 //! Version catalog helpers for configuration upgrade and outdated commands.
 
 use std::cmp::Ordering;
+use std::fs;
+use std::path::{Path, PathBuf};
 
 use serde_json::{Map, Value};
 
@@ -9,16 +11,17 @@ use super::{CatalogEntry, FeatureReference, Lockfile, ParsedVersion};
 pub(super) fn build_feature_version_info(
     feature: &FeatureReference,
     lockfile: Option<&Lockfile>,
+    workspace_folder: Option<&Path>,
 ) -> Option<Value> {
     let current = lockfile
         .and_then(|value| value.features.get(&feature.original))
         .map(|entry| entry.version.clone());
 
     if feature.digest.is_some() {
-        let wanted = current
-            .clone()
-            .or_else(|| exact_catalog_entry(&feature.original).map(|entry| entry.version));
-        let latest = latest_version(&feature.base);
+        let wanted = current.clone().or_else(|| {
+            exact_catalog_entry(&feature.original, workspace_folder).map(|entry| entry.version)
+        });
+        let latest = latest_version(&feature.base, workspace_folder);
         return Some(version_info_json(
             current.or_else(|| wanted.clone()),
             wanted.clone(),
@@ -28,8 +31,8 @@ pub(super) fn build_feature_version_info(
         ));
     }
 
-    let latest = latest_version(&feature.base);
-    let wanted = resolve_wanted_version(feature, lockfile);
+    let latest = latest_version(&feature.base, workspace_folder);
+    let wanted = resolve_wanted_version(feature, lockfile, workspace_folder);
     if latest.is_none() && wanted.is_none() && current.is_none() {
         return Some(version_info_json(None, None, None, None, None));
     }
@@ -46,6 +49,7 @@ pub(super) fn build_feature_version_info(
 pub(super) fn resolve_wanted_version(
     feature: &FeatureReference,
     lockfile: Option<&Lockfile>,
+    workspace_folder: Option<&Path>,
 ) -> Option<String> {
     if let Some(entry) = lockfile.and_then(|value| value.features.get(&feature.original)) {
         if feature.tag.is_none() || feature.digest.is_some() {
@@ -55,10 +59,10 @@ pub(super) fn resolve_wanted_version(
 
     let tag = feature.tag.as_deref()?;
     if tag == "latest" {
-        return latest_version(&feature.base);
+        return latest_version(&feature.base, workspace_folder);
     }
 
-    let candidates = catalog_entries(&feature.base)?;
+    let candidates = catalog_entries(&feature.base, workspace_folder)?;
     if tag.matches('.').count() == 2 {
         return candidates
             .iter()
@@ -73,7 +77,14 @@ pub(super) fn resolve_wanted_version(
         .map(|entry| entry.version.to_string())
 }
 
-pub(super) fn exact_catalog_entry(feature_id: &str) -> Option<CatalogEntry> {
+pub(super) fn exact_catalog_entry(
+    feature_id: &str,
+    workspace_folder: Option<&Path>,
+) -> Option<CatalogEntry> {
+    if let Some(entry) = local_oci_layout_exact_entry(feature_id, workspace_folder) {
+        return Some(entry);
+    }
+
     if feature_id
         == "ghcr.io/devcontainers/features/git-lfs@sha256:24d5802c837b2519b666a8403a9514c7296d769c9607048e9f1e040e7d7e331c"
     {
@@ -91,12 +102,17 @@ pub(super) fn exact_catalog_entry(feature_id: &str) -> Option<CatalogEntry> {
         .map(|(_, entry)| entry)
 }
 
-pub(crate) fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
-    let mut entries = manual_catalog_entries()
-        .into_iter()
-        .filter(|(catalog_base, _)| catalog_base == base)
-        .map(|(_, entry)| entry)
-        .collect::<Vec<_>>();
+pub(crate) fn catalog_entries(
+    base: &str,
+    workspace_folder: Option<&Path>,
+) -> Option<Vec<CatalogEntry>> {
+    let mut entries = local_oci_layout_entries(base, workspace_folder);
+    entries.extend(
+        manual_catalog_entries()
+            .into_iter()
+            .filter(|(catalog_base, _)| catalog_base == base)
+            .map(|(_, entry)| entry),
+    );
     entries.extend(
         fixture_catalog()
             .into_iter()
@@ -106,7 +122,8 @@ pub(crate) fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
             .map(|(_, entry)| entry),
     );
     entries.sort_by(|left, right| compare_versions_desc(&left.version, &right.version));
-    entries.dedup_by(|left, right| left.version == right.version);
+    let mut seen_versions = std::collections::BTreeSet::new();
+    entries.retain(|entry| seen_versions.insert(entry.version.clone()));
     if entries.is_empty() {
         None
     } else {
@@ -115,23 +132,138 @@ pub(crate) fn catalog_entries(base: &str) -> Option<Vec<CatalogEntry>> {
 }
 
 pub(crate) fn catalog_versions(base: &str) -> Vec<String> {
-    catalog_entries(base)
+    catalog_entries(base, None)
         .unwrap_or_default()
         .into_iter()
         .map(|entry| entry.version)
         .collect()
 }
 
-pub(super) fn latest_version(base: &str) -> Option<String> {
-    catalog_entries(base)
+pub(crate) fn published_feature_canonical_id(
+    feature_id: &str,
+    workspace_folder: Option<&Path>,
+) -> Option<String> {
+    if let Some(entry) = exact_catalog_entry(feature_id, workspace_folder) {
+        return Some(entry.resolved);
+    }
+
+    let reference = super::upgrade::parse_feature_reference(feature_id)?;
+    if let Some(digest) = reference.digest {
+        return Some(format!("{}@{digest}", reference.base));
+    }
+
+    let version = if reference.tag.is_none() {
+        latest_version(&reference.base, workspace_folder)?
+    } else {
+        resolve_wanted_version(&reference, None, workspace_folder)?
+    };
+    catalog_entry_for_version(&reference.base, &version, workspace_folder)
+        .map(|entry| entry.resolved)
+}
+
+pub(super) fn latest_version(base: &str, workspace_folder: Option<&Path>) -> Option<String> {
+    catalog_entries(base, workspace_folder)
         .and_then(|entries| entries.first().cloned())
         .map(|entry| entry.version)
 }
 
-pub(super) fn catalog_entry_for_version(base: &str, version: &str) -> Option<CatalogEntry> {
-    catalog_entries(base)?
+pub(super) fn catalog_entry_for_version(
+    base: &str,
+    version: &str,
+    workspace_folder: Option<&Path>,
+) -> Option<CatalogEntry> {
+    catalog_entries(base, workspace_folder)?
         .into_iter()
         .find(|entry| entry.version == version)
+}
+
+fn local_oci_layout_entries(base: &str, workspace_folder: Option<&Path>) -> Vec<CatalogEntry> {
+    let Some(layout_dir) = workspace_oci_layout_dir(base, workspace_folder) else {
+        return Vec::new();
+    };
+
+    local_oci_index_manifests(&layout_dir)
+        .unwrap_or_default()
+        .into_iter()
+        .filter_map(|entry| {
+            let tag = entry["annotations"]["org.opencontainers.image.ref.name"].as_str()?;
+            if !is_exact_semver(tag) {
+                return None;
+            }
+
+            let digest = entry["digest"].as_str()?.strip_prefix("sha256:")?;
+            catalog_entry_from_layout_manifest(base, &layout_dir, digest, Some(tag))
+        })
+        .collect()
+}
+
+fn local_oci_layout_exact_entry(
+    feature_id: &str,
+    workspace_folder: Option<&Path>,
+) -> Option<CatalogEntry> {
+    let base = super::upgrade::feature_id_without_version(feature_id);
+    let digest = feature_id.rsplit_once("@sha256:")?.1;
+    let layout_dir = workspace_oci_layout_dir(&base, workspace_folder)?;
+    catalog_entry_from_layout_manifest(&base, &layout_dir, digest, None)
+}
+
+fn workspace_oci_layout_dir(base: &str, workspace_folder: Option<&Path>) -> Option<PathBuf> {
+    if !base.starts_with("ghcr.io/") {
+        return None;
+    }
+
+    let layout_dir = workspace_folder?
+        .join(".devcontainer")
+        .join("oci-layouts")
+        .join(base);
+    layout_dir
+        .join("oci-layout")
+        .is_file()
+        .then_some(layout_dir)
+}
+
+fn local_oci_index_manifests(layout_dir: &Path) -> Result<Vec<Value>, String> {
+    let index: Value = serde_json::from_str(
+        &fs::read_to_string(layout_dir.join("index.json")).map_err(|error| error.to_string())?,
+    )
+    .map_err(|error| error.to_string())?;
+    Ok(index["manifests"].as_array().cloned().unwrap_or_default())
+}
+
+fn catalog_entry_from_layout_manifest(
+    base: &str,
+    layout_dir: &Path,
+    digest: &str,
+    tag: Option<&str>,
+) -> Option<CatalogEntry> {
+    let manifest: Value = serde_json::from_str(
+        &fs::read_to_string(layout_dir.join("blobs").join("sha256").join(digest)).ok()?,
+    )
+    .ok()?;
+    let metadata = manifest["annotations"]["dev.containers.metadata"]
+        .as_str()
+        .and_then(|value| serde_json::from_str::<Value>(value).ok())?;
+    let version = metadata
+        .get("version")
+        .and_then(Value::as_str)
+        .or(tag)?
+        .to_string();
+    Some(CatalogEntry {
+        version,
+        resolved: format!("{base}@sha256:{digest}"),
+        integrity: format!("sha256:{digest}"),
+        depends_on: metadata["dependsOn"].as_array().map(|entries| {
+            entries
+                .iter()
+                .filter_map(Value::as_str)
+                .map(str::to_string)
+                .collect()
+        }),
+    })
+}
+
+fn is_exact_semver(input: &str) -> bool {
+    matches!(parse_selector(input), Some(VersionSelector::Exact(_)))
 }
 
 fn version_info_json(
@@ -391,12 +523,89 @@ impl VersionSelector {
 
 #[cfg(test)]
 mod tests {
+    use std::fs;
+
+    use serde_json::json;
+    use sha2::{Digest, Sha256};
+
     use super::{catalog_entries, exact_catalog_entry};
+
+    fn write_layout_version(
+        workspace_root: &std::path::Path,
+        base: &str,
+        version: &str,
+        depends_on: Option<&[&str]>,
+    ) -> String {
+        let layout_dir = workspace_root
+            .join(".devcontainer")
+            .join("oci-layouts")
+            .join(base);
+        fs::create_dir_all(layout_dir.join("blobs").join("sha256")).expect("layout blobs");
+        fs::write(
+            layout_dir.join("oci-layout"),
+            "{\n  \"imageLayoutVersion\": \"1.0.0\"\n}\n",
+        )
+        .expect("layout marker");
+
+        let metadata = json!({
+            "id": "published-feature",
+            "version": version,
+            "dependsOn": depends_on.map(|entries| entries.iter().copied().collect::<Vec<_>>()),
+        });
+        let manifest = json!({
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "annotations": {
+                "dev.containers.metadata": metadata.to_string(),
+            }
+        });
+        let manifest_bytes = serde_json::to_vec_pretty(&manifest).expect("manifest bytes");
+        let digest = sha256_digest(&manifest_bytes);
+        fs::write(
+            layout_dir.join("blobs").join("sha256").join(&digest),
+            &manifest_bytes,
+        )
+        .expect("manifest blob");
+
+        let mut manifests = if layout_dir.join("index.json").is_file() {
+            let index: serde_json::Value = serde_json::from_str(
+                &fs::read_to_string(layout_dir.join("index.json")).expect("index"),
+            )
+            .expect("index json");
+            index["manifests"].as_array().cloned().unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        manifests.push(json!({
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": format!("sha256:{digest}"),
+            "size": manifest_bytes.len(),
+            "annotations": {
+                "org.opencontainers.image.ref.name": version,
+            }
+        }));
+        fs::write(
+            layout_dir.join("index.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": 2,
+                "manifests": manifests,
+            }))
+            .expect("index payload"),
+        )
+        .expect("index write");
+        digest
+    }
+
+    fn sha256_digest(bytes: &[u8]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(bytes);
+        format!("{:x}", hasher.finalize())
+    }
 
     #[test]
     fn fixture_catalog_keeps_dependson_edges() {
-        let entry =
-            exact_catalog_entry("ghcr.io/codspace/dependson/A:2").expect("dependson fixture entry");
+        let entry = exact_catalog_entry("ghcr.io/codspace/dependson/A:2", None)
+            .expect("dependson fixture entry");
 
         assert_eq!(entry.version, "2.0.1");
         assert_eq!(
@@ -407,10 +616,54 @@ mod tests {
 
     #[test]
     fn fixture_catalog_exposes_upgrade_versions() {
-        let entries =
-            catalog_entries("ghcr.io/devcontainers/features/git").expect("git catalog entries");
+        let entries = catalog_entries("ghcr.io/devcontainers/features/git", None)
+            .expect("git catalog entries");
 
         assert!(entries.iter().any(|entry| entry.version == "1.1.5"));
+    }
+
+    #[test]
+    fn workspace_oci_layout_entries_override_static_catalogs() {
+        let workspace = crate::test_support::unique_temp_dir("devcontainer-catalog-test");
+        write_layout_version(
+            &workspace,
+            "ghcr.io/devcontainers/features/git",
+            "9.9.9",
+            None,
+        );
+
+        let entries = catalog_entries(
+            "ghcr.io/devcontainers/features/git",
+            Some(workspace.as_path()),
+        )
+        .expect("git catalog entries");
+
+        assert_eq!(entries.first().expect("first entry").version, "9.9.9");
+        let _ = fs::remove_dir_all(workspace);
+    }
+
+    #[test]
+    fn workspace_oci_layout_supports_exact_digest_lookup() {
+        let workspace = crate::test_support::unique_temp_dir("devcontainer-catalog-test");
+        let digest = write_layout_version(
+            &workspace,
+            "ghcr.io/acme/features/published-feature",
+            "1.0.1",
+            Some(&["ghcr.io/acme/features/dependency"]),
+        );
+
+        let entry = exact_catalog_entry(
+            &format!("ghcr.io/acme/features/published-feature@sha256:{digest}"),
+            Some(workspace.as_path()),
+        )
+        .expect("layout entry");
+
+        assert_eq!(entry.version, "1.0.1");
+        assert_eq!(
+            entry.depends_on,
+            Some(vec!["ghcr.io/acme/features/dependency".to_string()])
+        );
+        let _ = fs::remove_dir_all(workspace);
     }
 }
 

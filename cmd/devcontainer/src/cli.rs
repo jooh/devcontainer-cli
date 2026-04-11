@@ -95,7 +95,7 @@ pub fn print_command_help(command: &str) {
             println!("\nNative support:");
             println!("  - set-up / run-user-commands invoke lifecycle hooks in-container");
             println!(
-                "  - outdated / upgrade are native, but still rely on fixture/manual catalog data"
+                "  - outdated / upgrade are native and can read workspace OCI layout mirrors, but registry-backed catalogs remain partial"
             );
         }
         _ => {
