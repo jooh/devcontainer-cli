@@ -1,5 +1,6 @@
 //! Control-manifest helpers for disallowed Features and future advisory support.
 
+use std::env;
 use std::fs;
 use std::path::PathBuf;
 
@@ -95,11 +96,7 @@ pub(crate) fn feature_advisories_for_oci_features(
 }
 
 fn control_manifest(args: &[String]) -> Result<DevContainerControlManifest, String> {
-    let Some(user_data_folder) = common::parse_option_value(args, "--user-data-folder") else {
-        return Ok(DevContainerControlManifest::default());
-    };
-
-    let manifest_path = PathBuf::from(user_data_folder).join("control-manifest.json");
+    let manifest_path = control_manifest_path(args);
     if !manifest_path.is_file() {
         return Ok(DevContainerControlManifest::default());
     }
@@ -107,6 +104,22 @@ fn control_manifest(args: &[String]) -> Result<DevContainerControlManifest, Stri
     let raw = fs::read_to_string(&manifest_path).map_err(|error| error.to_string())?;
     let parsed = crate::config::parse_jsonc_value(&raw)?;
     Ok(sanitize_control_manifest(&parsed))
+}
+
+fn control_manifest_path(args: &[String]) -> PathBuf {
+    common::parse_option_value(args, "--user-data-folder")
+        .map(PathBuf::from)
+        .unwrap_or_else(default_user_data_folder)
+        .join("control-manifest.json")
+}
+
+fn default_user_data_folder() -> PathBuf {
+    if cfg!(target_os = "linux") {
+        let username = env::var("USER").unwrap_or_else(|_| "unknown".to_string());
+        return env::temp_dir().join(format!("devcontainercli-{username}"));
+    }
+
+    env::temp_dir().join("devcontainercli")
 }
 
 fn sanitize_control_manifest(value: &Value) -> DevContainerControlManifest {
@@ -252,22 +265,44 @@ mod tests {
 
     #[test]
     fn ensure_no_disallowed_features_accepts_allowed_feature_sets() {
+        let root = unique_temp_dir("devcontainer-control-manifest-test");
+        let user_data = root.join("user-data");
+        std::fs::create_dir_all(&user_data).expect("user data dir");
         let features = Map::from_iter([(
             "ghcr.io/devcontainers/features/git:1".to_string(),
             Value::Object(Map::new()),
         )]);
 
-        ensure_no_disallowed_features(&[], &features).expect("allowed features");
+        ensure_no_disallowed_features(
+            &[
+                "--user-data-folder".to_string(),
+                user_data.display().to_string(),
+            ],
+            &features,
+        )
+        .expect("allowed features");
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
     fn ensure_no_disallowed_features_defaults_to_an_empty_manifest() {
+        let root = unique_temp_dir("devcontainer-control-manifest-test");
+        let user_data = root.join("user-data");
+        std::fs::create_dir_all(&user_data).expect("user data dir");
         let features = Map::from_iter([(
             "ghcr.io/devcontainers/features/problematic-feature:1".to_string(),
             Value::Object(Map::new()),
         )]);
 
-        ensure_no_disallowed_features(&[], &features).expect("empty default control manifest");
+        ensure_no_disallowed_features(
+            &[
+                "--user-data-folder".to_string(),
+                user_data.display().to_string(),
+            ],
+            &features,
+        )
+        .expect("empty default control manifest");
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]
@@ -318,8 +353,14 @@ mod tests {
 
     #[test]
     fn feature_advisories_are_empty_without_a_control_manifest() {
+        let root = unique_temp_dir("devcontainer-control-manifest-test");
+        let user_data = root.join("user-data");
+        std::fs::create_dir_all(&user_data).expect("user data dir");
         let advisories = feature_advisories_for_oci_features(
-            &[],
+            &[
+                "--user-data-folder".to_string(),
+                user_data.display().to_string(),
+            ],
             &[(
                 "ghcr.io/devcontainers/features/feature-with-advisory".to_string(),
                 "1.0.9".to_string(),
@@ -328,6 +369,7 @@ mod tests {
         .expect("advisories");
 
         assert!(advisories.is_empty());
+        let _ = std::fs::remove_dir_all(root);
     }
 
     #[test]

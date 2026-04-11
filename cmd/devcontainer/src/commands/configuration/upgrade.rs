@@ -348,7 +348,7 @@ fn cell(value: Option<&Value>) -> String {
     value.and_then(Value::as_str).unwrap_or("-").to_string()
 }
 
-fn parse_feature_reference(feature_id: &str) -> Option<FeatureReference> {
+pub(super) fn parse_feature_reference(feature_id: &str) -> Option<FeatureReference> {
     if !feature_id.starts_with("ghcr.io/")
         && !feature_id.starts_with("https://")
         && !feature_id.starts_with("http://")

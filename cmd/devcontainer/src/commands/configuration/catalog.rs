@@ -139,6 +139,28 @@ pub(crate) fn catalog_versions(base: &str) -> Vec<String> {
         .collect()
 }
 
+pub(crate) fn published_feature_canonical_id(
+    feature_id: &str,
+    workspace_folder: Option<&Path>,
+) -> Option<String> {
+    if let Some(entry) = exact_catalog_entry(feature_id, workspace_folder) {
+        return Some(entry.resolved);
+    }
+
+    let reference = super::upgrade::parse_feature_reference(feature_id)?;
+    if let Some(digest) = reference.digest {
+        return Some(format!("{}@{digest}", reference.base));
+    }
+
+    let version = if reference.tag.is_none() {
+        latest_version(&reference.base, workspace_folder)?
+    } else {
+        resolve_wanted_version(&reference, None, workspace_folder)?
+    };
+    catalog_entry_for_version(&reference.base, &version, workspace_folder)
+        .map(|entry| entry.resolved)
+}
+
 pub(super) fn latest_version(base: &str, workspace_folder: Option<&Path>) -> Option<String> {
     catalog_entries(base, workspace_folder)
         .and_then(|entries| entries.first().cloned())
