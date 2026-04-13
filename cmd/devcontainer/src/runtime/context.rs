@@ -14,8 +14,9 @@ use super::container;
 use inspection::{inspect_container_context, workspace_folder_from_args};
 
 pub(crate) use workspace::{
-    combined_remote_env, configured_user, default_remote_workspace_folder, derived_workspace_mount,
-    remote_user, remote_workspace_folder_for_args, workspace_mount_for_args,
+    additional_mounts_for_workspace_target, combined_remote_env, configured_user,
+    default_remote_workspace_folder, derived_workspace_mount, remote_user,
+    remote_workspace_folder_for_args, workspace_mount_for_args,
 };
 
 pub(crate) struct ResolvedConfig {

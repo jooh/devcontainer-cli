@@ -139,6 +139,33 @@ pub(crate) fn derived_workspace_mount(
     })
 }
 
+pub(crate) fn additional_mounts_for_workspace_target(
+    resolved: &ResolvedConfig,
+    remote_workspace_folder: &str,
+    args: &[String],
+) -> Vec<String> {
+    let Some(derived) = derived_workspace_mount(&resolved.workspace_folder, args) else {
+        return Vec::new();
+    };
+    if resolved.configuration.get("workspaceFolder").is_none()
+        || derived.host_mount_folder != resolved.workspace_folder
+    {
+        return derived.additional_mounts;
+    }
+
+    let mut additional_mounts = Vec::new();
+    if common::parse_bool_option(args, "--mount-git-worktree-common-dir", false) {
+        if let Some(additional_mount) = git_worktree_common_dir_mount_for_workspace_target(
+            &derived.host_mount_folder,
+            args,
+            remote_workspace_folder,
+        ) {
+            additional_mounts.push(additional_mount);
+        }
+    }
+    additional_mounts
+}
+
 fn default_workspace_mount(
     workspace_folder: &Path,
     configuration: &Value,
@@ -180,6 +207,61 @@ fn git_worktree_common_dir_mount(
     args: &[String],
     default_container_mount_folder: &str,
 ) -> Option<(String, String)> {
+    let worktree_mount = git_worktree_common_dir_info(host_mount_folder)?;
+    let container_mount_folder = if worktree_mount
+        .relative_host_mount_folder
+        .components()
+        .next()
+        .is_none()
+    {
+        default_container_mount_folder.to_string()
+    } else {
+        join_container_path("/workspaces", &worktree_mount.relative_host_mount_folder)
+    };
+    let container_git_common_dir =
+        join_container_path("/workspaces", &worktree_mount.relative_git_common_dir);
+    let mut additional_mount = format!(
+        "type=bind,source={},target={container_git_common_dir}",
+        worktree_mount.git_common_dir.display(),
+    );
+    append_workspace_mount_consistency(&mut additional_mount, args);
+
+    Some((container_mount_folder, additional_mount))
+}
+
+fn git_worktree_common_dir_mount_for_workspace_target(
+    host_mount_folder: &Path,
+    args: &[String],
+    container_workspace_folder: &str,
+) -> Option<String> {
+    let worktree_mount = git_worktree_common_dir_info(host_mount_folder)?;
+    let container_common_dir_base = ascend_container_path(
+        container_workspace_folder,
+        worktree_mount
+            .relative_host_mount_folder
+            .components()
+            .count(),
+    );
+    let container_git_common_dir = join_container_path(
+        &container_common_dir_base,
+        &worktree_mount.relative_git_common_dir,
+    );
+    let mut additional_mount = format!(
+        "type=bind,source={},target={container_git_common_dir}",
+        worktree_mount.git_common_dir.display(),
+    );
+    append_workspace_mount_consistency(&mut additional_mount, args);
+
+    Some(additional_mount)
+}
+
+struct GitWorktreeCommonDirInfo {
+    git_common_dir: PathBuf,
+    relative_host_mount_folder: PathBuf,
+    relative_git_common_dir: PathBuf,
+}
+
+fn git_worktree_common_dir_info(host_mount_folder: &Path) -> Option<GitWorktreeCommonDirInfo> {
     let dot_git_path = host_mount_folder.join(".git");
     if !dot_git_path.is_file() {
         return None;
@@ -197,33 +279,16 @@ fn git_worktree_common_dir_mount(
 
     let git_common_dir = normalize_path(host_mount_folder.join(gitdir_path).join("..").join(".."));
     let mut current = host_mount_folder;
-    let mut segments = Vec::new();
     while !git_common_dir.starts_with(current) {
-        segments.push(
-            current
-                .file_name()
-                .and_then(|value| value.to_str())
-                .unwrap_or("workspace")
-                .to_string(),
-        );
         current = current.parent()?;
     }
-    segments.reverse();
-
-    let container_mount_folder = if segments.is_empty() {
-        default_container_mount_folder.to_string()
-    } else {
-        format!("/workspaces/{}", segments.join("/"))
-    };
-    let relative_git_common_dir = git_common_dir.strip_prefix(current).ok()?;
-    let container_git_common_dir = join_container_path("/workspaces", relative_git_common_dir);
-    let mut additional_mount = format!(
-        "type=bind,source={},target={container_git_common_dir}",
-        git_common_dir.display(),
-    );
-    append_workspace_mount_consistency(&mut additional_mount, args);
-
-    Some((container_mount_folder, additional_mount))
+    let relative_host_mount_folder = host_mount_folder.strip_prefix(current).ok()?.to_path_buf();
+    let relative_git_common_dir = git_common_dir.strip_prefix(current).ok()?.to_path_buf();
+    Some(GitWorktreeCommonDirInfo {
+        git_common_dir,
+        relative_host_mount_folder,
+        relative_git_common_dir,
+    })
 }
 
 fn normalize_path(path: PathBuf) -> PathBuf {
@@ -258,11 +323,30 @@ fn join_container_path(base: &str, relative: &Path) -> String {
         .components()
         .fold(base.to_string(), |mut path, component| {
             if let std::path::Component::Normal(segment) = component {
-                path.push('/');
+                if !path.ends_with('/') {
+                    path.push('/');
+                }
                 path.push_str(&segment.to_string_lossy());
             }
             path
         })
+}
+
+fn ascend_container_path(path: &str, segments: usize) -> String {
+    let mut parts = path
+        .split('/')
+        .filter(|segment| !segment.is_empty())
+        .collect::<Vec<_>>();
+    for _ in 0..segments {
+        if parts.pop().is_none() {
+            return "/".to_string();
+        }
+    }
+    if parts.is_empty() {
+        "/".to_string()
+    } else {
+        format!("/{}", parts.join("/"))
+    }
 }
 
 fn append_workspace_mount_consistency(mount: &mut String, args: &[String]) {
@@ -299,7 +383,10 @@ fn find_git_root_folder(workspace_folder: &Path) -> Option<PathBuf> {
 mod tests {
     use std::fs;
 
-    use super::{git_worktree_common_dir_mount, normalize_path};
+    use super::{
+        ascend_container_path, git_worktree_common_dir_mount,
+        git_worktree_common_dir_mount_for_workspace_target, normalize_path,
+    };
     use crate::test_support::unique_temp_dir;
 
     #[test]
@@ -343,6 +430,32 @@ mod tests {
     }
 
     #[test]
+    fn git_worktree_common_dir_mount_rebases_common_dir_for_custom_workspace_target() {
+        let root = unique_temp_dir("devcontainer-workspace-test");
+        let worktree = root.join("worktrees").join("feature");
+        fs::create_dir_all(&worktree).expect("worktree dir");
+        fs::write(
+            worktree.join(".git"),
+            "gitdir: ../../repo/.git/worktrees/feature\n",
+        )
+        .expect("git file");
+
+        let additional_mount =
+            git_worktree_common_dir_mount_for_workspace_target(&worktree, &[], "/workspace")
+                .expect("additional mount");
+
+        assert_eq!(
+            additional_mount,
+            format!(
+                "type=bind,source={},target=/repo/.git",
+                root.join("repo").join(".git").display()
+            )
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn git_worktree_common_dir_mount_skips_absolute_gitdir_targets() {
         let root = unique_temp_dir("devcontainer-workspace-test");
         let worktree = root.join("worktrees").join("feature");
@@ -356,5 +469,11 @@ mod tests {
         assert!(git_worktree_common_dir_mount(&worktree, &[], "/workspaces/feature").is_none());
 
         let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn ascend_container_path_clamps_at_root() {
+        assert_eq!(ascend_container_path("/workspace", 2), "/");
+        assert_eq!(ascend_container_path("/one/two/three", 2), "/one");
     }
 }

@@ -2,7 +2,9 @@
 
 use serde_json::{Map, Number, Value};
 
-use crate::runtime::context::{derived_workspace_mount, workspace_mount_for_args, ResolvedConfig};
+use crate::runtime::context::{
+    additional_mounts_for_workspace_target, workspace_mount_for_args, ResolvedConfig,
+};
 use crate::runtime::mounts::split_mount_options;
 
 pub(super) enum ComposeVolumeEntry {
@@ -41,15 +43,14 @@ pub(super) fn compose_additional_volumes(
         .map(|mounts| mounts.iter().filter_map(compose_mount_definition).collect())
         .unwrap_or_default();
     if resolved.configuration.get("workspaceMount").is_none() {
-        if let Some(derived) = derived_workspace_mount(&resolved.workspace_folder, args) {
-            volumes.extend(
-                derived
-                    .additional_mounts
-                    .iter()
-                    .filter_map(|mount| compose_mount_definition_from_str(mount))
-                    .map(ComposeVolumeEntry::Long),
-            );
-        }
+        let remote_workspace_folder =
+            crate::runtime::context::remote_workspace_folder_for_args(resolved, args);
+        volumes.extend(
+            additional_mounts_for_workspace_target(resolved, &remote_workspace_folder, args)
+                .iter()
+                .filter_map(|mount| compose_mount_definition_from_str(mount))
+                .map(ComposeVolumeEntry::Long),
+        );
     }
     volumes
 }

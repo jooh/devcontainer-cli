@@ -350,6 +350,53 @@ fn up_mounts_git_worktree_common_dir_when_requested() {
     )));
 }
 
+#[test]
+fn up_rebases_git_worktree_common_dir_for_configured_workspace_folder() {
+    let harness = RuntimeHarness::new();
+    let repo_root = harness.root.join("repo");
+    let worktree_root = harness.root.join("worktrees").join("feature");
+    init_git_repo_with_commit(&repo_root);
+    add_relative_git_worktree(&repo_root, &worktree_root);
+    let expected_worktree_root = worktree_root
+        .canonicalize()
+        .unwrap_or_else(|_| worktree_root.clone());
+    let expected_repo_git_dir = repo_root
+        .join(".git")
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.join(".git"));
+    write_devcontainer_config(
+        &worktree_root,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/workspace\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            worktree_root.to_string_lossy().as_ref(),
+            "--mount-git-worktree-common-dir",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(payload["remoteWorkspaceFolder"], "/workspace");
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/workspace",
+        expected_worktree_root.display()
+    )));
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/repo/.git",
+        expected_repo_git_dir.display()
+    )));
+}
+
 fn init_git_repo(root: &std::path::Path) {
     let status = Command::new("git")
         .args(["init", "--quiet"])
