@@ -1,5 +1,8 @@
 //! Container engine invocation helpers for native runtime commands.
 
+use std::io;
+use std::path::Path;
+
 use crate::commands::common;
 use crate::process_runner::{self, ProcessRequest, ProcessResult};
 
@@ -15,14 +18,18 @@ pub(crate) fn run_engine(
     args: &[String],
     engine_args: Vec<String>,
 ) -> Result<ProcessResult, String> {
-    process_runner::run_process(&engine_request(args, engine_args))
+    let request = engine_request(args, engine_args);
+    process_runner::run_process(&request)
+        .map_err(|error| normalize_process_error(args, &request, error))
 }
 
 pub(crate) fn run_engine_streaming(
     args: &[String],
     engine_args: Vec<String>,
 ) -> Result<i32, String> {
-    process_runner::run_process_streaming(&engine_request(args, engine_args))
+    let request = engine_request(args, engine_args);
+    process_runner::run_process_streaming(&request)
+        .map_err(|error| normalize_process_error(args, &request, error))
 }
 
 pub(crate) fn compose_request(args: &[String], compose_args: Vec<String>) -> ProcessRequest {
@@ -47,7 +54,9 @@ pub(crate) fn run_compose(
     args: &[String],
     compose_args: Vec<String>,
 ) -> Result<ProcessResult, String> {
-    process_runner::run_process(&compose_request(args, compose_args))
+    let request = compose_request(args, compose_args);
+    process_runner::run_process(&request)
+        .map_err(|error| normalize_process_error(args, &request, error))
 }
 
 pub(crate) fn stderr_or_stdout(result: &ProcessResult) -> String {
@@ -60,6 +69,36 @@ pub(crate) fn stderr_or_stdout(result: &ProcessResult) -> String {
 
 fn engine_program(args: &[String]) -> String {
     common::parse_option_value(args, "--docker-path").unwrap_or_else(|| "docker".to_string())
+}
+
+fn normalize_process_error(args: &[String], request: &ProcessRequest, error: io::Error) -> String {
+    if error.kind() != io::ErrorKind::NotFound {
+        return error.to_string();
+    }
+
+    let executable = request.program.as_str();
+    if common::parse_option_value(args, "--docker-compose-path")
+        .as_deref()
+        .is_some_and(|program| program == executable)
+    {
+        return format!(
+            "Container compose executable not found: {executable}. Verify --docker-compose-path or install the requested compose CLI."
+        );
+    }
+
+    let requested_engine = common::parse_option_value(args, "--docker-path");
+    if requested_engine.is_none()
+        && Path::new(executable)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("docker"))
+    {
+        return "Container engine executable not found: docker. Install Docker or rerun with --docker-path podman.".to_string();
+    }
+
+    format!(
+        "Container engine executable not found: {executable}. Verify --docker-path or install the requested container engine."
+    )
 }
 
 fn apply_buildkit_env(args: &[String], request_args: &[String], request: &mut ProcessRequest) {

@@ -55,11 +55,44 @@ fn up_starts_a_container_and_exec_runs_inside_it() {
 
     let invocations = harness.read_invocations();
     assert!(invocations.contains("run "));
+    assert!(invocations.contains("--mount type=bind,source="));
+    assert!(invocations.contains(",target=/workspace"));
     assert!(invocations
         .contains("exec --workdir /workspace fake-container-id /bin/echo hello-from-container"));
 
     let exec_log = harness.read_exec_log();
     assert!(exec_log.contains("/bin/sh -lc echo ready"));
+}
+
+#[test]
+fn up_reports_missing_default_engine_with_actionable_guidance() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/workspace\"\n}\n",
+    );
+
+    let path = harness.root.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[
+            ("PATH", path.as_str()),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
+    );
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.contains("Container engine executable not found: docker"));
+    assert!(stderr.contains("--docker-path podman"));
+    assert!(!stderr.contains("os error 2"));
+    assert!(!stderr.contains("No such file or directory"));
 }
 
 #[test]
@@ -313,6 +346,53 @@ fn up_mounts_git_worktree_common_dir_when_requested() {
     )));
     assert!(invocations.contains(&format!(
         "--mount type=bind,source={},target=/workspaces/repo/.git",
+        expected_repo_git_dir.display()
+    )));
+}
+
+#[test]
+fn up_rebases_git_worktree_common_dir_for_configured_workspace_folder() {
+    let harness = RuntimeHarness::new();
+    let repo_root = harness.root.join("repo");
+    let worktree_root = harness.root.join("worktrees").join("feature");
+    init_git_repo_with_commit(&repo_root);
+    add_relative_git_worktree(&repo_root, &worktree_root);
+    let expected_worktree_root = worktree_root
+        .canonicalize()
+        .unwrap_or_else(|_| worktree_root.clone());
+    let expected_repo_git_dir = repo_root
+        .join(".git")
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.join(".git"));
+    write_devcontainer_config(
+        &worktree_root,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/workspace\",\n  \"postCreateCommand\": \"echo ready\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            worktree_root.to_string_lossy().as_ref(),
+            "--mount-git-worktree-common-dir",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(payload["remoteWorkspaceFolder"], "/workspace");
+
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/workspace",
+        expected_worktree_root.display()
+    )));
+    assert!(invocations.contains(&format!(
+        "--mount type=bind,source={},target=/repo/.git",
         expected_repo_git_dir.display()
     )));
 }

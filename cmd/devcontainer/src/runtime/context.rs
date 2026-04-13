@@ -14,8 +14,9 @@ use super::container;
 use inspection::{inspect_container_context, workspace_folder_from_args};
 
 pub(crate) use workspace::{
-    combined_remote_env, configured_user, default_remote_workspace_folder, derived_workspace_mount,
-    remote_user, remote_workspace_folder_for_args, workspace_mount_for_args,
+    additional_mounts_for_workspace_target, combined_remote_env, configured_user,
+    default_remote_workspace_folder, derived_workspace_mount, remote_user,
+    remote_workspace_folder_for_args, workspace_mount_for_args,
 };
 
 pub(crate) struct ResolvedConfig {
@@ -128,7 +129,13 @@ pub(crate) fn resolve_existing_container_context(
 mod tests {
     //! Unit tests for runtime context helpers.
 
+    use std::fs;
+    use std::process::Command;
+
     use serde_json::json;
+
+    use crate::runtime::mounts::split_mount_options;
+    use crate::test_support::unique_temp_dir;
 
     use super::{
         default_remote_workspace_folder, derived_workspace_mount, remote_workspace_folder_for_args,
@@ -195,6 +202,36 @@ mod tests {
     }
 
     #[test]
+    fn workspace_mount_for_args_preserves_git_root_source_for_nested_workspace_folder_targets() {
+        let root = unique_temp_dir("devcontainer-runtime-context");
+        let repo_root = root.join("repo");
+        let workspace = repo_root.join("packages").join("app");
+        fs::create_dir_all(workspace.join(".devcontainer")).expect("config dir");
+        init_git_repo(&repo_root);
+        let expected_repo_root = repo_root
+            .canonicalize()
+            .unwrap_or_else(|_| repo_root.clone());
+        let resolved = ResolvedConfig {
+            workspace_folder: workspace
+                .canonicalize()
+                .unwrap_or_else(|_| workspace.clone()),
+            config_file: workspace.join(".devcontainer").join("devcontainer.json"),
+            configuration: json!({
+                "workspaceFolder": "/workspace"
+            }),
+        };
+
+        let mount = workspace_mount_for_args(&resolved, "/workspace", &[]);
+        let options = split_mount_options(&mount);
+
+        assert!(options.contains(&format!("source={}", expected_repo_root.display())));
+        assert!(!options.contains(&format!("source={}", resolved.workspace_folder.display())));
+        assert!(options.contains(&"target=/workspace".to_string()));
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn derived_workspace_mount_uses_workspace_folder_when_git_root_mount_is_disabled() {
         let workspace = std::env::temp_dir().join("devcontainer-rs-no-git-root");
         let derived = derived_workspace_mount(
@@ -211,5 +248,14 @@ mod tests {
             "/workspaces/devcontainer-rs-no-git-root"
         );
         assert!(derived.additional_mounts.is_empty());
+    }
+
+    fn init_git_repo(root: &std::path::Path) {
+        let status = Command::new("git")
+            .args(["init", "--quiet"])
+            .current_dir(root)
+            .status()
+            .expect("git init");
+        assert!(status.success(), "git init failed: {status:?}");
     }
 }

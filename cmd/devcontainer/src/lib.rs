@@ -14,6 +14,7 @@ pub mod runtime;
 pub(crate) mod test_support;
 
 pub const NATIVE_ONLY_ENV_VAR: &str = "DEVCONTAINER_NATIVE_ONLY";
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 pub fn native_only_mode_enabled() -> bool {
     env::var(NATIVE_ONLY_ENV_VAR)
@@ -37,6 +38,11 @@ pub fn run(raw_args: Vec<String>) -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
+    if matches!(raw_args[0].as_str(), "--version" | "-V" | "version") {
+        println!("{VERSION}");
+        return ExitCode::SUCCESS;
+    }
+
     let (log_format, offset) = cli::parse_log_format(&raw_args);
     if !matches!(log_format, "text" | "json") {
         eprintln!("Unsupported log format: {log_format}");
@@ -46,6 +52,11 @@ pub fn run(raw_args: Vec<String>) -> ExitCode {
     if raw_args.len() <= offset {
         cli::print_help();
         return ExitCode::from(2);
+    }
+
+    if matches!(raw_args[offset].as_str(), "--version" | "-V" | "version") {
+        println!("{VERSION}");
+        return ExitCode::SUCCESS;
     }
 
     let command = &raw_args[offset];

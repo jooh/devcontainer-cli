@@ -44,6 +44,12 @@ jobs:
       - name: Rust tests
         run: cargo test --manifest-path cmd/devcontainer/Cargo.toml
 
+      - name: Build release binary
+        run: cargo build --release --manifest-path cmd/devcontainer/Cargo.toml
+
+      - name: Standalone artifact smoke
+        run: ./scripts/standalone/smoke.sh ./cmd/devcontainer/target/release/devcontainer
+
       - name: Rust coverage
         run: cargo llvm-cov --manifest-path cmd/devcontainer/Cargo.toml --lcov --output-path cmd/devcontainer/target/coverage.lcov
 
@@ -76,6 +82,27 @@ jobs:
 
       - name: GHCR network smoke tests
         run: cargo test --manifest-path cmd/devcontainer/Cargo.toml --test network_smoke -- --ignored
+
+  real-engine-lifecycle-smoke:
+    name: Real Engine Lifecycle Smoke
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build release binary
+        run: cargo build --release --manifest-path cmd/devcontainer/Cargo.toml
+
+      - name: Docker version
+        run: docker version
+
+      - name: Real engine lifecycle smoke
+        run: ./scripts/standalone/real-engine-smoke.sh ./cmd/devcontainer/target/release/devcontainer
 
   upstream-convergence:
     name: Upstream Convergence Baseline

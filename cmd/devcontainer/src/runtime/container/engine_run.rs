@@ -4,7 +4,9 @@ use serde_json::Value;
 
 use crate::commands::common;
 
-use super::super::context::{derived_workspace_mount, workspace_mount_for_args, ResolvedConfig};
+use super::super::context::{
+    additional_mounts_for_workspace_target, workspace_mount_for_args, ResolvedConfig,
+};
 use super::super::engine;
 use super::super::metadata::serialized_container_metadata;
 use super::super::mounts::mount_value_to_engine_arg;
@@ -41,11 +43,10 @@ pub(super) fn start_container(
         workspace_mount_for_args(resolved, remote_workspace_folder, args),
     ];
     if resolved.configuration.get("workspaceMount").is_none() {
-        if let Some(derived) = derived_workspace_mount(&resolved.workspace_folder, args) {
-            for mount in derived.additional_mounts {
-                engine_args.push("--mount".to_string());
-                engine_args.push(mount);
-            }
+        for mount in additional_mounts_for_workspace_target(resolved, remote_workspace_folder, args)
+        {
+            engine_args.push("--mount".to_string());
+            engine_args.push(mount);
         }
     }
     if resolved

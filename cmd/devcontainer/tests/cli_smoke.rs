@@ -8,3 +8,5 @@ mod collections;
 mod lockfile;
 #[path = "cli_smoke/read_configuration.rs"]
 mod read_configuration;
+#[path = "cli_smoke/version.rs"]
+mod version;

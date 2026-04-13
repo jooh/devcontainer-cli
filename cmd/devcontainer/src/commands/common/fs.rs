@@ -36,7 +36,8 @@ pub(crate) fn package_collection_target(
         cwd: None,
         env: HashMap::new(),
         log_level: ProcessLogLevel::Info,
-    })?;
+    })
+    .map_err(|error| error.to_string())?;
 
     if result.status_code != 0 {
         return Err(result.stderr);

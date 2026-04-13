@@ -12,7 +12,7 @@ use super::service::{
     compose_image_name_separator, inspect_service_definition, parse_semver_prefix,
 };
 use super::uses_compose_config;
-use crate::test_support::{init_git_repo, unique_temp_dir, write_executable_script};
+use crate::test_support::{init_git_repo, run_git, unique_temp_dir, write_executable_script};
 
 #[test]
 fn detects_compose_configs() {
@@ -222,6 +222,80 @@ fn metadata_override_file_mounts_nested_workspaces_from_the_git_root() {
         "{}:/workspaces/repo/packages/app",
         expected_repo_root.display()
     )));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_rebases_worktree_common_dir_for_configured_workspace_folder() {
+    let root = unique_temp_dir("devcontainer-compose-test");
+    let repo_root = root.join("repo");
+    let worktree_root = root.join("worktrees").join("feature");
+    fs::create_dir_all(&repo_root).expect("repo root");
+    init_git_repo(&repo_root);
+    fs::write(repo_root.join("README.md"), "hello\n").expect("readme");
+    run_git(&repo_root, &["add", "README.md"]);
+    run_git(
+        &repo_root,
+        &[
+            "-c",
+            "user.name=Devcontainer Tests",
+            "-c",
+            "user.email=devcontainer-tests@example.com",
+            "commit",
+            "-m",
+            "init",
+            "--quiet",
+        ],
+    );
+    if let Some(parent) = worktree_root.parent() {
+        fs::create_dir_all(parent).expect("worktree parent");
+    }
+    run_git(
+        &repo_root,
+        &[
+            "worktree",
+            "add",
+            "--relative-paths",
+            worktree_root.to_string_lossy().as_ref(),
+            "-b",
+            "feature",
+        ],
+    );
+    let expected_worktree_root = worktree_root
+        .canonicalize()
+        .unwrap_or_else(|_| worktree_root.clone());
+    let expected_repo_git_dir = repo_root
+        .join(".git")
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.join(".git"));
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: expected_worktree_root.clone(),
+        config_file: expected_worktree_root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "workspaceFolder": "/workspace",
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(
+        &resolved,
+        &["--mount-git-worktree-common-dir".to_string()],
+        "/workspace",
+        None,
+    )
+    .expect("override result")
+    .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains(&format!(
+        "- '{}:/workspace'",
+        expected_worktree_root.display()
+    )));
+    assert!(override_content.contains(&expected_repo_git_dir.display().to_string()));
+    assert!(override_content.contains("/repo/.git"));
 
     let _ = fs::remove_file(override_file);
     let _ = fs::remove_dir_all(root);

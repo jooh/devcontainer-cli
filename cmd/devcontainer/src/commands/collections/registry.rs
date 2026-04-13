@@ -437,7 +437,8 @@ fn run_curl(args: &[String]) -> Result<String, String> {
         cwd: None,
         env: HashMap::new(),
         log_level: ProcessLogLevel::Info,
-    })?;
+    })
+    .map_err(|error| error.to_string())?;
     if result.status_code != 0 {
         return Err(result.stderr);
     }

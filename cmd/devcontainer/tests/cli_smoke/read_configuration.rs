@@ -342,6 +342,41 @@ fn read_configuration_uses_git_root_mount_for_nested_workspaces() {
     let _ = fs::remove_dir_all(root);
 }
 
+#[test]
+fn read_configuration_preserves_git_root_mount_for_nested_workspace_folder_targets() {
+    let root = unique_temp_dir("devcontainer-cli-smoke");
+    let repo_root = root.join("repo");
+    let workspace = repo_root.join("packages").join("app");
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    init_git_repo(&repo_root);
+    let expected_repo_root = repo_root
+        .canonicalize()
+        .unwrap_or_else(|_| repo_root.clone());
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("devcontainer.json"),
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/workspace\"\n}\n",
+    )
+    .expect("config write");
+
+    let (output, payload) = run_read_configuration(
+        &["--workspace-folder", workspace.to_string_lossy().as_ref()],
+        None,
+    );
+
+    assert!(output.status.success());
+    let workspace_mount = payload["workspace"]["workspaceMount"]
+        .as_str()
+        .expect("workspace mount");
+    let options = split_mount_options(workspace_mount);
+    assert!(options.contains(&format!("source={}", expected_repo_root.display())));
+    assert!(!options.contains(&format!("source={}", workspace.display())));
+    assert!(options.contains(&"target=/workspace".to_string()));
+    assert_eq!(payload["workspace"]["workspaceFolder"], "/workspace");
+
+    let _ = fs::remove_dir_all(root);
+}
+
 fn init_git_repo(root: &std::path::Path) {
     let status = Command::new("git")
         .args(["init", "--quiet"])
@@ -349,4 +384,27 @@ fn init_git_repo(root: &std::path::Path) {
         .status()
         .expect("git init");
     assert!(status.success(), "git init failed: {status:?}");
+}
+
+fn split_mount_options(mount: &str) -> Vec<String> {
+    let mut options = Vec::new();
+    let mut current = String::new();
+    let mut in_quotes = false;
+    for character in mount.chars() {
+        match character {
+            '"' => {
+                in_quotes = !in_quotes;
+                current.push(character);
+            }
+            ',' if !in_quotes => {
+                options.push(current.trim().to_string());
+                current.clear();
+            }
+            _ => current.push(character),
+        }
+    }
+    if !current.is_empty() {
+        options.push(current.trim().to_string());
+    }
+    options
 }
