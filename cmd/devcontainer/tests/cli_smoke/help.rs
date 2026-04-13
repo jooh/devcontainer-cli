@@ -123,3 +123,56 @@ fn only_top_level_long_version_flag_is_supported() {
         assert!(!output.status.success(), "{output:?}");
     }
 }
+
+#[test]
+fn unsupported_visible_command_option_fails_with_native_message() {
+    let output = devcontainer_command(None)
+        .args(["up", "--dotfiles-target-path", "/tmp/dotfiles"])
+        .output()
+        .expect("up command should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.contains("--dotfiles-target-path"), "{stderr}");
+    assert!(
+        stderr.contains("not yet implemented in the native Rust CLI"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("devcontainer up"), "{stderr}");
+}
+
+#[test]
+fn unsupported_hidden_command_option_fails_with_native_message() {
+    let output = devcontainer_command(None)
+        .args(["build", "--omit-syntax-directive"])
+        .output()
+        .expect("build command should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.contains("--omit-syntax-directive"), "{stderr}");
+    assert!(
+        stderr.contains("not yet implemented in the native Rust CLI"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("devcontainer build"), "{stderr}");
+}
+
+#[test]
+fn help_marks_unsupported_options_inline() {
+    let output = devcontainer_command(None)
+        .args(["up", "--help"])
+        .output()
+        .expect("up help should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    let marked_line = stdout
+        .lines()
+        .find(|line| line.contains("--dotfiles-target-path"))
+        .expect("marked unsupported option");
+    assert!(
+        marked_line.contains("[not yet implemented in native Rust CLI]"),
+        "{stdout}"
+    );
+}

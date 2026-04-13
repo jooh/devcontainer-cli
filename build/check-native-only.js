@@ -75,9 +75,10 @@ const env = {
 assertSuccess('top-level help without node', run(binaryPath, ['--help'], { env }));
 assertSuccess('build help without node', run(binaryPath, ['build', '--help'], { env }));
 assertSuccess('read-configuration help without node', run(binaryPath, ['read-configuration', '--help'], { env }));
+assertSuccess('features help without node', run(binaryPath, ['features', '--help'], { env }));
+assertSuccess('templates apply help without node', run(binaryPath, ['templates', 'apply', '--help'], { env }));
+assertSuccess('top-level version without node', run(binaryPath, ['--version'], { env }));
 assertSuccess('native read-configuration without node', run(binaryPath, ['read-configuration', '--workspace-folder', workspaceFolder], { env }));
-assertSuccess('native features list without node', run(binaryPath, ['features', 'list'], { env }));
-assertSuccess('native templates list without node', run(binaryPath, ['templates', 'list'], { env }));
 
 assertFailure(
 	'native-only fallback block',

@@ -1,6 +1,15 @@
 //! Command-line parsing and top-level dispatch for the devcontainer binary.
 
+use std::sync::OnceLock;
+
+use serde::Deserialize;
+
 use crate::output::{self, LogFormat};
+
+const CLI_METADATA_JSON: &str = include_str!("cli_metadata.json");
+const UNSUPPORTED_MARKER: &str = "  [not yet implemented in native Rust CLI]";
+const UNSUPPORTED_ARGUMENT_MESSAGE: &str =
+    "is recognized for this command but is not yet implemented in the native Rust CLI";
 
 pub const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 10] = [
     "read-configuration",
@@ -15,98 +24,112 @@ pub const SUPPORTED_TOP_LEVEL_COMMANDS: [&str; 10] = [
     "templates",
 ];
 
-fn command_description(command: &str) -> &'static str {
-    match command {
-        "up" => "Create and run dev container",
-        "set-up" => "Set up an existing container as a dev container",
-        "build" => "Build a dev container image",
-        "run-user-commands" => "Run user commands",
-        "read-configuration" => "Read configuration",
-        "outdated" => "Show current and available versions",
-        "upgrade" => "Upgrade lockfile",
-        "exec" => "Execute a command on a running dev container",
-        "features" => "Features commands",
-        "templates" => "Templates commands",
-        _ => "Native devcontainer command",
-    }
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CliMetadata {
+    root: HelpPage,
+    commands: Vec<CommandHelp>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HelpPage {
+    lines: Vec<HelpLine>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HelpLine {
+    text: String,
+    option_names: Vec<String>,
+    positional_names: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandHelp {
+    path: String,
+    token_path: Vec<String>,
+    lines: Vec<HelpLine>,
+    options: Vec<CommandOption>,
+    unsupported_options: Vec<String>,
+    unsupported_positionals: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandOption {
+    name: String,
+    aliases: Vec<String>,
+}
+
+pub struct ResolvedCommandHelp<'a> {
+    pub path: &'a str,
+    pub consumed_args: usize,
+}
+
+fn cli_metadata() -> &'static CliMetadata {
+    static CLI_METADATA: OnceLock<CliMetadata> = OnceLock::new();
+    CLI_METADATA.get_or_init(|| {
+        serde_json::from_str(CLI_METADATA_JSON).expect("valid generated CLI metadata")
+    })
+}
+
+fn command_help(path: &str) -> Option<&'static CommandHelp> {
+    cli_metadata()
+        .commands
+        .iter()
+        .find(|command| command.path == path)
+}
+
+fn child_command(parent_path: &str, child_token: &str) -> Option<&'static CommandHelp> {
+    let expected_length = parent_path.split(' ').count() + 1;
+    cli_metadata().commands.iter().find(|command| {
+        command.path.starts_with(parent_path)
+            && command.token_path.len() == expected_length
+            && command
+                .token_path
+                .last()
+                .is_some_and(|token| token == child_token)
+    })
 }
 
 pub fn print_help() {
-    println!("devcontainer (native Rust CLI)");
-    println!(
-        "\nUsage:\n  devcontainer [--log-format text|json] <command> [args...]\n  devcontainer [--log-format text|json] [--version|-V|version]\n"
-    );
-    println!("Supported top-level commands:");
-    for command in SUPPORTED_TOP_LEVEL_COMMANDS {
-        println!("  - {command}: {}", command_description(command));
-    }
-    println!("\nReference:");
-    println!("  - docs/cli/command-reference.md (generated from pinned upstream metadata)");
-    println!("  - docs/upstream/parity-inventory.md (measured native parity inventory)");
+    render_lines(&cli_metadata().root.lines, &[], &[]);
 }
 
-pub fn print_command_help(command: &str) {
-    println!("{}", command_description(command));
-    match command {
-        "read-configuration" => {
-            println!(
-                "Usage:\n  devcontainer read-configuration [--workspace-folder <path>] [--config <path>]"
-            );
-            println!("\nNative support:");
-            println!("  - resolves .devcontainer/devcontainer.json or .devcontainer.json");
-            println!("  - supports --workspace-folder and --config");
-        }
-        "features" => {
-            println!(
-                "Usage:\n  devcontainer features <list|ls|resolve-dependencies|info|test|package|publish|generate-docs>"
-            );
-            println!("\nNative support:");
-            println!("  - list / ls");
-            println!("  - resolve-dependencies");
-            println!("  - info manifest <feature>");
-            println!("  - test <project-folder>");
-            println!("  - package <target>");
-            println!("  - publish <target>");
-            println!("  - generate-docs <target>");
-            println!(
-                "  - published OCI flows remain partial; see docs/upstream/parity-inventory.md"
-            );
-        }
-        "templates" => {
-            println!(
-                "Usage:\n  devcontainer templates <list|ls|apply|metadata|publish|generate-docs>"
-            );
-            println!("\nNative support:");
-            println!("  - list / ls");
-            println!("  - apply <target>");
-            println!("  - metadata <target>");
-            println!("  - publish <target>");
-            println!("  - generate-docs <target>");
-            println!(
-                "  - published OCI flows remain partial; see docs/upstream/parity-inventory.md"
-            );
-        }
-        "build" | "up" | "exec" => {
-            println!("Usage:\n  devcontainer {command} [args...]");
-            println!("\nCurrent state:");
-            println!("  - native runtime path is available");
-            println!("  - upstream feature integration and some option coverage remain partial");
-        }
-        "set-up" | "run-user-commands" | "outdated" | "upgrade" => {
-            println!("Usage:\n  devcontainer {command} [args...]");
-            println!("\nNative support:");
-            println!("  - set-up / run-user-commands invoke lifecycle hooks in-container");
-            println!(
-                "  - outdated / upgrade are native and can read workspace OCI layout mirrors, but registry-backed catalogs remain partial"
-            );
-        }
-        _ => {
-            println!("Usage:\n  devcontainer {command} [args...]");
+pub fn print_command_help(path: &str) {
+    let Some(command) = command_help(path) else {
+        println!("devcontainer {path}");
+        return;
+    };
+    render_lines(
+        &command.lines,
+        &command.unsupported_options,
+        &command.unsupported_positionals,
+    );
+}
+
+fn render_lines(
+    lines: &[HelpLine],
+    unsupported_options: &[String],
+    unsupported_positionals: &[String],
+) {
+    for line in lines {
+        if line
+            .option_names
+            .iter()
+            .any(|name| unsupported_options.contains(name))
+            || line
+                .positional_names
+                .iter()
+                .any(|name| unsupported_positionals.contains(name))
+        {
+            println!("{}{}", line.text, UNSUPPORTED_MARKER);
+        } else {
+            println!("{}", line.text);
         }
     }
-    println!("\nReference:");
-    println!("  - docs/cli/command-reference.md");
-    println!("  - docs/upstream/parity-inventory.md");
 }
 
 pub fn parse_log_format(args: &[String]) -> (&str, usize) {
@@ -131,14 +154,132 @@ pub fn is_command_help_request(args: &[String]) -> bool {
     )
 }
 
+pub fn resolve_command_help<'a>(
+    command: &'a str,
+    args: &[String],
+) -> Option<ResolvedCommandHelp<'a>> {
+    let mut current = command_help(command)?;
+    let mut consumed_args = 0;
+
+    loop {
+        let Some(next_arg) = args.get(consumed_args) else {
+            break;
+        };
+        let Some(child) = child_command(&current.path, next_arg) else {
+            break;
+        };
+        current = child;
+        consumed_args += 1;
+    }
+
+    Some(ResolvedCommandHelp {
+        path: &current.path,
+        consumed_args,
+    })
+}
+
+pub fn unsupported_argument_error(command_path: &str, args: &[String]) -> Option<String> {
+    let command = command_help(command_path)?;
+    let mut unsupported_flags = Vec::new();
+
+    for option in &command.options {
+        if command.unsupported_options.contains(&option.name) {
+            unsupported_flags.push((format!("--{}", option.name), option.name.as_str()));
+            for alias in &option.aliases {
+                unsupported_flags.push((format!("-{alias}"), option.name.as_str()));
+            }
+        }
+    }
+
+    for arg in args {
+        if arg == "--" {
+            break;
+        }
+
+        if command.path == "exec" && !arg.starts_with('-') {
+            break;
+        }
+
+        let flag = arg.split_once('=').map_or(arg.as_str(), |(name, _)| name);
+        if let Some((matched_flag, _)) = unsupported_flags
+            .iter()
+            .find(|(candidate, _)| candidate == flag)
+        {
+            return Some(format!(
+                "Option {matched_flag} {UNSUPPORTED_ARGUMENT_MESSAGE}: devcontainer {command_path}"
+            ));
+        }
+    }
+
+    None
+}
+
 #[cfg(test)]
 mod tests {
-    use super::is_command_help_request;
+    use super::{
+        command_help, is_command_help_request, resolve_command_help, unsupported_argument_error,
+    };
 
     #[test]
     fn detects_subcommand_help_requests() {
         assert!(is_command_help_request(&["--help".to_string()]));
         assert!(is_command_help_request(&["-h".to_string()]));
         assert!(!is_command_help_request(&["list".to_string()]));
+    }
+
+    #[test]
+    fn resolves_nested_help_paths() {
+        let resolved =
+            resolve_command_help("templates", &["apply".to_string(), "--help".to_string()])
+                .expect("resolved help");
+
+        assert_eq!(resolved.path, "templates apply");
+        assert_eq!(resolved.consumed_args, 1);
+    }
+
+    #[test]
+    fn metadata_tracks_unsupported_flags() {
+        let command = command_help("up").expect("up metadata");
+        assert!(command
+            .unsupported_options
+            .contains(&"dotfiles-target-path".to_string()));
+    }
+
+    #[test]
+    fn detects_unsupported_command_options() {
+        let error = unsupported_argument_error(
+            "up",
+            &[
+                "--dotfiles-target-path".to_string(),
+                "/tmp/dotfiles".to_string(),
+            ],
+        )
+        .expect("unsupported error");
+
+        assert!(error.contains("--dotfiles-target-path"));
+        assert!(error.contains("devcontainer up"));
+    }
+
+    #[test]
+    fn ignores_exec_command_arguments_after_first_non_option() {
+        let error = unsupported_argument_error(
+            "exec",
+            &[
+                "/bin/echo".to_string(),
+                "--dotfiles-target-path".to_string(),
+                "/tmp/dotfiles".to_string(),
+            ],
+        );
+
+        assert!(error.is_none());
+    }
+
+    #[test]
+    fn preserves_positional_metadata_for_nested_commands() {
+        let command = command_help("features test").expect("features test metadata");
+        assert!(command
+            .lines
+            .iter()
+            .any(|line| line.positional_names.contains(&"target".to_string())));
     }
 }

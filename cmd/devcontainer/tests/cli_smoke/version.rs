@@ -6,7 +6,7 @@ use crate::support::test_support::devcontainer_command;
 
 #[test]
 fn top_level_version_flags_print_the_package_version() {
-    for args in [["--version"], ["-V"], ["version"]] {
+    for args in [["--version"]] {
         let output = devcontainer_command(None)
             .args(args)
             .output()
