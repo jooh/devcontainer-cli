@@ -1,6 +1,7 @@
 //! Process request and result types shared across runtime execution helpers.
 
 use std::collections::HashMap;
+use std::io;
 use std::path::PathBuf;
 use std::process::Command;
 
@@ -26,7 +27,7 @@ pub struct ProcessResult {
     pub stderr: String,
 }
 
-pub fn run_process(request: &ProcessRequest) -> Result<ProcessResult, String> {
+pub fn run_process(request: &ProcessRequest) -> Result<ProcessResult, io::Error> {
     log_request(request);
     let mut command = Command::new(&request.program);
     command.args(&request.args);
@@ -39,7 +40,7 @@ pub fn run_process(request: &ProcessRequest) -> Result<ProcessResult, String> {
         command.envs(&request.env);
     }
 
-    let output = command.output().map_err(|error| error.to_string())?;
+    let output = command.output()?;
     let result = ProcessResult {
         status_code: output.status.code().unwrap_or(1),
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
@@ -49,7 +50,7 @@ pub fn run_process(request: &ProcessRequest) -> Result<ProcessResult, String> {
     Ok(result)
 }
 
-pub fn run_process_streaming(request: &ProcessRequest) -> Result<i32, String> {
+pub fn run_process_streaming(request: &ProcessRequest) -> Result<i32, io::Error> {
     log_request(request);
     let mut command = Command::new(&request.program);
     command.args(&request.args);
@@ -62,7 +63,7 @@ pub fn run_process_streaming(request: &ProcessRequest) -> Result<i32, String> {
         command.envs(&request.env);
     }
 
-    let status = command.status().map_err(|error| error.to_string())?;
+    let status = command.status()?;
     let status_code = status.code().unwrap_or(1);
     log_result(request, status_code);
     Ok(status_code)

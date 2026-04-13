@@ -225,7 +225,8 @@ fn extract_local_published_template_source_root(
         cwd: None,
         env: std::collections::HashMap::new(),
         log_level: ProcessLogLevel::Info,
-    })?;
+    })
+    .map_err(|error| error.to_string())?;
     if result.status_code != 0 {
         return Err(result.stderr);
     }

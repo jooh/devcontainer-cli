@@ -101,7 +101,8 @@ fn run_process_group(
                 .into_iter()
                 .next()
                 .expect("single lifecycle command"),
-        )?)?;
+        )?)
+        .map_err(|error| error.to_string())?;
         if result.status_code != 0 {
             return Err(engine::stderr_or_stdout(&result));
         }
@@ -113,7 +114,9 @@ fn run_process_group(
         .map(|command| {
             let request = build_request(command);
             thread::spawn(move || match request {
-                Ok(request) => process_runner::run_process(&request),
+                Ok(request) => {
+                    process_runner::run_process(&request).map_err(|error| error.to_string())
+                }
                 Err(error) => Err(error),
             })
         })
