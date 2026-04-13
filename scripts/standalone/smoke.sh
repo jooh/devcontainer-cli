@@ -102,6 +102,7 @@ EOF
 chmod +x "$fake_bin/podman"
 
 "$binary" --help >/dev/null
+"$binary" --version >/dev/null
 "$binary" read-configuration --help >/dev/null
 "$binary" up --help >/dev/null
 "$binary" build --help >/dev/null

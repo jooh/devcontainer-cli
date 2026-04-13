@@ -33,7 +33,9 @@ fn command_description(command: &str) -> &'static str {
 
 pub fn print_help() {
     println!("devcontainer (native Rust CLI)");
-    println!("\nUsage:\n  devcontainer [--log-format text|json] <command> [args...]\n");
+    println!(
+        "\nUsage:\n  devcontainer [--log-format text|json] <command> [args...]\n  devcontainer [--log-format text|json] [--version|-V|version]\n"
+    );
     println!("Supported top-level commands:");
     for command in SUPPORTED_TOP_LEVEL_COMMANDS {
         println!("  - {command}: {}", command_description(command));
