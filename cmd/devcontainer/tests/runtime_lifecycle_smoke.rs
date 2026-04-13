@@ -6,5 +6,7 @@ mod support;
 mod commands;
 #[path = "runtime_lifecycle_smoke/dotfiles.rs"]
 mod dotfiles;
+#[path = "runtime_lifecycle_smoke/end_to_end.rs"]
+mod end_to_end;
 #[path = "runtime_lifecycle_smoke/selection.rs"]
 mod selection;

@@ -63,6 +63,37 @@ fn up_starts_a_container_and_exec_runs_inside_it() {
 }
 
 #[test]
+fn up_reports_missing_default_engine_with_actionable_guidance() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"workspaceFolder\": \"/workspace\"\n}\n",
+    );
+
+    let path = harness.root.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[
+            ("PATH", path.as_str()),
+            ("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1"),
+        ],
+    );
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(stderr.contains("Container engine executable not found: docker"));
+    assert!(stderr.contains("--docker-path podman"));
+    assert!(!stderr.contains("os error 2"));
+    assert!(!stderr.contains("No such file or directory"));
+}
+
+#[test]
 fn up_uses_workspace_mount_target_for_remote_workdir_when_workspace_folder_is_omitted() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
