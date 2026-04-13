@@ -147,9 +147,7 @@ pub(crate) fn additional_mounts_for_workspace_target(
     let Some(derived) = derived_workspace_mount(&resolved.workspace_folder, args) else {
         return Vec::new();
     };
-    if resolved.configuration.get("workspaceFolder").is_none()
-        || derived.host_mount_folder != resolved.workspace_folder
-    {
+    if resolved.configuration.get("workspaceFolder").is_none() {
         return derived.additional_mounts;
     }
 
@@ -172,19 +170,6 @@ fn default_workspace_mount(
     remote_workspace_folder: &str,
     args: &[String],
 ) -> String {
-    if configuration
-        .get("workspaceFolder")
-        .and_then(Value::as_str)
-        .is_some()
-    {
-        let mut mount = format!(
-            "type=bind,source={},target={remote_workspace_folder}",
-            workspace_folder.display()
-        );
-        append_workspace_mount_consistency(&mut mount, args);
-        return mount;
-    }
-
     let Some(derived) = derived_workspace_mount(workspace_folder, args) else {
         let mut mount = format!(
             "type=bind,source={},target={remote_workspace_folder}",
@@ -193,6 +178,18 @@ fn default_workspace_mount(
         append_workspace_mount_consistency(&mut mount, args);
         return mount;
     };
+    if configuration
+        .get("workspaceFolder")
+        .and_then(Value::as_str)
+        .is_some()
+    {
+        let mut mount = format!(
+            "type=bind,source={},target={remote_workspace_folder}",
+            derived.host_mount_folder.display()
+        );
+        append_workspace_mount_consistency(&mut mount, args);
+        return mount;
+    }
     let mut mount = format!(
         "type=bind,source={},target={}",
         derived.host_mount_folder.display(),
@@ -383,9 +380,12 @@ fn find_git_root_folder(workspace_folder: &Path) -> Option<PathBuf> {
 mod tests {
     use std::fs;
 
+    use serde_json::json;
+
     use super::{
-        ascend_container_path, git_worktree_common_dir_mount,
-        git_worktree_common_dir_mount_for_workspace_target, normalize_path,
+        additional_mounts_for_workspace_target, ascend_container_path,
+        git_worktree_common_dir_mount, git_worktree_common_dir_mount_for_workspace_target,
+        normalize_path, ResolvedConfig,
     };
     use crate::test_support::unique_temp_dir;
 
@@ -450,6 +450,44 @@ mod tests {
                 "type=bind,source={},target=/repo/.git",
                 root.join("repo").join(".git").display()
             )
+        );
+
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn additional_mounts_rebase_common_dir_for_custom_workspace_folder_targets() {
+        let root = unique_temp_dir("devcontainer-workspace-test");
+        let workspace = root.join("worktree");
+        fs::create_dir_all(&workspace).expect("workspace dir");
+        fs::write(
+            workspace.join(".git"),
+            "gitdir: ../repo/.git/worktrees/worktree\n",
+        )
+        .expect("git file");
+        let resolved = ResolvedConfig {
+            workspace_folder: workspace.clone(),
+            config_file: workspace.join(".devcontainer").join("devcontainer.json"),
+            configuration: json!({
+                "workspaceFolder": "/workspace"
+            }),
+        };
+
+        let additional_mounts = additional_mounts_for_workspace_target(
+            &resolved,
+            "/workspace",
+            &[
+                "--mount-git-worktree-common-dir".to_string(),
+                "true".to_string(),
+            ],
+        );
+
+        assert_eq!(
+            additional_mounts,
+            vec![format!(
+                "type=bind,source={},target=/repo/.git",
+                root.join("repo").join(".git").display()
+            )]
         );
 
         let _ = fs::remove_dir_all(root);
