@@ -55,6 +55,8 @@ fn up_starts_a_container_and_exec_runs_inside_it() {
 
     let invocations = harness.read_invocations();
     assert!(invocations.contains("run "));
+    assert!(invocations.contains("--mount type=bind,source="));
+    assert!(invocations.contains(",target=/workspace"));
     assert!(invocations
         .contains("exec --workdir /workspace fake-container-id /bin/echo hello-from-container"));
 

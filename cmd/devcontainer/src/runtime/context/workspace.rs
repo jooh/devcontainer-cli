@@ -75,7 +75,12 @@ pub(crate) fn workspace_mount_for_args(
         .and_then(Value::as_str)
         .map(str::to_string)
         .unwrap_or_else(|| {
-            default_workspace_mount(&resolved.workspace_folder, remote_workspace_folder, args)
+            default_workspace_mount(
+                &resolved.workspace_folder,
+                &resolved.configuration,
+                remote_workspace_folder,
+                args,
+            )
         })
 }
 
@@ -136,9 +141,23 @@ pub(crate) fn derived_workspace_mount(
 
 fn default_workspace_mount(
     workspace_folder: &Path,
+    configuration: &Value,
     remote_workspace_folder: &str,
     args: &[String],
 ) -> String {
+    if configuration
+        .get("workspaceFolder")
+        .and_then(Value::as_str)
+        .is_some()
+    {
+        let mut mount = format!(
+            "type=bind,source={},target={remote_workspace_folder}",
+            workspace_folder.display()
+        );
+        append_workspace_mount_consistency(&mut mount, args);
+        return mount;
+    }
+
     let Some(derived) = derived_workspace_mount(workspace_folder, args) else {
         let mut mount = format!(
             "type=bind,source={},target={remote_workspace_folder}",
