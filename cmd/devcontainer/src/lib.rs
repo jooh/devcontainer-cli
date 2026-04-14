@@ -38,7 +38,7 @@ pub fn run(raw_args: Vec<String>) -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    if raw_args[0] == "--version" {
+    if cli::is_command_version_request(&raw_args) {
         println!("{VERSION}");
         return ExitCode::SUCCESS;
     }
@@ -54,7 +54,7 @@ pub fn run(raw_args: Vec<String>) -> ExitCode {
         return ExitCode::from(2);
     }
 
-    if raw_args[offset] == "--version" {
+    if cli::is_command_version_request(&raw_args[offset..]) {
         println!("{VERSION}");
         return ExitCode::SUCCESS;
     }
@@ -71,6 +71,11 @@ pub fn run(raw_args: Vec<String>) -> ExitCode {
 
     if cli::is_command_help_request(resolved_args) {
         cli::print_command_help(resolved_help.path);
+        return ExitCode::SUCCESS;
+    }
+
+    if cli::is_command_version_request(resolved_args) {
+        println!("{VERSION}");
         return ExitCode::SUCCESS;
     }
 

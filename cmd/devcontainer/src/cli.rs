@@ -154,6 +154,10 @@ pub fn is_command_help_request(args: &[String]) -> bool {
     )
 }
 
+pub fn is_command_version_request(args: &[String]) -> bool {
+    matches!(args.first().map(String::as_str), Some("--version"))
+}
+
 pub fn resolve_command_help<'a>(
     command: &'a str,
     args: &[String],
@@ -217,7 +221,8 @@ pub fn unsupported_argument_error(command_path: &str, args: &[String]) -> Option
 #[cfg(test)]
 mod tests {
     use super::{
-        command_help, is_command_help_request, resolve_command_help, unsupported_argument_error,
+        command_help, is_command_help_request, is_command_version_request, resolve_command_help,
+        unsupported_argument_error,
     };
 
     #[test]
@@ -225,6 +230,13 @@ mod tests {
         assert!(is_command_help_request(&["--help".to_string()]));
         assert!(is_command_help_request(&["-h".to_string()]));
         assert!(!is_command_help_request(&["list".to_string()]));
+    }
+
+    #[test]
+    fn detects_subcommand_version_requests() {
+        assert!(is_command_version_request(&["--version".to_string()]));
+        assert!(!is_command_version_request(&["-V".to_string()]));
+        assert!(!is_command_version_request(&["version".to_string()]));
     }
 
     #[test]
