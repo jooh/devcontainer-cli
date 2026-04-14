@@ -107,8 +107,8 @@ chmod +x "$fake_bin/podman"
 "$binary" up --help >/dev/null
 "$binary" build --help >/dev/null
 "$binary" exec --help >/dev/null
-"$binary" features list >/dev/null
-"$binary" templates list >/dev/null
+"$binary" features --help >/dev/null
+"$binary" templates apply --help >/dev/null
 "$binary" upgrade --help >/dev/null
 
 missing_engine_stderr="$tmp_dir/missing-engine.stderr"

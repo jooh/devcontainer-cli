@@ -1,0 +1,66 @@
+.PHONY: tests \
+	rust-fmt \
+	rust-clippy \
+	rust-check \
+	rust-tests \
+	build-release \
+	standalone-artifact-smoke \
+	native-only-startup-contract \
+	command-matrix-drift-check \
+	schema-drift-check \
+	parity-harness \
+	no-node-runtime \
+	check-parity-inventory \
+	check-cli-metadata \
+	check-todo-args \
+	upstream-compatibility
+
+RUST_MANIFEST := cmd/devcontainer/Cargo.toml
+RELEASE_BINARY := ./cmd/devcontainer/target/release/devcontainer
+
+tests: rust-fmt rust-clippy rust-check rust-tests build-release standalone-artifact-smoke native-only-startup-contract command-matrix-drift-check schema-drift-check parity-harness no-node-runtime check-parity-inventory check-cli-metadata check-todo-args upstream-compatibility
+
+rust-fmt:
+	cargo fmt --manifest-path $(RUST_MANIFEST) --all -- --check
+
+rust-clippy:
+	cargo clippy --manifest-path $(RUST_MANIFEST) -- -D warnings
+
+rust-check:
+	cargo check --manifest-path $(RUST_MANIFEST)
+
+rust-tests:
+	cargo test --manifest-path $(RUST_MANIFEST)
+
+build-release:
+	cargo build --release --manifest-path $(RUST_MANIFEST)
+
+standalone-artifact-smoke: build-release
+	./scripts/standalone/smoke.sh $(RELEASE_BINARY)
+
+native-only-startup-contract:
+	node build/check-native-only.js
+
+command-matrix-drift-check:
+	node build/generate-command-matrix.js --check
+
+schema-drift-check:
+	node build/check-spec-drift.js
+
+parity-harness:
+	node build/check-parity-harness.js
+
+no-node-runtime:
+	node build/check-no-node-runtime.js
+
+check-parity-inventory:
+	node build/generate-parity-inventory.js --check
+
+check-cli-metadata:
+	node build/generate-cli-metadata.js --check
+
+check-todo-args:
+	node build/generate-todo-args.js --check
+
+upstream-compatibility:
+	node build/check-upstream-compatibility.js

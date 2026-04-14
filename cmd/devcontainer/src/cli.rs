@@ -251,25 +251,27 @@ mod tests {
 
     #[test]
     fn metadata_tracks_unsupported_flags() {
-        let command = command_help("up").expect("up metadata");
+        let command = command_help("outdated").expect("outdated metadata");
         assert!(command
             .unsupported_options
-            .contains(&"dotfiles-target-path".to_string()));
+            .contains(&"log-level".to_string()));
+
+        let up = command_help("up").expect("up metadata");
+        assert!(!up
+            .unsupported_options
+            .contains(&"omit-syntax-directive".to_string()));
     }
 
     #[test]
     fn detects_unsupported_command_options() {
         let error = unsupported_argument_error(
-            "up",
-            &[
-                "--dotfiles-target-path".to_string(),
-                "/tmp/dotfiles".to_string(),
-            ],
+            "outdated",
+            &["--log-level".to_string(), "trace".to_string()],
         )
         .expect("unsupported error");
 
-        assert!(error.contains("--dotfiles-target-path"));
-        assert!(error.contains("devcontainer up"));
+        assert!(error.contains("--log-level"));
+        assert!(error.contains("devcontainer outdated"));
     }
 
     #[test]

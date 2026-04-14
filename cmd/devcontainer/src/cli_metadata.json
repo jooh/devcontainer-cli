@@ -722,11 +722,7 @@
 				}
 			],
 			"positionals": [],
-			"unsupportedOptions": [
-				"dotfiles-install-command",
-				"dotfiles-target-path",
-				"omit-syntax-directive"
-			],
+			"unsupportedOptions": [],
 			"unsupportedPositionals": []
 		},
 		{
@@ -1053,10 +1049,7 @@
 				}
 			],
 			"positionals": [],
-			"unsupportedOptions": [
-				"dotfiles-install-command",
-				"dotfiles-target-path"
-			],
+			"unsupportedOptions": [],
 			"unsupportedPositionals": []
 		},
 		{
@@ -1798,10 +1791,7 @@
 				}
 			],
 			"positionals": [],
-			"unsupportedOptions": [
-				"dotfiles-install-command",
-				"dotfiles-target-path"
-			],
+			"unsupportedOptions": [],
 			"unsupportedPositionals": []
 		},
 		{

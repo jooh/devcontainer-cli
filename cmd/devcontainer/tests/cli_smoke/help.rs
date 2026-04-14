@@ -127,39 +127,22 @@ fn only_top_level_long_version_flag_is_supported() {
 #[test]
 fn unsupported_visible_command_option_fails_with_native_message() {
     let output = devcontainer_command(None)
-        .args(["up", "--dotfiles-target-path", "/tmp/dotfiles"])
+        .args(["outdated", "--log-level", "trace"])
         .output()
-        .expect("up command should run");
+        .expect("outdated command should run");
 
     assert!(!output.status.success(), "{output:?}");
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
-    assert!(stderr.contains("--dotfiles-target-path"), "{stderr}");
+    assert!(stderr.contains("--log-level"), "{stderr}");
     assert!(
         stderr.contains("not yet implemented in the native Rust CLI"),
         "{stderr}"
     );
-    assert!(stderr.contains("devcontainer up"), "{stderr}");
+    assert!(stderr.contains("devcontainer outdated"), "{stderr}");
 }
 
 #[test]
-fn unsupported_hidden_command_option_fails_with_native_message() {
-    let output = devcontainer_command(None)
-        .args(["up", "--omit-syntax-directive"])
-        .output()
-        .expect("up command should run");
-
-    assert!(!output.status.success(), "{output:?}");
-    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
-    assert!(stderr.contains("--omit-syntax-directive"), "{stderr}");
-    assert!(
-        stderr.contains("not yet implemented in the native Rust CLI"),
-        "{stderr}"
-    );
-    assert!(stderr.contains("devcontainer up"), "{stderr}");
-}
-
-#[test]
-fn help_marks_unsupported_options_inline() {
+fn help_omits_hidden_upstream_options() {
     let output = devcontainer_command(None)
         .args(["up", "--help"])
         .output()
@@ -167,9 +150,21 @@ fn help_marks_unsupported_options_inline() {
 
     assert!(output.status.success(), "{output:?}");
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert!(!stdout.contains("--omit-syntax-directive"), "{stdout}");
+}
+
+#[test]
+fn help_marks_unsupported_options_inline() {
+    let output = devcontainer_command(None)
+        .args(["outdated", "--help"])
+        .output()
+        .expect("outdated help should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
     let marked_line = stdout
         .lines()
-        .find(|line| line.contains("--dotfiles-target-path"))
+        .find(|line| line.contains("--log-level"))
         .expect("marked unsupported option");
     assert!(
         marked_line.contains("[not yet implemented in native Rust CLI]"),

@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 189,
-		"optionsMissing": 11
+		"optionsReferenced": 196,
+		"optionsMissing": 4
 	},
 	"commands": [
 		{
@@ -16,8 +16,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 43,
-				"referenced": 40,
-				"missing": 3
+				"referenced": 43,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -25,8 +25,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/resolve.rs",
-						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs"
 					]
 				},
 				{
@@ -41,6 +40,7 @@
 					"name": "buildkit",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
 						"cmd/devcontainer/src/runtime/engine.rs"
 					]
 				},
@@ -66,7 +66,6 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -104,7 +103,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -114,29 +112,34 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
-						"cmd/devcontainer/src/runtime/container/uid_update/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
 				{
 					"name": "dotfiles-install-command",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
+					]
 				},
 				{
 					"name": "dotfiles-repository",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/lifecycle.rs"
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
 					]
 				},
 				{
 					"name": "dotfiles-target-path",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
+					]
 				},
 				{
 					"name": "expect-existing-container",
@@ -149,8 +152,7 @@
 					"name": "experimental-frozen-lockfile",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
-						"cmd/devcontainer/src/runtime/compose/tests.rs"
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
@@ -164,7 +166,8 @@
 					"name": "gpu-availability",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/compose/tests.rs"
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/container/engine_run.rs"
 					]
 				},
 				{
@@ -190,7 +193,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/mod.rs"
 					]
 				},
@@ -205,7 +207,6 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -214,10 +215,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/container/engine_run.rs",
-						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -227,7 +225,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -237,8 +234,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -255,15 +250,17 @@
 				},
 				{
 					"name": "omit-syntax-directive",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/build.rs"
+					]
 				},
 				{
 					"name": "override-config",
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -293,7 +290,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -301,7 +297,6 @@
 					"name": "skip-non-blocking-commands",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/lifecycle.rs",
 						"cmd/devcontainer/src/runtime/lifecycle/selection.rs"
 					]
 				},
@@ -323,7 +318,6 @@
 					"name": "terminal-columns",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -331,7 +325,6 @@
 					"name": "terminal-rows",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -339,7 +332,8 @@
 					"name": "update-remote-user-uid-default",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/container/uid_update/tests.rs"
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/container/uid_update.rs"
 					]
 				},
 				{
@@ -347,7 +341,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -357,8 +350,6 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
 						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/discovery.rs",
 						"cmd/devcontainer/src/runtime/context/inspection.rs",
@@ -370,8 +361,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -389,8 +378,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 20,
-				"referenced": 18,
-				"missing": 2
+				"referenced": 20,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -442,29 +431,34 @@
 					"name": "docker-path",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
-						"cmd/devcontainer/src/runtime/container/uid_update/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
 				{
 					"name": "dotfiles-install-command",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
+					]
 				},
 				{
 					"name": "dotfiles-repository",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/lifecycle.rs"
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
 					]
 				},
 				{
 					"name": "dotfiles-target-path",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
+					]
 				},
 				{
 					"name": "include-configuration",
@@ -491,7 +485,6 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -506,7 +499,6 @@
 					"name": "skip-non-blocking-commands",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/lifecycle.rs",
 						"cmd/devcontainer/src/runtime/lifecycle/selection.rs"
 					]
 				},
@@ -521,7 +513,6 @@
 					"name": "terminal-columns",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -529,7 +520,6 @@
 					"name": "terminal-rows",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -561,14 +551,14 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/resolve.rs",
-						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs"
 					]
 				},
 				{
 					"name": "buildkit",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
 						"cmd/devcontainer/src/runtime/engine.rs"
 					]
 				},
@@ -594,7 +584,6 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -604,7 +593,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -614,9 +602,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
-						"cmd/devcontainer/src/runtime/container/uid_update/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -625,8 +611,7 @@
 					"name": "experimental-frozen-lockfile",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
-						"cmd/devcontainer/src/runtime/compose/tests.rs"
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
@@ -664,7 +649,6 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -697,8 +681,7 @@
 					"evidence": [
 						"cmd/devcontainer/src/runtime/build.rs",
 						"cmd/devcontainer/src/runtime/compose/args.rs",
-						"cmd/devcontainer/src/runtime/container/uid_update.rs",
-						"cmd/devcontainer/src/runtime/container/uid_update/tests.rs"
+						"cmd/devcontainer/src/runtime/container/uid_update.rs"
 					]
 				},
 				{
@@ -714,7 +697,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -731,7 +713,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -741,8 +722,6 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
 						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/discovery.rs",
 						"cmd/devcontainer/src/runtime/context/inspection.rs",
@@ -762,8 +741,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 27,
-				"referenced": 25,
-				"missing": 2
+				"referenced": 27,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -823,29 +802,34 @@
 					"name": "docker-path",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
-						"cmd/devcontainer/src/runtime/container/uid_update/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
 				{
 					"name": "dotfiles-install-command",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
+					]
 				},
 				{
 					"name": "dotfiles-repository",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/lifecycle.rs"
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
 					]
 				},
 				{
 					"name": "dotfiles-target-path",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs"
+					]
 				},
 				{
 					"name": "id-label",
@@ -868,7 +852,6 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -876,7 +859,6 @@
 					"name": "mount-git-worktree-common-dir",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -885,7 +867,6 @@
 					"name": "mount-workspace-git-root",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -922,7 +903,6 @@
 					"name": "skip-non-blocking-commands",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/lifecycle.rs",
 						"cmd/devcontainer/src/runtime/lifecycle/selection.rs"
 					]
 				},
@@ -937,14 +917,14 @@
 					"name": "stop-for-personalization",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/lifecycle.rs"
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/lifecycle/selection.rs"
 					]
 				},
 				{
 					"name": "terminal-columns",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -952,7 +932,6 @@
 					"name": "terminal-rows",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -993,8 +972,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/resolve.rs",
-						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs"
 					]
 				},
 				{
@@ -1003,7 +981,6 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1024,7 +1001,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1034,9 +1010,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
-						"cmd/devcontainer/src/runtime/container/uid_update/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1056,8 +1030,7 @@
 					"name": "include-features-configuration",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs"
 					]
 				},
 				{
@@ -1065,7 +1038,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/mod.rs"
 					]
 				},
@@ -1080,7 +1052,6 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1089,7 +1060,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1099,8 +1069,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1110,7 +1078,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1119,7 +1086,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1127,7 +1093,6 @@
 					"name": "terminal-columns",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1135,7 +1100,6 @@
 					"name": "terminal-rows",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1144,7 +1108,6 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1154,8 +1117,6 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
 						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/discovery.rs",
 						"cmd/devcontainer/src/runtime/context/inspection.rs",
@@ -1184,8 +1145,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
-						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs"
 					]
 				},
 				{
@@ -1221,8 +1181,7 @@
 					"name": "user-data-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/features/control.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/features/control.rs"
 					]
 				},
 				{
@@ -1231,8 +1190,6 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
 						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				}
@@ -1257,16 +1214,14 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
-						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs"
 					]
 				},
 				{
 					"name": "docker-compose-path",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs"
 					]
 				},
 				{
@@ -1308,8 +1263,6 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
-						"cmd/devcontainer/src/commands/configuration/tests/upgrade.rs",
 						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				}
@@ -1356,8 +1309,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs",
-						"cmd/devcontainer/src/commands/collections/templates.rs",
-						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+						"cmd/devcontainer/src/commands/collections/templates.rs"
 					]
 				},
 				{
@@ -1385,16 +1337,14 @@
 					"name": "permit-randomization",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs",
-						"cmd/devcontainer/src/commands/collections/tests/feature_tests.rs"
+						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs"
 					]
 				},
 				{
 					"name": "preserve-test-containers",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs",
-						"cmd/devcontainer/src/commands/collections/tests/feature_tests.rs"
+						"cmd/devcontainer/src/commands/collections/feature_tests/mod.rs"
 					]
 				},
 				{
@@ -1528,9 +1478,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/collections/mod.rs",
-						"cmd/devcontainer/src/commands/collections/templates.rs",
-						"cmd/devcontainer/src/commands/collections/tests/features.rs",
-						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+						"cmd/devcontainer/src/commands/collections/templates.rs"
 					]
 				}
 			],
@@ -1575,8 +1523,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/collections/mod.rs",
-						"cmd/devcontainer/src/commands/collections/publish.rs",
-						"cmd/devcontainer/src/commands/collections/tests/publish.rs"
+						"cmd/devcontainer/src/commands/collections/publish.rs"
 					]
 				},
 				{
@@ -1592,8 +1539,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/collections/mod.rs",
-						"cmd/devcontainer/src/commands/collections/publish.rs",
-						"cmd/devcontainer/src/commands/collections/tests/publish.rs"
+						"cmd/devcontainer/src/commands/collections/publish.rs"
 					]
 				}
 			],
@@ -1632,8 +1578,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/collections/feature_tests/discovery.rs",
-						"cmd/devcontainer/src/commands/collections/templates.rs",
-						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+						"cmd/devcontainer/src/commands/collections/templates.rs"
 					]
 				},
 				{
@@ -1647,16 +1592,14 @@
 					"name": "omit-paths",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/templates.rs",
-						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+						"cmd/devcontainer/src/commands/collections/templates.rs"
 					]
 				},
 				{
 					"name": "template-args",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/templates.rs",
-						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+						"cmd/devcontainer/src/commands/collections/templates.rs"
 					]
 				},
 				{
@@ -1670,8 +1613,7 @@
 					"name": "tmp-dir",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/collections/templates.rs",
-						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+						"cmd/devcontainer/src/commands/collections/templates.rs"
 					]
 				},
 				{
@@ -1679,9 +1621,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/collections/mod.rs",
-						"cmd/devcontainer/src/commands/collections/templates.rs",
-						"cmd/devcontainer/src/commands/collections/tests/features.rs",
-						"cmd/devcontainer/src/commands/collections/tests/templates.rs"
+						"cmd/devcontainer/src/commands/collections/templates.rs"
 					]
 				}
 			],
@@ -1833,9 +1773,7 @@
 					"name": "docker-path",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
-						"cmd/devcontainer/src/runtime/container/uid_update/tests.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1861,7 +1799,6 @@
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1869,7 +1806,6 @@
 					"name": "mount-git-worktree-common-dir",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1878,7 +1814,6 @@
 					"name": "mount-workspace-git-root",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1908,7 +1843,6 @@
 					"name": "terminal-columns",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1916,7 +1850,6 @@
 					"name": "terminal-rows",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
