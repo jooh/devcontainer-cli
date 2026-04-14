@@ -15,7 +15,7 @@ use super::{FeatureReference, Lockfile, LockfileEntry};
 use crate::commands::common;
 
 pub(super) fn run_outdated(args: &[String]) -> ExitCode {
-    match build_outdated_payload(args) {
+    match validate_outdated_options(args).and_then(|()| build_outdated_payload(args)) {
         Ok(payload) => {
             let output_format = common::parse_option_value(args, "--output-format")
                 .unwrap_or_else(|| "json".to_string());
@@ -34,7 +34,7 @@ pub(super) fn run_outdated(args: &[String]) -> ExitCode {
 }
 
 pub(super) fn run_upgrade(args: &[String]) -> ExitCode {
-    match run_upgrade_lockfile(args) {
+    match validate_upgrade_command_options(args).and_then(|()| run_upgrade_lockfile(args)) {
         Ok(lockfile) => {
             if common::has_flag(args, "--dry-run") {
                 println!(
@@ -127,8 +127,6 @@ pub(super) fn build_outdated_payload(args: &[String]) -> Result<Value, String> {
 }
 
 pub(super) fn run_upgrade_lockfile(args: &[String]) -> Result<Lockfile, String> {
-    validate_upgrade_options(args)?;
-
     let mut loaded = load_config(args)?;
     if let (Some(feature), Some(target_version)) = (
         common::parse_option_value(args, "--feature"),
@@ -158,6 +156,46 @@ pub(super) fn run_upgrade_lockfile(args: &[String]) -> Result<Lockfile, String> 
     }
 
     Ok(generated)
+}
+
+fn validate_outdated_options(args: &[String]) -> Result<(), String> {
+    common::validate_option_values(
+        args,
+        &[
+            "--user-data-folder",
+            "--workspace-folder",
+            "--config",
+            "--output-format",
+            "--log-level",
+            "--log-format",
+            "--terminal-columns",
+            "--terminal-rows",
+        ],
+    )?;
+    common::validate_choice_option(args, "--output-format", &["text", "json"])?;
+    common::validate_choice_option(args, "--log-format", &["text", "json"])?;
+    common::validate_choice_option(args, "--log-level", &["info", "debug", "trace"])?;
+    common::validate_paired_options(args, "--terminal-columns", "--terminal-rows")?;
+    common::validate_number_option(args, "--terminal-columns")?;
+    common::validate_number_option(args, "--terminal-rows")?;
+    Ok(())
+}
+
+fn validate_upgrade_command_options(args: &[String]) -> Result<(), String> {
+    common::validate_option_values(
+        args,
+        &[
+            "--workspace-folder",
+            "--docker-path",
+            "--docker-compose-path",
+            "--config",
+            "--log-level",
+            "--feature",
+            "--target-version",
+        ],
+    )?;
+    common::validate_choice_option(args, "--log-level", &["error", "info", "debug", "trace"])?;
+    validate_upgrade_options(args)
 }
 
 fn validate_upgrade_options(args: &[String]) -> Result<(), String> {

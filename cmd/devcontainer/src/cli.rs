@@ -250,28 +250,22 @@ mod tests {
     }
 
     #[test]
-    fn metadata_tracks_unsupported_flags() {
+    fn metadata_tracks_no_remaining_visible_unsupported_flags() {
         let command = command_help("outdated").expect("outdated metadata");
-        assert!(command
-            .unsupported_options
-            .contains(&"log-level".to_string()));
+        assert!(command.unsupported_options.is_empty());
 
-        let up = command_help("up").expect("up metadata");
-        assert!(!up
-            .unsupported_options
-            .contains(&"omit-syntax-directive".to_string()));
+        let upgrade = command_help("upgrade").expect("upgrade metadata");
+        assert!(upgrade.unsupported_options.is_empty());
     }
 
     #[test]
-    fn detects_unsupported_command_options() {
+    fn supported_command_options_are_not_reported_as_unsupported() {
         let error = unsupported_argument_error(
             "outdated",
             &["--log-level".to_string(), "trace".to_string()],
-        )
-        .expect("unsupported error");
+        );
 
-        assert!(error.contains("--log-level"));
-        assert!(error.contains("devcontainer outdated"));
+        assert!(error.is_none());
     }
 
     #[test]

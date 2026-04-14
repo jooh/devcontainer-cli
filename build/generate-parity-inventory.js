@@ -294,6 +294,26 @@ const OPTION_EVIDENCE_OVERRIDES = {
 			'cmd/devcontainer/src/runtime/lifecycle/selection.rs',
 		],
 	},
+	'outdated': {
+		'log-level': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/commands/configuration/upgrade.rs',
+		],
+		'terminal-columns': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/commands/configuration/upgrade.rs',
+		],
+		'terminal-rows': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/commands/configuration/upgrade.rs',
+		],
+	},
+	'upgrade': {
+		'log-level': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/commands/configuration/upgrade.rs',
+		],
+	},
 };
 
 function readFile(relativePath) {

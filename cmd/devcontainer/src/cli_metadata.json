@@ -2256,11 +2256,7 @@
 				}
 			],
 			"positionals": [],
-			"unsupportedOptions": [
-				"log-level",
-				"terminal-columns",
-				"terminal-rows"
-			],
+			"unsupportedOptions": [],
 			"unsupportedPositionals": []
 		},
 		{
@@ -2417,9 +2413,7 @@
 				}
 			],
 			"positionals": [],
-			"unsupportedOptions": [
-				"log-level"
-			],
+			"unsupportedOptions": [],
 			"unsupportedPositionals": []
 		},
 		{
