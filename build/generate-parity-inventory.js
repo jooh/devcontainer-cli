@@ -222,6 +222,14 @@ const OPTION_EVIDENCE_OVERRIDES = {
 			'cmd/devcontainer/src/runtime/mod.rs',
 		],
 	},
+	'up': {
+		'omit-config-remote-env-from-metadata': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/compose/override_file.rs',
+			'cmd/devcontainer/src/runtime/container/engine_run.rs',
+			'cmd/devcontainer/src/runtime/metadata.rs',
+		],
+	},
 };
 
 const OPTION_EVIDENCE_EXCLUSIONS = {

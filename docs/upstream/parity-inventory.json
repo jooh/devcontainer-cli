@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 188,
-		"optionsMissing": 12
+		"optionsReferenced": 189,
+		"optionsMissing": 11
 	},
 	"commands": [
 		{
@@ -16,8 +16,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 43,
-				"referenced": 39,
-				"missing": 4
+				"referenced": 40,
+				"missing": 3
 			},
 			"options": [
 				{
@@ -245,8 +245,13 @@
 				},
 				{
 					"name": "omit-config-remote-env-from-metadata",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/compose/override_file.rs",
+						"cmd/devcontainer/src/runtime/container/engine_run.rs",
+						"cmd/devcontainer/src/runtime/metadata.rs"
+					]
 				},
 				{
 					"name": "omit-syntax-directive",

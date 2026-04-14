@@ -725,7 +725,6 @@
 			"unsupportedOptions": [
 				"dotfiles-install-command",
 				"dotfiles-target-path",
-				"omit-config-remote-env-from-metadata",
 				"omit-syntax-directive"
 			],
 			"unsupportedPositionals": []
