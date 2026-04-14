@@ -1375,10 +1375,7 @@
 				}
 			],
 			"positionals": [],
-			"unsupportedOptions": [
-				"omit-syntax-directive",
-				"skip-persisting-customizations-from-features"
-			],
+			"unsupportedOptions": [],
 			"unsupportedPositionals": []
 		},
 		{

@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 186,
-		"optionsMissing": 14
+		"optionsReferenced": 188,
+		"optionsMissing": 12
 	},
 	"commands": [
 		{
@@ -64,7 +64,6 @@
 					"name": "config",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
@@ -216,6 +215,7 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/container/engine_run.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
@@ -227,6 +227,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -341,6 +342,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -348,7 +350,6 @@
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
@@ -391,7 +392,6 @@
 					"name": "config",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -547,8 +547,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 22,
-				"referenced": 20,
-				"missing": 2
+				"referenced": 22,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -587,7 +587,6 @@
 					"name": "config",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
@@ -674,8 +673,11 @@
 				},
 				{
 					"name": "omit-syntax-directive",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/build.rs"
+					]
 				},
 				{
 					"name": "output",
@@ -713,14 +715,18 @@
 				},
 				{
 					"name": "skip-persisting-customizations-from-features",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/runtime/mod.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -728,7 +734,6 @@
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
@@ -760,7 +765,6 @@
 					"name": "config",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -867,6 +871,7 @@
 					"name": "mount-git-worktree-common-dir",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -957,7 +962,6 @@
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/runtime/container/discovery.rs",
 						"cmd/devcontainer/src/runtime/context/inspection.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
@@ -992,7 +996,6 @@
 					"name": "config",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
@@ -1081,6 +1084,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1135,6 +1139,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1142,7 +1147,6 @@
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
@@ -1174,7 +1178,6 @@
 					"name": "config",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
@@ -1213,14 +1216,14 @@
 					"name": "user-data-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/features/control.rs"
+						"cmd/devcontainer/src/commands/configuration/features/control.rs",
+						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
 					]
 				},
 				{
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
@@ -1248,7 +1251,6 @@
 					"name": "config",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs"
@@ -1299,7 +1301,6 @@
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/commands/configuration/tests/read.rs",
@@ -1521,7 +1522,6 @@
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/collections/mod.rs",
 						"cmd/devcontainer/src/commands/collections/templates.rs",
 						"cmd/devcontainer/src/commands/collections/tests/features.rs",
@@ -1673,7 +1673,6 @@
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/commands/collections/mod.rs",
 						"cmd/devcontainer/src/commands/collections/templates.rs",
 						"cmd/devcontainer/src/commands/collections/tests/features.rs",
@@ -1783,7 +1782,6 @@
 					"name": "config",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1866,6 +1864,7 @@
 					"name": "mount-git-worktree-common-dir",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/runtime/compose/tests.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1927,7 +1926,6 @@
 					"name": "workspace-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs",
 						"cmd/devcontainer/src/runtime/container/discovery.rs",
 						"cmd/devcontainer/src/runtime/context/inspection.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"

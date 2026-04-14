@@ -144,9 +144,9 @@ fn unsupported_visible_command_option_fails_with_native_message() {
 #[test]
 fn unsupported_hidden_command_option_fails_with_native_message() {
     let output = devcontainer_command(None)
-        .args(["build", "--omit-syntax-directive"])
+        .args(["up", "--omit-syntax-directive"])
         .output()
-        .expect("build command should run");
+        .expect("up command should run");
 
     assert!(!output.status.success(), "{output:?}");
     let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
@@ -155,7 +155,7 @@ fn unsupported_hidden_command_option_fails_with_native_message() {
         stderr.contains("not yet implemented in the native Rust CLI"),
         "{stderr}"
     );
-    assert!(stderr.contains("devcontainer build"), "{stderr}");
+    assert!(stderr.contains("devcontainer up"), "{stderr}");
 }
 
 #[test]

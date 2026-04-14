@@ -5,11 +5,6 @@ Unsupported CLI args for the current pinned upstream command surface.
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 
-## `build`
-
-- `--omit-syntax-directive` [hidden upstream option]: No upstream help description available.
-- `--skip-persisting-customizations-from-features` [hidden upstream option]: No upstream help description available.
-
 ## `outdated`
 
 - `--log-level`: Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: "info", "debug", "trace"] [default: "info"]

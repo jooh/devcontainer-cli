@@ -211,6 +211,31 @@ const COMMAND_SOURCE_PATHS = {
 	],
 };
 
+const OPTION_EVIDENCE_OVERRIDES = {
+	'build': {
+		'omit-syntax-directive': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/build.rs',
+		],
+		'skip-persisting-customizations-from-features': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/mod.rs',
+		],
+	},
+};
+
+const OPTION_EVIDENCE_EXCLUSIONS = {
+	'up': {
+		'dotfiles-target-path': ['cmd/devcontainer/src/cli.rs'],
+	},
+	'set-up': {
+		'dotfiles-target-path': ['cmd/devcontainer/src/cli.rs'],
+	},
+	'run-user-commands': {
+		'dotfiles-target-path': ['cmd/devcontainer/src/cli.rs'],
+	},
+};
+
 function readFile(relativePath) {
 	return fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
 }
@@ -236,8 +261,13 @@ function commandSourceFiles(commandPath) {
 
 function optionEvidence(commandPath, optionName) {
 	const needle = `--${optionName}`;
-	return commandSourceFiles(commandPath)
+	const overrideEvidence = OPTION_EVIDENCE_OVERRIDES[commandPath]?.[optionName] || [];
+	const excludedEvidence = OPTION_EVIDENCE_EXCLUSIONS[commandPath]?.[optionName] || [];
+	return [...new Set([...commandSourceFiles(commandPath), ...overrideEvidence])]
 		.filter(relativePath => readFile(relativePath).includes(needle))
+		.concat(overrideEvidence)
+		.filter(relativePath => !excludedEvidence.includes(relativePath))
+		.filter((relativePath, index, allPaths) => allPaths.indexOf(relativePath) === index)
 		.sort();
 }
 
