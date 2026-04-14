@@ -38,7 +38,7 @@ pub fn run(raw_args: Vec<String>) -> ExitCode {
         return ExitCode::SUCCESS;
     }
 
-    if matches!(raw_args[0].as_str(), "--version" | "-V" | "version") {
+    if cli::is_command_version_request(&raw_args) {
         println!("{VERSION}");
         return ExitCode::SUCCESS;
     }
@@ -54,7 +54,7 @@ pub fn run(raw_args: Vec<String>) -> ExitCode {
         return ExitCode::from(2);
     }
 
-    if matches!(raw_args[offset].as_str(), "--version" | "-V" | "version") {
+    if cli::is_command_version_request(&raw_args[offset..]) {
         println!("{VERSION}");
         return ExitCode::SUCCESS;
     }
@@ -66,9 +66,22 @@ pub fn run(raw_args: Vec<String>) -> ExitCode {
     }
 
     let command_args = &raw_args[offset + 1..];
-    if cli::is_command_help_request(command_args) {
-        cli::print_command_help(command);
+    let resolved_help = cli::resolve_command_help(command, command_args).expect("known command");
+    let resolved_args = &command_args[resolved_help.consumed_args..];
+
+    if cli::is_command_help_request(resolved_args) {
+        cli::print_command_help(resolved_help.path);
         return ExitCode::SUCCESS;
+    }
+
+    if cli::is_command_version_request(resolved_args) {
+        println!("{VERSION}");
+        return ExitCode::SUCCESS;
+    }
+
+    if let Some(error) = cli::unsupported_argument_error(resolved_help.path, resolved_args) {
+        eprintln!("{error}");
+        return ExitCode::from(2);
     }
 
     match commands::dispatch(command, command_args) {

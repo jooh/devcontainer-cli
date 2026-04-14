@@ -43,7 +43,8 @@ fn top_level_help_lists_supported_commands() {
     assert!(stdout.contains("read-configuration"));
     assert!(stdout.contains("templates"));
     assert!(stdout.contains("Create and run dev container"));
-    assert!(stdout.contains("docs/cli/command-reference.md"));
+    assert!(stdout.contains("devcontainer <command>"));
+    assert!(!stdout.contains("docs/cli/command-reference.md"));
 }
 
 #[test]

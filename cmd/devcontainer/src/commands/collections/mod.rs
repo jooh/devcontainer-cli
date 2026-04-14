@@ -13,12 +13,8 @@ use serde_json::Value;
 use crate::commands::common;
 
 pub(crate) fn run_features(args: &[String]) -> ExitCode {
-    let subcommand = args.first().map(String::as_str).unwrap_or("list");
+    let subcommand = args.first().map(String::as_str).unwrap_or("");
     let result = match subcommand {
-        "list" | "ls" => {
-            print_collection_list("features");
-            return ExitCode::SUCCESS;
-        }
         "resolve-dependencies" => features::build_features_resolve_dependencies_payload(&args[1..]),
         "info" => {
             if args.len() < 3 {
@@ -95,6 +91,7 @@ pub(crate) fn run_features(args: &[String]) -> ExitCode {
                 })
             }
         }
+        "" => Err("features requires a subcommand".to_string()),
         _ => Err(format!("Unsupported features subcommand: {subcommand}")),
     };
 
@@ -106,12 +103,8 @@ fn render_collection_info_text(payload: &Value) -> String {
 }
 
 pub(crate) fn run_templates(args: &[String]) -> ExitCode {
-    let subcommand = args.first().map(String::as_str).unwrap_or("list");
+    let subcommand = args.first().map(String::as_str).unwrap_or("");
     let result = match subcommand {
-        "list" | "ls" => {
-            print_collection_list("templates");
-            return ExitCode::SUCCESS;
-        }
         "apply" => templates::run_template_apply(&args[1..]),
         "metadata" => {
             if args.len() < 2 {
@@ -159,6 +152,7 @@ pub(crate) fn run_templates(args: &[String]) -> ExitCode {
                 })
             }
         }
+        "" => Err("templates requires a subcommand".to_string()),
         _ => Err(format!("Unsupported templates subcommand: {subcommand}")),
     };
 
@@ -176,15 +170,6 @@ fn print_result(result: Result<Value, String>) -> ExitCode {
             ExitCode::from(1)
         }
     }
-}
-
-fn print_collection_list(command: &str) {
-    let payload = match command {
-        "features" => "{\"features\":[]}",
-        "templates" => "{\"templates\":[]}",
-        _ => "{}",
-    };
-    println!("{payload}");
 }
 
 #[cfg(test)]

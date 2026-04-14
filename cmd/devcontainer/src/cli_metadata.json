@@ -1,0 +1,4464 @@
+{
+	"upstreamCommit": "39685cf1aa58b5b11e90085bd32562fad61f4103",
+	"sourcePath": "upstream/src/spec-node/devContainersSpecCLI.ts",
+	"root": {
+		"lines": [
+			{
+				"text": "devcontainer <command>",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "Commands:",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer up                   Create and run dev container",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer set-up               Set up an existing container as a dev container",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer build [path]         Build a dev container image",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer run-user-commands    Run user commands",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer read-configuration   Read configuration",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer outdated             Show current and available versions",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer upgrade              Upgrade lockfile",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer features             Features commands",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer templates            Templates commands",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  devcontainer exec <cmd> [args..]  Execute a command on a running dev container",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "Options:",
+				"optionNames": [],
+				"positionalNames": []
+			},
+			{
+				"text": "  --help     Show help  [boolean]",
+				"optionNames": [
+					"help"
+				],
+				"positionalNames": []
+			},
+			{
+				"text": "  --version  Show version number  [boolean]",
+				"optionNames": [
+					"version"
+				],
+				"positionalNames": []
+			}
+		],
+		"options": [
+			{
+				"name": "help",
+				"aliases": [],
+				"description": "Show help  [boolean]",
+				"visible": true
+			},
+			{
+				"name": "version",
+				"aliases": [],
+				"description": "Show version number  [boolean]",
+				"visible": true
+			}
+		],
+		"subcommands": [
+			"up",
+			"set-up",
+			"build",
+			"run-user-commands",
+			"read-configuration",
+			"outdated",
+			"upgrade",
+			"features",
+			"templates",
+			"exec"
+		]
+	},
+	"commands": [
+		{
+			"path": "up",
+			"group": null,
+			"tokenPath": [
+				"up"
+			],
+			"description": "Create and run dev container",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer up",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Create and run dev container",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help                            Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version                         Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-path                     Docker CLI path.  [string]",
+					"optionNames": [
+						"docker-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-compose-path             Docker Compose CLI path.  [string]",
+					"optionNames": [
+						"docker-compose-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-data-folder           Container data folder where user data inside the container will be stored.  [string]",
+					"optionNames": [
+						"container-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-system-data-folder    Container system data folder where system data inside the container will be stored.  [string]",
+					"optionNames": [
+						"container-system-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-folder                Workspace folder path. The devcontainer.json will be looked up relative to this path. If --id-label, --override-config, and --workspace-folder are not provided, this defaults to the current directory.  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-mount-consistency     Workspace mount consistency.  [choices: \"consistent\", \"cached\", \"delegated\"] [default: \"cached\"]",
+					"optionNames": [
+						"workspace-mount-consistency"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --gpu-availability                Availability of GPUs in case the dev container requires any. `all` expects a GPU to be available.  [choices: \"all\", \"detect\", \"none\"] [default: \"detect\"]",
+					"optionNames": [
+						"gpu-availability"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount-workspace-git-root        Mount the workspace using its Git root.  [boolean] [default: true]",
+					"optionNames": [
+						"mount-workspace-git-root"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount-git-worktree-common-dir   Mount the Git worktree common dir for Git operations to work in the container. This requires the worktree to be created with relative paths (`git worktree add --relative-paths`).  [boolean] [default: false]",
+					"optionNames": [
+						"mount-git-worktree-common-dir"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --id-label                        Id label(s) of the format name=value. These will be set on the container and used to query for an existing container. If no --id-label is given, one will be inferred from the --workspace-folder path.  [string]",
+					"optionNames": [
+						"id-label"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --config                          devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"optionNames": [
+						"config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --override-config                 devcontainer.json path to override any devcontainer.json in the workspace folder (or built-in configuration). This is required when there is no devcontainer.json otherwise.  [string]",
+					"optionNames": [
+						"override-config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level                       Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-format                      Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"log-format"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-columns                Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-columns"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-rows                   Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-rows"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --default-user-env-probe          Default value for the devcontainer.json's \"userEnvProbe\".  [choices: \"none\", \"loginInteractiveShell\", \"interactiveShell\", \"loginShell\"] [default: \"loginInteractiveShell\"]",
+					"optionNames": [
+						"default-user-env-probe"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --update-remote-user-uid-default  Default for updating the remote user's UID and GID to the local user's one.  [choices: \"never\", \"on\", \"off\"] [default: \"on\"]",
+					"optionNames": [
+						"update-remote-user-uid-default"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --remove-existing-container       Removes the dev container if it already exists.  [boolean] [default: false]",
+					"optionNames": [
+						"remove-existing-container"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --build-no-cache                  Builds the image with `--no-cache` if the container does not exist.  [boolean] [default: false]",
+					"optionNames": [
+						"build-no-cache"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --expect-existing-container       Fail if the container does not exist.  [boolean] [default: false]",
+					"optionNames": [
+						"expect-existing-container"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --skip-post-create                Do not run onCreateCommand, updateContentCommand, postCreateCommand, postStartCommand or postAttachCommand and do not install dotfiles.  [boolean] [default: false]",
+					"optionNames": [
+						"skip-post-create"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --skip-non-blocking-commands      Stop running user commands after running the command configured with waitFor or the updateContentCommand by default.  [boolean] [default: false]",
+					"optionNames": [
+						"skip-non-blocking-commands"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --prebuild                        Stop after onCreateCommand and updateContentCommand, rerunning updateContentCommand if it has run before.  [boolean] [default: false]",
+					"optionNames": [
+						"prebuild"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --user-data-folder                Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"optionNames": [
+						"user-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount                           Additional mount point(s). Format: type=<bind|volume>,source=<source>,target=<target>[,external=<true|false>]  [string]",
+					"optionNames": [
+						"mount"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --remote-env                      Remote environment variables of the format name=value. These will be added when executing the user commands.  [string]",
+					"optionNames": [
+						"remote-env"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --cache-from                      Additional image to use as potential layer cache during image building  [string]",
+					"optionNames": [
+						"cache-from"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --cache-to                        Additional image to use as potential layer cache during image building  [string]",
+					"optionNames": [
+						"cache-to"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --buildkit                        Control whether BuildKit should be used  [choices: \"auto\", \"never\"] [default: \"auto\"]",
+					"optionNames": [
+						"buildkit"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --additional-features             Additional features to apply to the dev container (JSON as per \"features\" section in devcontainer.json)  [string]",
+					"optionNames": [
+						"additional-features"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --skip-post-attach                Do not run postAttachCommand.  [boolean] [default: false]",
+					"optionNames": [
+						"skip-post-attach"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-repository             URL of a dotfiles Git repository (e.g., https://github.com/owner/repository.git)  [string]",
+					"optionNames": [
+						"dotfiles-repository"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-install-command        The command to run after cloning the dotfiles repository. Defaults to run the first file of `install.sh`, `install`, `bootstrap.sh`, `bootstrap`, `setup.sh` and `setup` found in the dotfiles repository`s root folder.  [string]",
+					"optionNames": [
+						"dotfiles-install-command"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-target-path            The path to clone the dotfiles repository to. Defaults to `~/dotfiles`.  [string] [default: \"~/dotfiles\"]",
+					"optionNames": [
+						"dotfiles-target-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-session-data-folder   Folder to cache CLI data, for example userEnvProbe results  [string]",
+					"optionNames": [
+						"container-session-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --secrets-file                    Path to a json file containing secret environment variables as key-value pairs.  [string]",
+					"optionNames": [
+						"secrets-file"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --include-configuration           Include configuration in result.  [boolean] [default: false]",
+					"optionNames": [
+						"include-configuration"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --include-merged-configuration    Include merged configuration in result.  [boolean] [default: false]",
+					"optionNames": [
+						"include-merged-configuration"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "additional-features",
+					"aliases": [],
+					"description": "Additional features to apply to the dev container (JSON as per \"features\" section in devcontainer.json)  [string]",
+					"visible": true
+				},
+				{
+					"name": "build-no-cache",
+					"aliases": [],
+					"description": "Builds the image with `--no-cache` if the container does not exist.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "buildkit",
+					"aliases": [],
+					"description": "Control whether BuildKit should be used  [choices: \"auto\", \"never\"] [default: \"auto\"]",
+					"visible": true
+				},
+				{
+					"name": "cache-from",
+					"aliases": [],
+					"description": "Additional image to use as potential layer cache during image building  [string]",
+					"visible": true
+				},
+				{
+					"name": "cache-to",
+					"aliases": [],
+					"description": "Additional image to use as potential layer cache during image building  [string]",
+					"visible": true
+				},
+				{
+					"name": "config",
+					"aliases": [],
+					"description": "devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-data-folder",
+					"aliases": [],
+					"description": "Container data folder where user data inside the container will be stored.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-session-data-folder",
+					"aliases": [],
+					"description": "Folder to cache CLI data, for example userEnvProbe results  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-system-data-folder",
+					"aliases": [],
+					"description": "Container system data folder where system data inside the container will be stored.  [string]",
+					"visible": true
+				},
+				{
+					"name": "default-user-env-probe",
+					"aliases": [],
+					"description": "Default value for the devcontainer.json's \"userEnvProbe\".  [choices: \"none\", \"loginInteractiveShell\", \"interactiveShell\", \"loginShell\"] [default: \"loginInteractiveShell\"]",
+					"visible": true
+				},
+				{
+					"name": "docker-compose-path",
+					"aliases": [],
+					"description": "Docker Compose CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "docker-path",
+					"aliases": [],
+					"description": "Docker CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-install-command",
+					"aliases": [],
+					"description": "The command to run after cloning the dotfiles repository. Defaults to run the first file of `install.sh`, `install`, `bootstrap.sh`, `bootstrap`, `setup.sh` and `setup` found in the dotfiles repository`s root folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-repository",
+					"aliases": [],
+					"description": "URL of a dotfiles Git repository (e.g., https://github.com/owner/repository.git)  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-target-path",
+					"aliases": [],
+					"description": "The path to clone the dotfiles repository to. Defaults to `~/dotfiles`.  [string] [default: \"~/dotfiles\"]",
+					"visible": true
+				},
+				{
+					"name": "expect-existing-container",
+					"aliases": [],
+					"description": "Fail if the container does not exist.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "experimental-frozen-lockfile",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "experimental-lockfile",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "gpu-availability",
+					"aliases": [],
+					"description": "Availability of GPUs in case the dev container requires any. `all` expects a GPU to be available.  [choices: \"all\", \"detect\", \"none\"] [default: \"detect\"]",
+					"visible": true
+				},
+				{
+					"name": "id-label",
+					"aliases": [],
+					"description": "Id label(s) of the format name=value. These will be set on the container and used to query for an existing container. If no --id-label is given, one will be inferred from the --workspace-folder path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "include-configuration",
+					"aliases": [],
+					"description": "Include configuration in result.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "include-merged-configuration",
+					"aliases": [],
+					"description": "Include merged configuration in result.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "log-format",
+					"aliases": [],
+					"description": "Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "mount",
+					"aliases": [],
+					"description": "Additional mount point(s). Format: type=<bind|volume>,source=<source>,target=<target>[,external=<true|false>]  [string]",
+					"visible": true
+				},
+				{
+					"name": "mount-git-worktree-common-dir",
+					"aliases": [],
+					"description": "Mount the Git worktree common dir for Git operations to work in the container. This requires the worktree to be created with relative paths (`git worktree add --relative-paths`).  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "mount-workspace-git-root",
+					"aliases": [],
+					"description": "Mount the workspace using its Git root.  [boolean] [default: true]",
+					"visible": true
+				},
+				{
+					"name": "omit-config-remote-env-from-metadata",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "omit-syntax-directive",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "override-config",
+					"aliases": [],
+					"description": "devcontainer.json path to override any devcontainer.json in the workspace folder (or built-in configuration). This is required when there is no devcontainer.json otherwise.  [string]",
+					"visible": true
+				},
+				{
+					"name": "remote-env",
+					"aliases": [],
+					"description": "Remote environment variables of the format name=value. These will be added when executing the user commands.  [string]",
+					"visible": true
+				},
+				{
+					"name": "remove-existing-container",
+					"aliases": [],
+					"description": "Removes the dev container if it already exists.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "secrets-file",
+					"aliases": [],
+					"description": "Path to a json file containing secret environment variables as key-value pairs.  [string]",
+					"visible": true
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "skip-non-blocking-commands",
+					"aliases": [],
+					"description": "Stop running user commands after running the command configured with waitFor or the updateContentCommand by default.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "skip-post-attach",
+					"aliases": [],
+					"description": "Do not run postAttachCommand.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "skip-post-create",
+					"aliases": [],
+					"description": "Do not run onCreateCommand, updateContentCommand, postCreateCommand, postStartCommand or postAttachCommand and do not install dotfiles.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "terminal-columns",
+					"aliases": [],
+					"description": "Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "terminal-rows",
+					"aliases": [],
+					"description": "Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "update-remote-user-uid-default",
+					"aliases": [],
+					"description": "Default for updating the remote user's UID and GID to the local user's one.  [choices: \"never\", \"on\", \"off\"] [default: \"on\"]",
+					"visible": true
+				},
+				{
+					"name": "user-data-folder",
+					"aliases": [],
+					"description": "Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"visible": true
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [],
+					"description": "Workspace folder path. The devcontainer.json will be looked up relative to this path. If --id-label, --override-config, and --workspace-folder are not provided, this defaults to the current directory.  [string]",
+					"visible": true
+				},
+				{
+					"name": "workspace-mount-consistency",
+					"aliases": [],
+					"description": "Workspace mount consistency.  [choices: \"consistent\", \"cached\", \"delegated\"] [default: \"cached\"]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "prebuild",
+					"aliases": [],
+					"description": "Stop after onCreateCommand and updateContentCommand, rerunning updateContentCommand if it has run before.  [boolean] [default: false]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "set-up",
+			"group": null,
+			"tokenPath": [
+				"set-up"
+			],
+			"description": "Set up an existing container as a dev container",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer set-up",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Set up an existing container as a dev container",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help                           Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version                        Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-path                    Docker CLI path.  [string]",
+					"optionNames": [
+						"docker-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-data-folder          Container data folder where user data inside the container will be stored.  [string]",
+					"optionNames": [
+						"container-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-system-data-folder   Container system data folder where system data inside the container will be stored.  [string]",
+					"optionNames": [
+						"container-system-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-id                   Id of the container.  [string] [required]",
+					"optionNames": [
+						"container-id"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --config                         devcontainer.json path.  [string]",
+					"optionNames": [
+						"config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level                      Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-format                     Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"log-format"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-columns               Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-columns"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-rows                  Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-rows"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --default-user-env-probe         Default value for the devcontainer.json's \"userEnvProbe\".  [choices: \"none\", \"loginInteractiveShell\", \"interactiveShell\", \"loginShell\"] [default: \"loginInteractiveShell\"]",
+					"optionNames": [
+						"default-user-env-probe"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --skip-post-create               Do not run onCreateCommand, updateContentCommand, postCreateCommand, postStartCommand or postAttachCommand and do not install dotfiles.  [boolean] [default: false]",
+					"optionNames": [
+						"skip-post-create"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --skip-non-blocking-commands     Stop running user commands after running the command configured with waitFor or the updateContentCommand by default.  [boolean] [default: false]",
+					"optionNames": [
+						"skip-non-blocking-commands"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --user-data-folder               Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"optionNames": [
+						"user-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --remote-env                     Remote environment variables of the format name=value. These will be added when executing the user commands.  [string]",
+					"optionNames": [
+						"remote-env"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-repository            URL of a dotfiles Git repository (e.g., https://github.com/owner/repository.git)  [string]",
+					"optionNames": [
+						"dotfiles-repository"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-install-command       The command to run after cloning the dotfiles repository. Defaults to run the first file of `install.sh`, `install`, `bootstrap.sh`, `bootstrap`, `setup.sh` and `setup` found in the dotfiles repository`s root folder.  [string]",
+					"optionNames": [
+						"dotfiles-install-command"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-target-path           The path to clone the dotfiles repository to. Defaults to `~/dotfiles`.  [string] [default: \"~/dotfiles\"]",
+					"optionNames": [
+						"dotfiles-target-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-session-data-folder  Folder to cache CLI data, for example userEnvProbe results  [string]",
+					"optionNames": [
+						"container-session-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --include-configuration          Include configuration in result.  [boolean] [default: false]",
+					"optionNames": [
+						"include-configuration"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --include-merged-configuration   Include merged configuration in result.  [boolean] [default: false]",
+					"optionNames": [
+						"include-merged-configuration"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "config",
+					"aliases": [],
+					"description": "devcontainer.json path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-data-folder",
+					"aliases": [],
+					"description": "Container data folder where user data inside the container will be stored.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-id",
+					"aliases": [],
+					"description": "Id of the container.  [string] [required]",
+					"visible": true
+				},
+				{
+					"name": "container-session-data-folder",
+					"aliases": [],
+					"description": "Folder to cache CLI data, for example userEnvProbe results  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-system-data-folder",
+					"aliases": [],
+					"description": "Container system data folder where system data inside the container will be stored.  [string]",
+					"visible": true
+				},
+				{
+					"name": "default-user-env-probe",
+					"aliases": [],
+					"description": "Default value for the devcontainer.json's \"userEnvProbe\".  [choices: \"none\", \"loginInteractiveShell\", \"interactiveShell\", \"loginShell\"] [default: \"loginInteractiveShell\"]",
+					"visible": true
+				},
+				{
+					"name": "docker-path",
+					"aliases": [],
+					"description": "Docker CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-install-command",
+					"aliases": [],
+					"description": "The command to run after cloning the dotfiles repository. Defaults to run the first file of `install.sh`, `install`, `bootstrap.sh`, `bootstrap`, `setup.sh` and `setup` found in the dotfiles repository`s root folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-repository",
+					"aliases": [],
+					"description": "URL of a dotfiles Git repository (e.g., https://github.com/owner/repository.git)  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-target-path",
+					"aliases": [],
+					"description": "The path to clone the dotfiles repository to. Defaults to `~/dotfiles`.  [string] [default: \"~/dotfiles\"]",
+					"visible": true
+				},
+				{
+					"name": "include-configuration",
+					"aliases": [],
+					"description": "Include configuration in result.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "include-merged-configuration",
+					"aliases": [],
+					"description": "Include merged configuration in result.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "log-format",
+					"aliases": [],
+					"description": "Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "remote-env",
+					"aliases": [],
+					"description": "Remote environment variables of the format name=value. These will be added when executing the user commands.  [string]",
+					"visible": true
+				},
+				{
+					"name": "skip-non-blocking-commands",
+					"aliases": [],
+					"description": "Stop running user commands after running the command configured with waitFor or the updateContentCommand by default.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "skip-post-create",
+					"aliases": [],
+					"description": "Do not run onCreateCommand, updateContentCommand, postCreateCommand, postStartCommand or postAttachCommand and do not install dotfiles.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "terminal-columns",
+					"aliases": [],
+					"description": "Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "terminal-rows",
+					"aliases": [],
+					"description": "Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "user-data-folder",
+					"aliases": [],
+					"description": "Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "build",
+			"group": null,
+			"tokenPath": [
+				"build"
+			],
+			"description": "Build a dev container image",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer build [path]",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Build a dev container image",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help                 Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version              Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --user-data-folder     Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"optionNames": [
+						"user-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-path          Docker CLI path.  [string]",
+					"optionNames": [
+						"docker-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-compose-path  Docker Compose CLI path.  [string]",
+					"optionNames": [
+						"docker-compose-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-folder     Workspace folder path. The devcontainer.json will be looked up relative to this path. If not provided, defaults to the current directory.  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --config               devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"optionNames": [
+						"config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level            Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-format           Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"log-format"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --no-cache             Builds the image with `--no-cache`.  [boolean] [default: false]",
+					"optionNames": [
+						"no-cache"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --image-name           Image name.  [string]",
+					"optionNames": [
+						"image-name"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --cache-from           Additional image to use as potential layer cache  [string]",
+					"optionNames": [
+						"cache-from"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --cache-to             A destination of buildx cache  [string]",
+					"optionNames": [
+						"cache-to"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --buildkit             Control whether BuildKit should be used  [choices: \"auto\", \"never\"] [default: \"auto\"]",
+					"optionNames": [
+						"buildkit"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --platform             Set target platforms.  [string]",
+					"optionNames": [
+						"platform"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --push                 Push to a container registry.  [boolean] [default: false]",
+					"optionNames": [
+						"push"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --label                Provide key and value configuration that adds metadata to an image  [string]",
+					"optionNames": [
+						"label"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --output               Overrides the default behavior to load built images into the local docker registry. Valid options are the same ones provided to the --output option of docker buildx build.  [string]",
+					"optionNames": [
+						"output"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --additional-features  Additional features to apply to the dev container (JSON as per \"features\" section in devcontainer.json)  [string]",
+					"optionNames": [
+						"additional-features"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "additional-features",
+					"aliases": [],
+					"description": "Additional features to apply to the dev container (JSON as per \"features\" section in devcontainer.json)  [string]",
+					"visible": true
+				},
+				{
+					"name": "buildkit",
+					"aliases": [],
+					"description": "Control whether BuildKit should be used  [choices: \"auto\", \"never\"] [default: \"auto\"]",
+					"visible": true
+				},
+				{
+					"name": "cache-from",
+					"aliases": [],
+					"description": "Additional image to use as potential layer cache  [string]",
+					"visible": true
+				},
+				{
+					"name": "cache-to",
+					"aliases": [],
+					"description": "A destination of buildx cache  [string]",
+					"visible": true
+				},
+				{
+					"name": "config",
+					"aliases": [],
+					"description": "devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "docker-compose-path",
+					"aliases": [],
+					"description": "Docker Compose CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "docker-path",
+					"aliases": [],
+					"description": "Docker CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "experimental-frozen-lockfile",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "experimental-lockfile",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "image-name",
+					"aliases": [],
+					"description": "Image name.  [string]",
+					"visible": true
+				},
+				{
+					"name": "label",
+					"aliases": [],
+					"description": "Provide key and value configuration that adds metadata to an image  [string]",
+					"visible": true
+				},
+				{
+					"name": "log-format",
+					"aliases": [],
+					"description": "Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "no-cache",
+					"aliases": [],
+					"description": "Builds the image with `--no-cache`.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "omit-syntax-directive",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "output",
+					"aliases": [],
+					"description": "Overrides the default behavior to load built images into the local docker registry. Valid options are the same ones provided to the --output option of docker buildx build.  [string]",
+					"visible": true
+				},
+				{
+					"name": "platform",
+					"aliases": [],
+					"description": "Set target platforms.  [string]",
+					"visible": true
+				},
+				{
+					"name": "push",
+					"aliases": [],
+					"description": "Push to a container registry.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "skip-persisting-customizations-from-features",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "user-data-folder",
+					"aliases": [],
+					"description": "Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"visible": true
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [],
+					"description": "Workspace folder path. The devcontainer.json will be looked up relative to this path. If not provided, defaults to the current directory.  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "run-user-commands",
+			"group": null,
+			"tokenPath": [
+				"run-user-commands"
+			],
+			"description": "Run user commands",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer run-user-commands",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Run user commands",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help                           Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version                        Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --user-data-folder               Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"optionNames": [
+						"user-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-path                    Docker CLI path.  [string]",
+					"optionNames": [
+						"docker-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-compose-path            Docker Compose CLI path.  [string]",
+					"optionNames": [
+						"docker-compose-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-data-folder          Container data folder where user data inside the container will be stored.  [string]",
+					"optionNames": [
+						"container-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-system-data-folder   Container system data folder where system data inside the container will be stored.  [string]",
+					"optionNames": [
+						"container-system-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-folder               Workspace folder path.The devcontainer.json will be looked up relative to this path. If --container-id, --id-label, and --workspace-folder are not provided, this defaults to the current directory.  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount-workspace-git-root       Mount the workspace using its Git root.  [boolean] [default: true]",
+					"optionNames": [
+						"mount-workspace-git-root"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount-git-worktree-common-dir  Mount the Git worktree common dir for Git operations to work in the container. This requires the worktree to be created with relative paths (`git worktree add --relative-paths`).  [boolean] [default: false]",
+					"optionNames": [
+						"mount-git-worktree-common-dir"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-id                   Id of the container to run the user commands for.  [string]",
+					"optionNames": [
+						"container-id"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --id-label                       Id label(s) of the format name=value. If no --container-id is given the id labels will be used to look up the container. If no --id-label is given, one will be inferred from the --workspace-folder path.  [string]",
+					"optionNames": [
+						"id-label"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --config                         devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"optionNames": [
+						"config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --override-config                devcontainer.json path to override any devcontainer.json in the workspace folder (or built-in configuration). This is required when there is no devcontainer.json otherwise.  [string]",
+					"optionNames": [
+						"override-config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level                      Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-format                     Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"log-format"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-columns               Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-columns"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-rows                  Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-rows"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --default-user-env-probe         Default value for the devcontainer.json's \"userEnvProbe\".  [choices: \"none\", \"loginInteractiveShell\", \"interactiveShell\", \"loginShell\"] [default: \"loginInteractiveShell\"]",
+					"optionNames": [
+						"default-user-env-probe"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --skip-non-blocking-commands     Stop running user commands after running the command configured with waitFor or the updateContentCommand by default.  [boolean] [default: false]",
+					"optionNames": [
+						"skip-non-blocking-commands"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --prebuild                       Stop after onCreateCommand and updateContentCommand, rerunning updateContentCommand if it has run before.  [boolean] [default: false]",
+					"optionNames": [
+						"prebuild"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --stop-for-personalization       Stop for personalization.  [boolean] [default: false]",
+					"optionNames": [
+						"stop-for-personalization"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --remote-env                     Remote environment variables of the format name=value. These will be added when executing the user commands.  [string]",
+					"optionNames": [
+						"remote-env"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --skip-post-attach               Do not run postAttachCommand.  [boolean] [default: false]",
+					"optionNames": [
+						"skip-post-attach"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-repository            URL of a dotfiles Git repository (e.g., https://github.com/owner/repository.git)  [string]",
+					"optionNames": [
+						"dotfiles-repository"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-install-command       The command to run after cloning the dotfiles repository. Defaults to run the first file of `install.sh`, `install`, `bootstrap.sh`, `bootstrap`, `setup.sh` and `setup` found in the dotfiles repository`s root folder.  [string]",
+					"optionNames": [
+						"dotfiles-install-command"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dotfiles-target-path           The path to clone the dotfiles repository to. Defaults to `~/dotfiles`.  [string] [default: \"~/dotfiles\"]",
+					"optionNames": [
+						"dotfiles-target-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-session-data-folder  Folder to cache CLI data, for example userEnvProbe results  [string]",
+					"optionNames": [
+						"container-session-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --secrets-file                   Path to a json file containing secret environment variables as key-value pairs.  [string]",
+					"optionNames": [
+						"secrets-file"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "config",
+					"aliases": [],
+					"description": "devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-data-folder",
+					"aliases": [],
+					"description": "Container data folder where user data inside the container will be stored.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-id",
+					"aliases": [],
+					"description": "Id of the container to run the user commands for.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-session-data-folder",
+					"aliases": [],
+					"description": "Folder to cache CLI data, for example userEnvProbe results  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-system-data-folder",
+					"aliases": [],
+					"description": "Container system data folder where system data inside the container will be stored.  [string]",
+					"visible": true
+				},
+				{
+					"name": "default-user-env-probe",
+					"aliases": [],
+					"description": "Default value for the devcontainer.json's \"userEnvProbe\".  [choices: \"none\", \"loginInteractiveShell\", \"interactiveShell\", \"loginShell\"] [default: \"loginInteractiveShell\"]",
+					"visible": true
+				},
+				{
+					"name": "docker-compose-path",
+					"aliases": [],
+					"description": "Docker Compose CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "docker-path",
+					"aliases": [],
+					"description": "Docker CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-install-command",
+					"aliases": [],
+					"description": "The command to run after cloning the dotfiles repository. Defaults to run the first file of `install.sh`, `install`, `bootstrap.sh`, `bootstrap`, `setup.sh` and `setup` found in the dotfiles repository`s root folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-repository",
+					"aliases": [],
+					"description": "URL of a dotfiles Git repository (e.g., https://github.com/owner/repository.git)  [string]",
+					"visible": true
+				},
+				{
+					"name": "dotfiles-target-path",
+					"aliases": [],
+					"description": "The path to clone the dotfiles repository to. Defaults to `~/dotfiles`.  [string] [default: \"~/dotfiles\"]",
+					"visible": true
+				},
+				{
+					"name": "id-label",
+					"aliases": [],
+					"description": "Id label(s) of the format name=value. If no --container-id is given the id labels will be used to look up the container. If no --id-label is given, one will be inferred from the --workspace-folder path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "log-format",
+					"aliases": [],
+					"description": "Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "mount-git-worktree-common-dir",
+					"aliases": [],
+					"description": "Mount the Git worktree common dir for Git operations to work in the container. This requires the worktree to be created with relative paths (`git worktree add --relative-paths`).  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "mount-workspace-git-root",
+					"aliases": [],
+					"description": "Mount the workspace using its Git root.  [boolean] [default: true]",
+					"visible": true
+				},
+				{
+					"name": "override-config",
+					"aliases": [],
+					"description": "devcontainer.json path to override any devcontainer.json in the workspace folder (or built-in configuration). This is required when there is no devcontainer.json otherwise.  [string]",
+					"visible": true
+				},
+				{
+					"name": "remote-env",
+					"aliases": [],
+					"description": "Remote environment variables of the format name=value. These will be added when executing the user commands.  [string]",
+					"visible": true
+				},
+				{
+					"name": "secrets-file",
+					"aliases": [],
+					"description": "Path to a json file containing secret environment variables as key-value pairs.  [string]",
+					"visible": true
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "skip-non-blocking-commands",
+					"aliases": [],
+					"description": "Stop running user commands after running the command configured with waitFor or the updateContentCommand by default.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "skip-post-attach",
+					"aliases": [],
+					"description": "Do not run postAttachCommand.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "stop-for-personalization",
+					"aliases": [],
+					"description": "Stop for personalization.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "terminal-columns",
+					"aliases": [],
+					"description": "Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "terminal-rows",
+					"aliases": [],
+					"description": "Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "user-data-folder",
+					"aliases": [],
+					"description": "Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"visible": true
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [],
+					"description": "Workspace folder path.The devcontainer.json will be looked up relative to this path. If --container-id, --id-label, and --workspace-folder are not provided, this defaults to the current directory.  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "prebuild",
+					"aliases": [],
+					"description": "Stop after onCreateCommand and updateContentCommand, rerunning updateContentCommand if it has run before.  [boolean] [default: false]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "read-configuration",
+			"group": null,
+			"tokenPath": [
+				"read-configuration"
+			],
+			"description": "Read configuration",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer read-configuration",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Read configuration",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help                            Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version                         Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --user-data-folder                Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"optionNames": [
+						"user-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-path                     Docker CLI path.  [string]",
+					"optionNames": [
+						"docker-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-compose-path             Docker Compose CLI path.  [string]",
+					"optionNames": [
+						"docker-compose-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-folder                Workspace folder path. The devcontainer.json will be looked up relative to this path. If --container-id, --id-label, and --workspace-folder are not provided, this defaults to the current directory.  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount-workspace-git-root        Mount the workspace using its Git root.  [boolean] [default: true]",
+					"optionNames": [
+						"mount-workspace-git-root"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount-git-worktree-common-dir   Mount the Git worktree common dir for Git operations to work in the container. This requires the worktree to be created with relative paths (`git worktree add --relative-paths`).  [boolean] [default: false]",
+					"optionNames": [
+						"mount-git-worktree-common-dir"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-id                    Id of the container to run the user commands for.  [string]",
+					"optionNames": [
+						"container-id"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --id-label                        Id label(s) of the format name=value. If no --container-id is given the id labels will be used to look up the container. If no --id-label is given, one will be inferred from the --workspace-folder path.  [string]",
+					"optionNames": [
+						"id-label"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --config                          devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"optionNames": [
+						"config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --override-config                 devcontainer.json path to override any devcontainer.json in the workspace folder (or built-in configuration). This is required when there is no devcontainer.json otherwise.  [string]",
+					"optionNames": [
+						"override-config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level                       Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-format                      Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"log-format"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-columns                Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-columns"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-rows                   Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-rows"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --include-features-configuration  Include features configuration.  [boolean] [default: false]",
+					"optionNames": [
+						"include-features-configuration"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --include-merged-configuration    Include merged configuration.  [boolean] [default: false]",
+					"optionNames": [
+						"include-merged-configuration"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --additional-features             Additional features to apply to the dev container (JSON as per \"features\" section in devcontainer.json)  [string]",
+					"optionNames": [
+						"additional-features"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "additional-features",
+					"aliases": [],
+					"description": "Additional features to apply to the dev container (JSON as per \"features\" section in devcontainer.json)  [string]",
+					"visible": true
+				},
+				{
+					"name": "config",
+					"aliases": [],
+					"description": "devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-id",
+					"aliases": [],
+					"description": "Id of the container to run the user commands for.  [string]",
+					"visible": true
+				},
+				{
+					"name": "docker-compose-path",
+					"aliases": [],
+					"description": "Docker Compose CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "docker-path",
+					"aliases": [],
+					"description": "Docker CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "id-label",
+					"aliases": [],
+					"description": "Id label(s) of the format name=value. If no --container-id is given the id labels will be used to look up the container. If no --id-label is given, one will be inferred from the --workspace-folder path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "include-features-configuration",
+					"aliases": [],
+					"description": "Include features configuration.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "include-merged-configuration",
+					"aliases": [],
+					"description": "Include merged configuration.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "log-format",
+					"aliases": [],
+					"description": "Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "mount-git-worktree-common-dir",
+					"aliases": [],
+					"description": "Mount the Git worktree common dir for Git operations to work in the container. This requires the worktree to be created with relative paths (`git worktree add --relative-paths`).  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "mount-workspace-git-root",
+					"aliases": [],
+					"description": "Mount the workspace using its Git root.  [boolean] [default: true]",
+					"visible": true
+				},
+				{
+					"name": "override-config",
+					"aliases": [],
+					"description": "devcontainer.json path to override any devcontainer.json in the workspace folder (or built-in configuration). This is required when there is no devcontainer.json otherwise.  [string]",
+					"visible": true
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "terminal-columns",
+					"aliases": [],
+					"description": "Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "terminal-rows",
+					"aliases": [],
+					"description": "Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "user-data-folder",
+					"aliases": [],
+					"description": "Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"visible": true
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [],
+					"description": "Workspace folder path. The devcontainer.json will be looked up relative to this path. If --container-id, --id-label, and --workspace-folder are not provided, this defaults to the current directory.  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "outdated",
+			"group": null,
+			"tokenPath": [
+				"outdated"
+			],
+			"description": "Show current and available versions",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer outdated",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Show current and available versions",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help              Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version           Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --user-data-folder  Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"optionNames": [
+						"user-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-folder  Workspace folder path. The devcontainer.json will be looked up relative to this path. If --workspace-folder is not provided, defaults to the current directory.  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --config            devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"optionNames": [
+						"config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --output-format     Output format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"output-format"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level         Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-format        Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"log-format"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-columns  Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-columns"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-rows     Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-rows"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "config",
+					"aliases": [],
+					"description": "devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "log-format",
+					"aliases": [],
+					"description": "Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "output-format",
+					"aliases": [],
+					"description": "Output format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "terminal-columns",
+					"aliases": [],
+					"description": "Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "terminal-rows",
+					"aliases": [],
+					"description": "Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "user-data-folder",
+					"aliases": [],
+					"description": "Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"visible": true
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [],
+					"description": "Workspace folder path. The devcontainer.json will be looked up relative to this path. If --workspace-folder is not provided, defaults to the current directory.  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [
+				"log-level",
+				"terminal-columns",
+				"terminal-rows"
+			],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "upgrade",
+			"group": null,
+			"tokenPath": [
+				"upgrade"
+			],
+			"description": "Upgrade lockfile",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer upgrade",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Upgrade lockfile",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help                 Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version              Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-folder     Workspace folder. If --workspace-folder is not provided defaults to the current directory.  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-path          Path to docker executable.  [string] [default: \"docker\"]",
+					"optionNames": [
+						"docker-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-compose-path  Path to docker-compose executable.  [string] [default: \"docker-compose\"]",
+					"optionNames": [
+						"docker-compose-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --config               devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"optionNames": [
+						"config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level            Log level.  [choices: \"error\", \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --dry-run              Write generated lockfile to standard out instead of to disk.  [boolean]",
+					"optionNames": [
+						"dry-run"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "config",
+					"aliases": [],
+					"description": "devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "docker-compose-path",
+					"aliases": [],
+					"description": "Path to docker-compose executable.  [string] [default: \"docker-compose\"]",
+					"visible": true
+				},
+				{
+					"name": "docker-path",
+					"aliases": [],
+					"description": "Path to docker executable.  [string] [default: \"docker\"]",
+					"visible": true
+				},
+				{
+					"name": "dry-run",
+					"aliases": [],
+					"description": "Write generated lockfile to standard out instead of to disk.  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "feature",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"error\", \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "target-version",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [],
+					"description": "Workspace folder. If --workspace-folder is not provided defaults to the current directory.  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [
+				"log-level"
+			],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "features",
+			"group": null,
+			"tokenPath": [
+				"features"
+			],
+			"description": "Features commands",
+			"subcommands": [
+				"generate-docs",
+				"info",
+				"package",
+				"publish",
+				"resolve-dependencies",
+				"test"
+			],
+			"lines": [
+				{
+					"text": "devcontainer features",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Features commands",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Commands:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer features test [target]          Test Features",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer features package <target>       Package Features",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer features publish <target>       Package and publish Features",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer features info <mode> <feature>  Fetch metadata for a published Feature",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer features resolve-dependencies   Read and resolve dependency graph from a configuration",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer features generate-docs          Generate documentation",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help     Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version  Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "features test",
+			"group": "features",
+			"tokenPath": [
+				"features",
+				"test"
+			],
+			"description": "Test Features",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer features test [target]",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Test Features",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Positionals:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  target  Path to folder containing 'src' and 'test' sub-folders.  [deprecated: Use --project-folder instead] [string] [default: \".\"]",
+					"optionNames": [],
+					"positionalNames": [
+						"target"
+					]
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "      --help                      Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --version                   Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -p, --project-folder            Path to folder containing 'src' and 'test' sub-folders. This is likely the git root of the project.  [string] [default: \".\"]",
+					"optionNames": [
+						"project-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -f, --features                  Feature(s) to test as space-separated parameters. Omit to run all tests.  Cannot be combined with '--global-scenarios-only'.  [array]",
+					"optionNames": [
+						"features"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --filter                    Filter current tests to only run scenarios containing this string.  Cannot be combined with '--skip-scenarios'.  [string]",
+					"optionNames": [
+						"filter"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --global-scenarios-only     Run only scenario tests under 'tests/_global' .  Cannot be combined with '-f'.  [boolean] [default: false]",
+					"optionNames": [
+						"global-scenarios-only"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --skip-scenarios            Skip all 'scenario' style tests.  Cannot be combined with '--global--scenarios-only'.  [boolean] [default: false]",
+					"optionNames": [
+						"skip-scenarios"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --skip-autogenerated        Skip all 'autogenerated' style tests (test.sh).  [boolean] [default: false]",
+					"optionNames": [
+						"skip-autogenerated"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --skip-duplicated           Skip all 'duplicate' style tests (duplicate.sh).  [boolean] [default: false]",
+					"optionNames": [
+						"skip-duplicated"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --permit-randomization      Allow an element of randomness in test cases.  [boolean] [default: false]",
+					"optionNames": [
+						"permit-randomization"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -i, --base-image                Base Image. Not used for scenarios.  [string] [default: \"ubuntu:focal\"]",
+					"optionNames": [
+						"base-image"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -u, --remote-user               Remote user.  Not used for scenarios.  [string]",
+					"optionNames": [
+						"remote-user"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --log-level                 Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --preserve-test-containers  Do not remove test containers after running tests.  [boolean] [default: false]",
+					"optionNames": [
+						"preserve-test-containers"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -q, --quiet                     Quiets output  [boolean] [default: false]",
+					"optionNames": [
+						"quiet"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "base-image",
+					"aliases": [
+						"i"
+					],
+					"description": "Base Image. Not used for scenarios.  [string] [default: \"ubuntu:focal\"]",
+					"visible": true
+				},
+				{
+					"name": "features",
+					"aliases": [
+						"f"
+					],
+					"description": "Feature(s) to test as space-separated parameters. Omit to run all tests.  Cannot be combined with '--global-scenarios-only'.  [array]",
+					"visible": true
+				},
+				{
+					"name": "filter",
+					"aliases": [],
+					"description": "Filter current tests to only run scenarios containing this string.  Cannot be combined with '--skip-scenarios'.  [string]",
+					"visible": true
+				},
+				{
+					"name": "global-scenarios-only",
+					"aliases": [],
+					"description": "Run only scenario tests under 'tests/_global' .  Cannot be combined with '-f'.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "permit-randomization",
+					"aliases": [],
+					"description": "Allow an element of randomness in test cases.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "preserve-test-containers",
+					"aliases": [],
+					"description": "Do not remove test containers after running tests.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "project-folder",
+					"aliases": [
+						"p"
+					],
+					"description": "Path to folder containing 'src' and 'test' sub-folders. This is likely the git root of the project.  [string] [default: \".\"]",
+					"visible": true
+				},
+				{
+					"name": "quiet",
+					"aliases": [
+						"q"
+					],
+					"description": "Quiets output  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "remote-user",
+					"aliases": [
+						"u"
+					],
+					"description": "Remote user.  Not used for scenarios.  [string]",
+					"visible": true
+				},
+				{
+					"name": "skip-autogenerated",
+					"aliases": [],
+					"description": "Skip all 'autogenerated' style tests (test.sh).  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "skip-duplicated",
+					"aliases": [],
+					"description": "Skip all 'duplicate' style tests (duplicate.sh).  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "skip-scenarios",
+					"aliases": [],
+					"description": "Skip all 'scenario' style tests.  Cannot be combined with '--global--scenarios-only'.  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [
+				{
+					"name": "target",
+					"description": "Path to folder containing 'src' and 'test' sub-folders.  [deprecated: Use --project-folder instead] [string] [default: \".\"]"
+				}
+			],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "features package",
+			"group": "features",
+			"tokenPath": [
+				"features",
+				"package"
+			],
+			"description": "Package Features",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer features package <target>",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Package Features",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Positionals:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  target",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "           Package features at provided [target] (default is cwd), where [target] is either:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "              1. A path to the src folder of the collection with [1..n] features.",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "              2. A path to a single feature that contains a devcontainer-feature.json.",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "              Additionally, a 'devcontainer-collection.json' will be generated in the output directory.",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  [string] [required] [default: \".\"]",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "      --help                       Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --version                    Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -o, --output-folder              Path to output directory. Will create directories as needed.  [string] [default: \"./output\"]",
+					"optionNames": [
+						"output-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -f, --force-clean-output-folder  Automatically delete previous output directory before packaging  [boolean] [default: false]",
+					"optionNames": [
+						"force-clean-output-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --log-level                  Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "output-folder",
+					"aliases": [
+						"o"
+					],
+					"description": "Path to output directory. Will create directories as needed.  [string] [default: \"./output\"]",
+					"visible": true
+				},
+				{
+					"name": "force-clean-output-folder",
+					"aliases": [
+						"f"
+					],
+					"description": "Automatically delete previous output directory before packaging  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "features publish",
+			"group": "features",
+			"tokenPath": [
+				"features",
+				"publish"
+			],
+			"description": "Package and publish Features",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer features publish <target>",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Package and publish Features",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Positionals:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  target",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "           Package and publish features at provided [target] (default is cwd), where [target] is either:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "              1. A path to the src folder of the collection with [1..n] features.",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "              2. A path to a single feature that contains a devcontainer-feature.json.",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  [string] [required] [default: \".\"]",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "      --help       Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --version    Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -r, --registry   Name of the OCI registry.  [string] [default: \"ghcr.io\"]",
+					"optionNames": [
+						"registry"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -n, --namespace  Unique indentifier for the collection of features. Example: <owner>/<repo>  [string] [required]",
+					"optionNames": [
+						"namespace"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --log-level  Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "registry",
+					"aliases": [
+						"r"
+					],
+					"description": "Name of the OCI registry.  [string] [default: \"ghcr.io\"]",
+					"visible": true
+				},
+				{
+					"name": "namespace",
+					"aliases": [
+						"n"
+					],
+					"description": "Unique indentifier for the collection of features. Example: <owner>/<repo>  [string] [required]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "features info",
+			"group": "features",
+			"tokenPath": [
+				"features",
+				"info"
+			],
+			"description": "Fetch metadata for a published Feature",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer features info <mode> <feature>",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Fetch metadata for a published Feature",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Positionals:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  mode     Data to query. Select 'verbose' to return everything.  [required] [choices: \"manifest\", \"tags\", \"dependencies\", \"verbose\"]",
+					"optionNames": [],
+					"positionalNames": [
+						"mode"
+					]
+				},
+				{
+					"text": "  feature  Feature Identifier  [string] [required]",
+					"optionNames": [],
+					"positionalNames": [
+						"feature"
+					]
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help           Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version        Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level      Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --output-format  Output format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"output-format"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "output-format",
+					"aliases": [],
+					"description": "Output format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [
+				{
+					"name": "mode",
+					"description": "Data to query. Select 'verbose' to return everything.  [required] [choices: \"manifest\", \"tags\", \"dependencies\", \"verbose\"]"
+				},
+				{
+					"name": "feature",
+					"description": "Feature Identifier  [string] [required]"
+				}
+			],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "features resolve-dependencies",
+			"group": "features",
+			"tokenPath": [
+				"features",
+				"resolve-dependencies"
+			],
+			"description": "Read and resolve dependency graph from a configuration",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer features resolve-dependencies",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Read and resolve dependency graph from a configuration",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help              Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version           Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level         Log level.  [choices: \"error\", \"info\", \"debug\", \"trace\"] [default: \"error\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-folder  Workspace folder to use for the configuration. If --workspace-folder is not provided, this defaults to the current directory  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"error\", \"info\", \"debug\", \"trace\"] [default: \"error\"]",
+					"visible": true
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [],
+					"description": "Workspace folder to use for the configuration. If --workspace-folder is not provided, this defaults to the current directory  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "features generate-docs",
+			"group": "features",
+			"tokenPath": [
+				"features",
+				"generate-docs"
+			],
+			"description": "Generate documentation",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer features generate-docs",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Generate documentation",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "      --help            Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --version         Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -p, --project-folder  Path to folder containing 'src' and 'test' sub-folders. This is likely the git root of the project.  [string] [default: \".\"]",
+					"optionNames": [
+						"project-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -r, --registry        Name of the OCI registry.  [string] [default: \"ghcr.io\"]",
+					"optionNames": [
+						"registry"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -n, --namespace       Unique indentifier for the collection of features. Example: <owner>/<repo>  [string] [required]",
+					"optionNames": [
+						"namespace"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --github-owner    GitHub owner for docs.  [string] [default: \"\"]",
+					"optionNames": [
+						"github-owner"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --github-repo     GitHub repo for docs.  [string] [default: \"\"]",
+					"optionNames": [
+						"github-repo"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --log-level       Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "github-owner",
+					"aliases": [],
+					"description": "GitHub owner for docs.  [string] [default: \"\"]",
+					"visible": true
+				},
+				{
+					"name": "github-repo",
+					"aliases": [],
+					"description": "GitHub repo for docs.  [string] [default: \"\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "namespace",
+					"aliases": [
+						"n"
+					],
+					"description": "Unique indentifier for the collection of features. Example: <owner>/<repo>  [string] [required]",
+					"visible": true
+				},
+				{
+					"name": "project-folder",
+					"aliases": [
+						"p"
+					],
+					"description": "Path to folder containing 'src' and 'test' sub-folders. This is likely the git root of the project.  [string] [default: \".\"]",
+					"visible": true
+				},
+				{
+					"name": "registry",
+					"aliases": [
+						"r"
+					],
+					"description": "Name of the OCI registry.  [string] [default: \"ghcr.io\"]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "templates",
+			"group": null,
+			"tokenPath": [
+				"templates"
+			],
+			"description": "Templates commands",
+			"subcommands": [
+				"apply",
+				"generate-docs",
+				"metadata",
+				"publish"
+			],
+			"lines": [
+				{
+					"text": "devcontainer templates",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Templates commands",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Commands:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer templates apply                  Apply a template to the project",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer templates publish <target>       Package and publish templates",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer templates metadata <templateId>  Fetch a published Template's metadata",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  devcontainer templates generate-docs          Generate documentation",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help     Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version  Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "templates apply",
+			"group": "templates",
+			"tokenPath": [
+				"templates",
+				"apply"
+			],
+			"description": "Apply a template to the project",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer templates apply",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Apply a template to the project",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "      --help              Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --version           Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -w, --workspace-folder  Target workspace folder to apply Template. If --workspace-folder is not provided, this defaults to the current directory  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -t, --template-id       Reference to a Template in a supported OCI registry  [string] [required]",
+					"optionNames": [
+						"template-id"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -a, --template-args     Arguments to replace within the provided Template, provided as JSON  [string] [default: \"{}\"]",
+					"optionNames": [
+						"template-args"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -f, --features          Features to add to the provided Template, provided as JSON.  [string] [default: \"[]\"]",
+					"optionNames": [
+						"features"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --log-level         Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --tmp-dir           Directory to use for temporary files. If not provided, the system default will be inferred.  [string]",
+					"optionNames": [
+						"tmp-dir"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --omit-paths        List of paths within the Template to omit applying, provided as JSON.  To ignore a directory append '/*'. Eg: '[\".github/*\", \"dir/a/*\", \"file.ts\"]'  [string] [default: \"[]\"]",
+					"optionNames": [
+						"omit-paths"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "features",
+					"aliases": [
+						"f"
+					],
+					"description": "Features to add to the provided Template, provided as JSON.  [string] [default: \"[]\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "omit-paths",
+					"aliases": [],
+					"description": "List of paths within the Template to omit applying, provided as JSON.  To ignore a directory append '/*'. Eg: '[\".github/*\", \"dir/a/*\", \"file.ts\"]'  [string] [default: \"[]\"]",
+					"visible": true
+				},
+				{
+					"name": "template-args",
+					"aliases": [
+						"a"
+					],
+					"description": "Arguments to replace within the provided Template, provided as JSON  [string] [default: \"{}\"]",
+					"visible": true
+				},
+				{
+					"name": "template-id",
+					"aliases": [
+						"t"
+					],
+					"description": "Reference to a Template in a supported OCI registry  [string] [required]",
+					"visible": true
+				},
+				{
+					"name": "tmp-dir",
+					"aliases": [],
+					"description": "Directory to use for temporary files. If not provided, the system default will be inferred.  [string]",
+					"visible": true
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [
+						"w"
+					],
+					"description": "Target workspace folder to apply Template. If --workspace-folder is not provided, this defaults to the current directory  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "templates publish",
+			"group": "templates",
+			"tokenPath": [
+				"templates",
+				"publish"
+			],
+			"description": "Package and publish templates",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer templates publish <target>",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Package and publish templates",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Positionals:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  target",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "           Package and publish templates at provided [target] (default is cwd), where [target] is either:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "              1. A path to the src folder of the collection with [1..n] templates.",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "              2. A path to a single template that contains a devcontainer-template.json.",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  [string] [required] [default: \".\"]",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "      --help       Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --version    Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -r, --registry   Name of the OCI registry.  [string] [default: \"ghcr.io\"]",
+					"optionNames": [
+						"registry"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -n, --namespace  Unique indentifier for the collection of templates. Example: <owner>/<repo>  [string] [required]",
+					"optionNames": [
+						"namespace"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --log-level  Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "registry",
+					"aliases": [
+						"r"
+					],
+					"description": "Name of the OCI registry.  [string] [default: \"ghcr.io\"]",
+					"visible": true
+				},
+				{
+					"name": "namespace",
+					"aliases": [
+						"n"
+					],
+					"description": "Unique indentifier for the collection of templates. Example: <owner>/<repo>  [string] [required]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "templates metadata",
+			"group": "templates",
+			"tokenPath": [
+				"templates",
+				"metadata"
+			],
+			"description": "Fetch a published Template\\'s metadata",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer templates metadata <templateId>",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Fetch a published Template's metadata",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Positionals:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  templateId  Template Identifier  [string] [required]",
+					"optionNames": [],
+					"positionalNames": [
+						"templateId"
+					]
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help       Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version    Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level  Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [
+				{
+					"name": "templateId",
+					"description": "Template Identifier  [string] [required]"
+				}
+			],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "templates generate-docs",
+			"group": "templates",
+			"tokenPath": [
+				"templates",
+				"generate-docs"
+			],
+			"description": "Generate documentation",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer templates generate-docs",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Generate documentation",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "      --help            Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --version         Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  -p, --project-folder  Path to folder containing 'src' and 'test' sub-folders. This is likely the git root of the project.  [string] [default: \".\"]",
+					"optionNames": [
+						"project-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --github-owner    GitHub owner for docs.  [string] [default: \"\"]",
+					"optionNames": [
+						"github-owner"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --github-repo     GitHub repo for docs.  [string] [default: \"\"]",
+					"optionNames": [
+						"github-repo"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "      --log-level       Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "github-owner",
+					"aliases": [],
+					"description": "GitHub owner for docs.  [string] [default: \"\"]",
+					"visible": true
+				},
+				{
+					"name": "github-repo",
+					"aliases": [],
+					"description": "GitHub repo for docs.  [string] [default: \"\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "project-folder",
+					"aliases": [
+						"p"
+					],
+					"description": "Path to folder containing 'src' and 'test' sub-folders. This is likely the git root of the project.  [string] [default: \".\"]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		},
+		{
+			"path": "exec",
+			"group": null,
+			"tokenPath": [
+				"exec"
+			],
+			"description": "Execute a command on a running dev container",
+			"subcommands": [],
+			"lines": [
+				{
+					"text": "devcontainer exec <cmd> [args..]",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Execute a command on a running dev container",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Positionals:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  cmd   Command to execute.  [string] [required]",
+					"optionNames": [],
+					"positionalNames": [
+						"cmd"
+					]
+				},
+				{
+					"text": "  args  Arguments to the command.  [array] [default: []]",
+					"optionNames": [],
+					"positionalNames": [
+						"args"
+					]
+				},
+				{
+					"text": "",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "Options:",
+					"optionNames": [],
+					"positionalNames": []
+				},
+				{
+					"text": "  --help                           Show help  [boolean]",
+					"optionNames": [
+						"help"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --version                        Show version number  [boolean]",
+					"optionNames": [
+						"version"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --user-data-folder               Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"optionNames": [
+						"user-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-path                    Docker CLI path.  [string]",
+					"optionNames": [
+						"docker-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --docker-compose-path            Docker Compose CLI path.  [string]",
+					"optionNames": [
+						"docker-compose-path"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-data-folder          Container data folder where user data inside the container will be stored.  [string]",
+					"optionNames": [
+						"container-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-system-data-folder   Container system data folder where system data inside the container will be stored.  [string]",
+					"optionNames": [
+						"container-system-data-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --workspace-folder               Workspace folder path. The devcontainer.json will be looked up relative to this path. If --container-id, --id-label, and --workspace-folder are not provided, this defaults to the current directory.  [string]",
+					"optionNames": [
+						"workspace-folder"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount-workspace-git-root       Mount the workspace using its Git root.  [boolean] [default: true]",
+					"optionNames": [
+						"mount-workspace-git-root"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --mount-git-worktree-common-dir  Mount the Git worktree common dir for Git operations to work in the container. This requires the worktree to be created with relative paths (`git worktree add --relative-paths`).  [boolean] [default: false]",
+					"optionNames": [
+						"mount-git-worktree-common-dir"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --container-id                   Id of the container to run the user commands for.  [string]",
+					"optionNames": [
+						"container-id"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --id-label                       Id label(s) of the format name=value. If no --container-id is given the id labels will be used to look up the container. If no --id-label is given, one will be inferred from the --workspace-folder path.  [string]",
+					"optionNames": [
+						"id-label"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --config                         devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"optionNames": [
+						"config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --override-config                devcontainer.json path to override any devcontainer.json in the workspace folder (or built-in configuration). This is required when there is no devcontainer.json otherwise.  [string]",
+					"optionNames": [
+						"override-config"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-level                      Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"optionNames": [
+						"log-level"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --log-format                     Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"optionNames": [
+						"log-format"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-columns               Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-columns"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --terminal-rows                  Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"optionNames": [
+						"terminal-rows"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --default-user-env-probe         Default value for the devcontainer.json's \"userEnvProbe\".  [choices: \"none\", \"loginInteractiveShell\", \"interactiveShell\", \"loginShell\"] [default: \"loginInteractiveShell\"]",
+					"optionNames": [
+						"default-user-env-probe"
+					],
+					"positionalNames": []
+				},
+				{
+					"text": "  --remote-env                     Remote environment variables of the format name=value. These will be added when executing the user commands.  [string]",
+					"optionNames": [
+						"remote-env"
+					],
+					"positionalNames": []
+				}
+			],
+			"options": [
+				{
+					"name": "config",
+					"aliases": [],
+					"description": "devcontainer.json path. The default is to use .devcontainer/devcontainer.json or, if that does not exist, .devcontainer.json in the workspace folder.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-data-folder",
+					"aliases": [],
+					"description": "Container data folder where user data inside the container will be stored.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-id",
+					"aliases": [],
+					"description": "Id of the container to run the user commands for.  [string]",
+					"visible": true
+				},
+				{
+					"name": "container-system-data-folder",
+					"aliases": [],
+					"description": "Container system data folder where system data inside the container will be stored.  [string]",
+					"visible": true
+				},
+				{
+					"name": "default-user-env-probe",
+					"aliases": [],
+					"description": "Default value for the devcontainer.json's \"userEnvProbe\".  [choices: \"none\", \"loginInteractiveShell\", \"interactiveShell\", \"loginShell\"] [default: \"loginInteractiveShell\"]",
+					"visible": true
+				},
+				{
+					"name": "docker-compose-path",
+					"aliases": [],
+					"description": "Docker Compose CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "docker-path",
+					"aliases": [],
+					"description": "Docker CLI path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "id-label",
+					"aliases": [],
+					"description": "Id label(s) of the format name=value. If no --container-id is given the id labels will be used to look up the container. If no --id-label is given, one will be inferred from the --workspace-folder path.  [string]",
+					"visible": true
+				},
+				{
+					"name": "log-format",
+					"aliases": [],
+					"description": "Log format.  [choices: \"text\", \"json\"] [default: \"text\"]",
+					"visible": true
+				},
+				{
+					"name": "log-level",
+					"aliases": [],
+					"description": "Log level for the --terminal-log-file. When set to trace, the log level for --log-file will also be set to trace.  [choices: \"info\", \"debug\", \"trace\"] [default: \"info\"]",
+					"visible": true
+				},
+				{
+					"name": "mount-git-worktree-common-dir",
+					"aliases": [],
+					"description": "Mount the Git worktree common dir for Git operations to work in the container. This requires the worktree to be created with relative paths (`git worktree add --relative-paths`).  [boolean] [default: false]",
+					"visible": true
+				},
+				{
+					"name": "mount-workspace-git-root",
+					"aliases": [],
+					"description": "Mount the workspace using its Git root.  [boolean] [default: true]",
+					"visible": true
+				},
+				{
+					"name": "override-config",
+					"aliases": [],
+					"description": "devcontainer.json path to override any devcontainer.json in the workspace folder (or built-in configuration). This is required when there is no devcontainer.json otherwise.  [string]",
+					"visible": true
+				},
+				{
+					"name": "remote-env",
+					"aliases": [],
+					"description": "Remote environment variables of the format name=value. These will be added when executing the user commands.  [string]",
+					"visible": true
+				},
+				{
+					"name": "skip-feature-auto-mapping",
+					"aliases": [],
+					"description": null,
+					"visible": false
+				},
+				{
+					"name": "terminal-columns",
+					"aliases": [],
+					"description": "Number of columns to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "terminal-rows",
+					"aliases": [],
+					"description": "Number of rows to render the output for. This is required for some of the subprocesses to correctly render their output.  [number]",
+					"visible": true
+				},
+				{
+					"name": "user-data-folder",
+					"aliases": [],
+					"description": "Host path to a directory that is intended to be persisted and share state between sessions.  [string]",
+					"visible": true
+				},
+				{
+					"name": "workspace-folder",
+					"aliases": [],
+					"description": "Workspace folder path. The devcontainer.json will be looked up relative to this path. If --container-id, --id-label, and --workspace-folder are not provided, this defaults to the current directory.  [string]",
+					"visible": true
+				},
+				{
+					"name": "help",
+					"aliases": [],
+					"description": "Show help  [boolean]",
+					"visible": true
+				},
+				{
+					"name": "version",
+					"aliases": [],
+					"description": "Show version number  [boolean]",
+					"visible": true
+				}
+			],
+			"positionals": [
+				{
+					"name": "cmd",
+					"description": "Command to execute.  [string] [required]"
+				},
+				{
+					"name": "args",
+					"description": "Arguments to the command.  [array] [default: []]"
+				}
+			],
+			"unsupportedOptions": [],
+			"unsupportedPositionals": []
+		}
+	]
+}

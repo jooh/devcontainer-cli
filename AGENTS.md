@@ -6,6 +6,7 @@ These instructions apply to the entire repository tree rooted at this directory.
 ## Development approach
 - Start by checking that the local branch is up to date with the remote. If there are incoming changes that materially change the plan, stop and report back
 - Use red/green TDD
+- Use `make tests` for full local verification before committing or pushing; use the individual phony `make <target>` entries for focused TDD reruns, and keep that target list current as the local verification surface changes
 - Commit your changes each time you complete a step in a list.
 - If on `main`, checkout a feature branch before making commits. Keep using the existing branch if not on `main`
 - Push to origin before reporting back at the end of the turn

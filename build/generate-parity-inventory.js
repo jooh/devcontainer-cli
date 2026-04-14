@@ -211,8 +211,136 @@ const COMMAND_SOURCE_PATHS = {
 	],
 };
 
+const OPTION_EVIDENCE_OVERRIDES = {
+	'build': {
+		'buildkit': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/engine.rs',
+		],
+		'omit-syntax-directive': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/build.rs',
+		],
+		'skip-persisting-customizations-from-features': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/mod.rs',
+		],
+	},
+	'up': {
+		'buildkit': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/engine.rs',
+		],
+		'dotfiles-repository': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+		'dotfiles-install-command': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+		'dotfiles-target-path': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+		'gpu-availability': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/container/engine_run.rs',
+		],
+		'omit-config-remote-env-from-metadata': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/compose/override_file.rs',
+			'cmd/devcontainer/src/runtime/container/engine_run.rs',
+			'cmd/devcontainer/src/runtime/metadata.rs',
+		],
+		'omit-syntax-directive': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/build.rs',
+		],
+		'update-remote-user-uid-default': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/container/uid_update.rs',
+		],
+	},
+	'set-up': {
+		'dotfiles-repository': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+		'dotfiles-install-command': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+		'dotfiles-target-path': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+	},
+	'run-user-commands': {
+		'dotfiles-repository': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+		'dotfiles-install-command': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+		'dotfiles-target-path': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/dotfiles.rs',
+		],
+		'stop-for-personalization': [
+			'cmd/devcontainer/src/commands/common/args.rs',
+			'cmd/devcontainer/src/runtime/lifecycle/selection.rs',
+		],
+	},
+};
+
 function readFile(relativePath) {
 	return fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
+}
+
+function isTestOnlyPath(relativePath) {
+	const pathSegments = relativePath.split(path.sep);
+	return path.basename(relativePath) === 'tests.rs' || pathSegments.includes('tests');
+}
+
+function stripCfgTestBlocks(source) {
+	let stripped = '';
+	let cursor = 0;
+
+	while (cursor < source.length) {
+		const markerIndex = source.indexOf('#[cfg(test)]', cursor);
+		if (markerIndex === -1) {
+			return stripped + source.slice(cursor);
+		}
+
+		stripped += source.slice(cursor, markerIndex);
+		const blockStart = source.indexOf('{', markerIndex);
+		if (blockStart === -1) {
+			return stripped;
+		}
+
+		let depth = 1;
+		let blockEnd = blockStart + 1;
+		while (blockEnd < source.length && depth > 0) {
+			if (source[blockEnd] === '{') {
+				depth += 1;
+			} else if (source[blockEnd] === '}') {
+				depth -= 1;
+			}
+			blockEnd += 1;
+		}
+
+		cursor = blockEnd;
+	}
+
+	return stripped;
+}
+
+function readSourceForEvidence(relativePath) {
+	const source = readFile(relativePath);
+	return relativePath.endsWith('.rs') ? stripCfgTestBlocks(source) : source;
 }
 
 function walkFiles(relativePath) {
@@ -231,13 +359,18 @@ function commandSourceFiles(commandPath) {
 	if (!configuredPaths) {
 		throw new Error(`No source-path mapping configured for command path: ${commandPath}`);
 	}
-	return configuredPaths.flatMap(relativePath => walkFiles(relativePath));
+	return configuredPaths
+		.flatMap(relativePath => walkFiles(relativePath))
+		.filter(relativePath => !isTestOnlyPath(relativePath));
 }
 
 function optionEvidence(commandPath, optionName) {
 	const needle = `--${optionName}`;
-	return commandSourceFiles(commandPath)
-		.filter(relativePath => readFile(relativePath).includes(needle))
+	const overrideEvidence = OPTION_EVIDENCE_OVERRIDES[commandPath]?.[optionName] || [];
+	return [...new Set([...commandSourceFiles(commandPath), ...overrideEvidence])]
+		.filter(relativePath => readSourceForEvidence(relativePath).includes(needle))
+		.concat(overrideEvidence)
+		.filter((relativePath, index, allPaths) => allPaths.indexOf(relativePath) === index)
 		.sort();
 }
 
