@@ -222,7 +222,8 @@
 						"cmd/devcontainer/src/commands/configuration/read.rs",
 						"cmd/devcontainer/src/runtime/container/engine_run.rs",
 						"cmd/devcontainer/src/runtime/context/workspace.rs",
-						"cmd/devcontainer/src/runtime/exec.rs"
+						"cmd/devcontainer/src/runtime/exec.rs",
+						"cmd/devcontainer/src/runtime/mounts.rs"
 					]
 				},
 				{
