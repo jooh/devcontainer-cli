@@ -4,7 +4,7 @@ use std::sync::OnceLock;
 
 use serde::Deserialize;
 
-use crate::output::{self, LogFormat};
+use crate::output::{self, CommandLogLevel, LogFormat};
 
 const CLI_METADATA_JSON: &str = include_str!("cli_metadata.json");
 const UNSUPPORTED_MARKER: &str = "  [not yet implemented in native Rust CLI]";
@@ -144,7 +144,10 @@ pub fn emit_log(log_format: &str, message: &str) {
         "json" => LogFormat::Json,
         _ => LogFormat::Text,
     };
-    println!("{}", output::render_log(format, "info", message));
+    println!(
+        "{}",
+        output::render_log(format, CommandLogLevel::Info, message)
+    );
 }
 
 pub fn is_command_help_request(args: &[String]) -> bool {

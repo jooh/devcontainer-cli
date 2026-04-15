@@ -133,11 +133,17 @@ fn outdated_emits_json_logs_when_requested() {
     let logs = stderr_json_logs(&output);
     assert!(!logs.is_empty(), "{logs:?}");
     assert!(
-        logs.iter().any(|entry| entry["level"] == "trace"),
+        logs.iter()
+            .any(|entry| entry["type"] == "text" && entry["level"] == 1),
         "{logs:?}"
     );
     assert!(
-        logs.iter().any(|entry| entry["message"]
+        logs.iter()
+            .all(|entry| entry["timestamp"].as_i64().is_some()),
+        "{logs:?}"
+    );
+    assert!(
+        logs.iter().any(|entry| entry["text"]
             .as_str()
             .is_some_and(|message| message.contains("Generated outdated payload"))),
         "{logs:?}"
