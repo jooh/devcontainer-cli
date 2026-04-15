@@ -1,6 +1,41 @@
 //! CLI smoke tests for help text and unsupported command surfaces.
 
+use serde::Deserialize;
+
 use crate::support::test_support::devcontainer_command;
+
+const UNSUPPORTED_MARKER: &str = "  [not yet implemented in native Rust CLI]";
+const CLI_METADATA_JSON: &str = include_str!("../../src/cli_metadata.json");
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CliMetadata {
+    root: HelpPage,
+    commands: Vec<CommandHelp>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HelpPage {
+    lines: Vec<HelpLine>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct HelpLine {
+    text: String,
+    option_names: Vec<String>,
+    positional_names: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct CommandHelp {
+    path: String,
+    lines: Vec<HelpLine>,
+    unsupported_options: Vec<String>,
+    unsupported_positionals: Vec<String>,
+}
 
 #[test]
 fn top_level_help_matches_public_cli_surface() {
@@ -125,20 +160,65 @@ fn only_top_level_long_version_flag_is_supported() {
 }
 
 #[test]
-fn unsupported_visible_command_option_fails_with_native_message() {
-    let output = devcontainer_command(None)
-        .args(["outdated", "--log-level", "trace"])
-        .output()
-        .expect("outdated command should run");
+fn committed_help_metadata_matches_actual_native_help_output() {
+    let metadata: CliMetadata = serde_json::from_str(CLI_METADATA_JSON).expect("cli metadata");
 
-    assert!(!output.status.success(), "{output:?}");
-    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
-    assert!(stderr.contains("--log-level"), "{stderr}");
-    assert!(
-        stderr.contains("not yet implemented in the native Rust CLI"),
-        "{stderr}"
+    let output = devcontainer_command(None)
+        .arg("--help")
+        .output()
+        .expect("top-level help should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    assert_eq!(
+        stdout.lines().collect::<Vec<_>>(),
+        rendered_lines(&metadata.root.lines, &[], &[])
     );
-    assert!(stderr.contains("devcontainer outdated"), "{stderr}");
+
+    for command in &metadata.commands {
+        let mut args = command
+            .path
+            .split_whitespace()
+            .map(str::to_string)
+            .collect::<Vec<_>>();
+        args.push("--help".to_string());
+
+        let output = devcontainer_command(None)
+            .args(&args)
+            .output()
+            .unwrap_or_else(|error| panic!("help command {:?} should run: {error}", args));
+
+        assert!(output.status.success(), "{output:?}");
+        let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+        assert_eq!(
+            stdout.lines().collect::<Vec<_>>(),
+            rendered_lines(
+                &command.lines,
+                &command.unsupported_options,
+                &command.unsupported_positionals,
+            ),
+            "help mismatch for {}",
+            command.path
+        );
+    }
+}
+
+#[test]
+fn outdated_help_no_longer_marks_log_and_terminal_flags_as_unsupported() {
+    let output = devcontainer_command(None)
+        .args(["outdated", "--help"])
+        .output()
+        .expect("outdated help should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
+    for flag in ["--log-level", "--terminal-columns", "--terminal-rows"] {
+        let line = stdout
+            .lines()
+            .find(|line| line.contains(flag))
+            .unwrap_or_else(|| panic!("missing help line for {flag}: {stdout}"));
+        assert!(!line.contains(UNSUPPORTED_MARKER), "{stdout}");
+    }
 }
 
 #[test]
@@ -154,20 +234,42 @@ fn help_omits_hidden_upstream_options() {
 }
 
 #[test]
-fn help_marks_unsupported_options_inline() {
+fn upgrade_help_no_longer_marks_log_level_as_unsupported() {
     let output = devcontainer_command(None)
-        .args(["outdated", "--help"])
+        .args(["upgrade", "--help"])
         .output()
-        .expect("outdated help should run");
+        .expect("upgrade help should run");
 
     assert!(output.status.success(), "{output:?}");
     let stdout = String::from_utf8(output.stdout).expect("utf8 stdout");
-    let marked_line = stdout
+    let line = stdout
         .lines()
         .find(|line| line.contains("--log-level"))
-        .expect("marked unsupported option");
-    assert!(
-        marked_line.contains("[not yet implemented in native Rust CLI]"),
-        "{stdout}"
-    );
+        .expect("log-level help line");
+    assert!(!line.contains(UNSUPPORTED_MARKER), "{stdout}");
+}
+
+fn rendered_lines(
+    lines: &[HelpLine],
+    unsupported_options: &[String],
+    unsupported_positionals: &[String],
+) -> Vec<String> {
+    lines
+        .iter()
+        .map(|line| {
+            if line
+                .option_names
+                .iter()
+                .any(|name| unsupported_options.contains(name))
+                || line
+                    .positional_names
+                    .iter()
+                    .any(|name| unsupported_positionals.contains(name))
+            {
+                format!("{}{}", line.text, UNSUPPORTED_MARKER)
+            } else {
+                line.text.clone()
+            }
+        })
+        .collect()
 }

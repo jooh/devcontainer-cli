@@ -5,8 +5,8 @@
 		"commandPathsTotal": 20,
 		"commandPathsDeclared": 20,
 		"optionsTotal": 200,
-		"optionsReferenced": 196,
-		"optionsMissing": 4
+		"optionsReferenced": 200,
+		"optionsMissing": 0
 	},
 	"commands": [
 		{
@@ -66,6 +66,7 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -103,6 +104,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -112,6 +114,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
@@ -200,13 +203,15 @@
 					"name": "log-format",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs"
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -318,6 +323,7 @@
 					"name": "terminal-columns",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -325,6 +331,7 @@
 					"name": "terminal-rows",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -341,6 +348,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -584,6 +592,7 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -593,6 +602,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -602,6 +612,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
@@ -642,13 +653,15 @@
 					"name": "log-format",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs"
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -713,6 +726,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -981,6 +995,7 @@
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/context.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1001,6 +1016,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
@@ -1010,6 +1026,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/container/uid_update.rs",
 						"cmd/devcontainer/src/runtime/engine.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
@@ -1045,13 +1062,15 @@
 					"name": "log-format",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs"
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
 					"name": "log-level",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1093,6 +1112,7 @@
 					"name": "terminal-columns",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1100,6 +1120,7 @@
 					"name": "terminal-rows",
 					"sourceReferenced": true,
 					"evidence": [
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1108,6 +1129,7 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/features/control.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs",
 						"cmd/devcontainer/src/runtime/exec.rs"
 					]
 				},
@@ -1136,8 +1158,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 8,
-				"referenced": 5,
-				"missing": 3
+				"referenced": 8,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -1145,20 +1167,25 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
-						"cmd/devcontainer/src/commands/configuration/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
 					"name": "log-format",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/cli.rs"
+						"cmd/devcontainer/src/cli.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+					]
 				},
 				{
 					"name": "output-format",
@@ -1169,19 +1196,26 @@
 				},
 				{
 					"name": "terminal-columns",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+					]
 				},
 				{
 					"name": "terminal-rows",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+					]
 				},
 				{
 					"name": "user-data-folder",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/features/control.rs"
+						"cmd/devcontainer/src/commands/configuration/features/control.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
@@ -1205,8 +1239,8 @@
 			"declared": true,
 			"optionSummary": {
 				"total": 8,
-				"referenced": 7,
-				"missing": 1
+				"referenced": 8,
+				"missing": 0
 			},
 			"options": [
 				{
@@ -1214,21 +1248,24 @@
 					"sourceReferenced": true,
 					"evidence": [
 						"cmd/devcontainer/src/commands/configuration/load.rs",
-						"cmd/devcontainer/src/commands/configuration/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
 					"name": "docker-compose-path",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
 					"name": "docker-path",
 					"sourceReferenced": true,
 					"evidence": [
-						"cmd/devcontainer/src/commands/configuration/read.rs"
+						"cmd/devcontainer/src/commands/configuration/read.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
 					]
 				},
 				{
@@ -1247,8 +1284,11 @@
 				},
 				{
 					"name": "log-level",
-					"sourceReferenced": false,
-					"evidence": []
+					"sourceReferenced": true,
+					"evidence": [
+						"cmd/devcontainer/src/commands/common/args.rs",
+						"cmd/devcontainer/src/commands/configuration/upgrade.rs"
+					]
 				},
 				{
 					"name": "target-version",

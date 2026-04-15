@@ -127,6 +127,53 @@ pub(crate) fn validate_option_values(args: &[String], options: &[&str]) -> Resul
     Ok(())
 }
 
+pub(crate) fn validate_choice_option(
+    args: &[String],
+    option: &str,
+    choices: &[&str],
+) -> Result<(), String> {
+    validate_option_values(args, &[option])?;
+
+    for value in parse_option_values(args, option) {
+        if !choices.contains(&value.as_str()) {
+            return Err(format!(
+                "Invalid value for option {option}: {value}. Expected one of: {}",
+                choices.join(", ")
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn validate_number_option(args: &[String], option: &str) -> Result<(), String> {
+    validate_option_values(args, &[option])?;
+
+    for value in parse_option_values(args, option) {
+        if value.parse::<f64>().is_err() {
+            return Err(format!(
+                "Invalid value for option {option}: {value}. Expected a number."
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn validate_paired_options(
+    args: &[String],
+    left: &str,
+    right: &str,
+) -> Result<(), String> {
+    let has_left = has_flag(args, left);
+    let has_right = has_flag(args, right);
+    if has_left != has_right {
+        return Err(format!("Options {left} and {right} must be used together."));
+    }
+
+    Ok(())
+}
+
 pub(crate) fn parse_option_values(args: &[String], option: &str) -> Vec<String> {
     let mut values = Vec::new();
     let mut index = 0;
@@ -211,7 +258,9 @@ mod tests {
 
     use crate::process_runner::ProcessLogLevel;
 
-    use super::runtime_options;
+    use super::{
+        runtime_options, validate_choice_option, validate_number_option, validate_paired_options,
+    };
 
     #[test]
     fn runtime_options_collect_shared_runtime_flags() {
@@ -304,5 +353,43 @@ mod tests {
 
         assert!(!options.skip_feature_auto_mapping);
         assert!(!options.stop_for_personalization);
+    }
+
+    #[test]
+    fn choice_options_reject_unknown_values() {
+        let error = validate_choice_option(
+            &["--log-level".to_string(), "warning".to_string()],
+            "--log-level",
+            &["info", "debug", "trace"],
+        )
+        .expect_err("invalid choice");
+
+        assert!(error.contains("--log-level"));
+        assert!(error.contains("warning"));
+    }
+
+    #[test]
+    fn number_options_require_numeric_values() {
+        let error = validate_number_option(
+            &["--terminal-columns".to_string(), "wide".to_string()],
+            "--terminal-columns",
+        )
+        .expect_err("invalid number");
+
+        assert!(error.contains("--terminal-columns"));
+        assert!(error.contains("wide"));
+    }
+
+    #[test]
+    fn paired_options_require_both_flags() {
+        let error = validate_paired_options(
+            &["--terminal-columns".to_string(), "120".to_string()],
+            "--terminal-columns",
+            "--terminal-rows",
+        )
+        .expect_err("missing paired option");
+
+        assert!(error.contains("--terminal-columns"));
+        assert!(error.contains("--terminal-rows"));
     }
 }

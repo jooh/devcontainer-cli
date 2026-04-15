@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::process::Output;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -10,18 +11,33 @@ use crate::support::test_support::{
     copy_recursive, devcontainer_command, repo_root, unique_temp_dir,
 };
 
-#[test]
-fn outdated_supports_upstream_json_output_fixture() {
-    let root = repo_root();
-    let fixture = root
+fn copied_lockfile_fixture(name: &str) -> std::path::PathBuf {
+    let fixture = repo_root()
         .join("upstream")
         .join("src")
         .join("test")
         .join("container-features")
         .join("configs")
-        .join("lockfile-outdated-command");
+        .join(name);
     let workspace = unique_temp_dir("devcontainer-cli-smoke");
     copy_recursive(&fixture, &workspace);
+    workspace
+}
+
+fn utf8_stderr(output: &Output) -> String {
+    String::from_utf8(output.stderr.clone()).expect("utf8 stderr")
+}
+
+fn stderr_json_logs(output: &Output) -> Vec<Value> {
+    utf8_stderr(output)
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("json log line"))
+        .collect()
+}
+
+#[test]
+fn outdated_supports_upstream_json_output_fixture() {
+    let workspace = copied_lockfile_fixture("lockfile-outdated-command");
 
     let output = devcontainer_command(None)
         .args([
@@ -62,16 +78,7 @@ fn outdated_supports_upstream_json_output_fixture() {
 
 #[test]
 fn outdated_supports_text_output_fixture() {
-    let root = repo_root();
-    let fixture = root
-        .join("upstream")
-        .join("src")
-        .join("test")
-        .join("container-features")
-        .join("configs")
-        .join("lockfile-outdated-command");
-    let workspace = unique_temp_dir("devcontainer-cli-smoke");
-    copy_recursive(&fixture, &workspace);
+    let workspace = copied_lockfile_fixture("lockfile-outdated-command");
 
     let output = devcontainer_command(None)
         .args([
@@ -98,17 +105,168 @@ fn outdated_supports_text_output_fixture() {
 }
 
 #[test]
+fn outdated_emits_json_logs_when_requested() {
+    let workspace = copied_lockfile_fixture("lockfile-outdated-command");
+
+    let output = devcontainer_command(None)
+        .args([
+            "outdated",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--output-format",
+            "json",
+            "--log-format",
+            "json",
+            "--log-level",
+            "trace",
+        ])
+        .output()
+        .expect("outdated should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("json payload");
+    assert_eq!(
+        payload["features"]["ghcr.io/devcontainers/features/git:1.0"]["latest"],
+        "1.2.0"
+    );
+
+    let logs = stderr_json_logs(&output);
+    assert!(!logs.is_empty(), "{logs:?}");
+    assert!(
+        logs.iter()
+            .any(|entry| entry["type"] == "text" && entry["level"] == 1),
+        "{logs:?}"
+    );
+    assert!(
+        logs.iter()
+            .all(|entry| entry["timestamp"].as_i64().is_some()),
+        "{logs:?}"
+    );
+    assert!(
+        logs.iter().any(|entry| entry["text"]
+            .as_str()
+            .is_some_and(|message| message.contains("Generated outdated payload"))),
+        "{logs:?}"
+    );
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn outdated_trace_logs_include_terminal_dimensions() {
+    let workspace = copied_lockfile_fixture("lockfile-outdated-command");
+
+    let output = devcontainer_command(None)
+        .args([
+            "outdated",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--output-format",
+            "json",
+            "--log-level",
+            "trace",
+            "--terminal-columns",
+            "120",
+            "--terminal-rows",
+            "40",
+        ])
+        .output()
+        .expect("outdated should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("json payload");
+    assert_eq!(
+        payload["features"]["ghcr.io/devcontainers/features/git:1.0"]["latest"],
+        "1.2.0"
+    );
+    let stderr = utf8_stderr(&output);
+    assert!(stderr.contains("terminal dimensions"), "{stderr}");
+    assert!(stderr.contains("120"), "{stderr}");
+    assert!(stderr.contains("40"), "{stderr}");
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn outdated_rejects_unpaired_terminal_dimensions() {
+    let workspace = copied_lockfile_fixture("lockfile-outdated-command");
+
+    let output = devcontainer_command(None)
+        .args([
+            "outdated",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--output-format",
+            "json",
+            "--terminal-columns",
+            "120",
+        ])
+        .output()
+        .expect("outdated should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = utf8_stderr(&output);
+    assert!(stderr.contains("--terminal-columns"), "{stderr}");
+    assert!(stderr.contains("--terminal-rows"), "{stderr}");
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn outdated_rejects_non_numeric_terminal_dimensions() {
+    let workspace = copied_lockfile_fixture("lockfile-outdated-command");
+
+    let output = devcontainer_command(None)
+        .args([
+            "outdated",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--output-format",
+            "json",
+            "--terminal-columns",
+            "wide",
+            "--terminal-rows",
+            "40",
+        ])
+        .output()
+        .expect("outdated should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = utf8_stderr(&output);
+    assert!(stderr.contains("--terminal-columns"), "{stderr}");
+    assert!(stderr.contains("number"), "{stderr}");
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn outdated_rejects_invalid_log_level() {
+    let workspace = copied_lockfile_fixture("lockfile-outdated-command");
+
+    let output = devcontainer_command(None)
+        .args([
+            "outdated",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--output-format",
+            "json",
+            "--log-level",
+            "warning",
+        ])
+        .output()
+        .expect("outdated should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = utf8_stderr(&output);
+    assert!(stderr.contains("--log-level"), "{stderr}");
+    assert!(stderr.contains("warning"), "{stderr}");
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn upgrade_matches_upstream_lockfile_fixture() {
-    let root = repo_root();
-    let fixture = root
-        .join("upstream")
-        .join("src")
-        .join("test")
-        .join("container-features")
-        .join("configs")
-        .join("lockfile-upgrade-command");
-    let workspace = unique_temp_dir("devcontainer-cli-smoke");
-    copy_recursive(&fixture, &workspace);
+    let workspace = copied_lockfile_fixture("lockfile-upgrade-command");
     fs::copy(
         workspace.join("outdated.devcontainer-lock.json"),
         workspace.join(".devcontainer-lock.json"),
@@ -135,17 +293,70 @@ fn upgrade_matches_upstream_lockfile_fixture() {
 }
 
 #[test]
+fn upgrade_trace_logs_cover_dry_run_milestones() {
+    let workspace = copied_lockfile_fixture("lockfile-upgrade-command");
+
+    let output = devcontainer_command(None)
+        .args([
+            "upgrade",
+            "--dry-run",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--log-level",
+            "trace",
+        ])
+        .output()
+        .expect("upgrade should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("dry-run lockfile");
+    let expected: Value = serde_json::from_str(
+        &fs::read_to_string(workspace.join("upgraded.devcontainer-lock.json"))
+            .expect("expected lockfile"),
+    )
+    .expect("expected lockfile json");
+    assert_eq!(payload, expected);
+    let stderr = utf8_stderr(&output);
+    assert!(
+        stderr.contains("Loading dev container configuration"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("Generating lockfile"), "{stderr}");
+    assert!(
+        stderr.contains("Dry-run lockfile generation complete"),
+        "{stderr}"
+    );
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn upgrade_rejects_invalid_log_level() {
+    let workspace = copied_lockfile_fixture("lockfile-upgrade-command");
+
+    let output = devcontainer_command(None)
+        .args([
+            "upgrade",
+            "--dry-run",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--log-level",
+            "warning",
+        ])
+        .output()
+        .expect("upgrade should run");
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = utf8_stderr(&output);
+    assert!(stderr.contains("--log-level"), "{stderr}");
+    assert!(stderr.contains("warning"), "{stderr}");
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
 fn upgrade_with_feature_updates_config_and_dry_run_lockfile() {
-    let root = repo_root();
-    let fixture = root
-        .join("upstream")
-        .join("src")
-        .join("test")
-        .join("container-features")
-        .join("configs")
-        .join("lockfile-upgrade-feature");
-    let workspace = unique_temp_dir("devcontainer-cli-smoke");
-    copy_recursive(&fixture, &workspace);
+    let workspace = copied_lockfile_fixture("lockfile-upgrade-feature");
     fs::copy(
         workspace.join("input.devcontainer.json"),
         workspace.join(".devcontainer.json"),
@@ -182,16 +393,7 @@ fn upgrade_with_feature_updates_config_and_dry_run_lockfile() {
 
 #[test]
 fn upgrade_supports_upstream_dependson_lockfile_fixture() {
-    let root = repo_root();
-    let fixture = root
-        .join("upstream")
-        .join("src")
-        .join("test")
-        .join("container-features")
-        .join("configs")
-        .join("lockfile-dependson");
-    let workspace = unique_temp_dir("devcontainer-cli-smoke");
-    copy_recursive(&fixture, &workspace);
+    let workspace = copied_lockfile_fixture("lockfile-dependson");
 
     let output = devcontainer_command(None)
         .args([

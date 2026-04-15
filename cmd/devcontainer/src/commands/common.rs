@@ -8,7 +8,8 @@ mod manifest;
 pub(crate) use args::{
     has_flag, parse_bool_option, parse_json_string_array_option, parse_option_value,
     parse_option_values, remote_env_overrides, runtime_options, runtime_process_request,
-    secrets_env,
+    secrets_env, validate_choice_option, validate_number_option, validate_option_values,
+    validate_paired_options,
 };
 pub(crate) use config_resolution::{
     load_resolved_config, resolve_override_config_path, resolve_read_configuration_path,

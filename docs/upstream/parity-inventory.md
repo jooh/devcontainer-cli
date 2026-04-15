@@ -5,7 +5,7 @@ Generated from the pinned upstream CLI command matrix and static source evidence
 - Upstream commit: `39685cf1aa58b5b11e90085bd32562fad61f4103`
 - Source: `upstream/src/spec-node/devContainersSpecCLI.ts`
 - Declared upstream command paths present natively: `20/20`
-- Upstream options with a native source reference in mapped files: `196/200`
+- Upstream options with a native source reference in mapped files: `200/200`
 
 This report is a static inventory, not a semantic parity proof. A referenced option can still be only partially implemented, and command-level known gaps are called out explicitly below.
 
@@ -18,8 +18,8 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 | `build` | yes | 22/22 | 0 | 2 |
 | `run-user-commands` | yes | 27/27 | 0 | 1 |
 | `read-configuration` | yes | 18/18 | 0 | 2 |
-| `outdated` | yes | 5/8 | 3 | 1 |
-| `upgrade` | yes | 7/8 | 1 | 1 |
+| `outdated` | yes | 8/8 | 0 | 1 |
+| `upgrade` | yes | 8/8 | 0 | 1 |
 | `features` | yes | 0/0 | 0 | 1 |
 | `features test` | yes | 13/13 | 0 | 1 |
 | `features package` | yes | 0/0 | 0 | 1 |
@@ -78,16 +78,16 @@ This report is a static inventory, not a semantic parity proof. A referenced opt
 
 - Description: Show current and available versions
 - Declared natively: yes
-- Option source references: 5/8
-- Missing option references: `log-level`, `terminal-columns`, `terminal-rows`
+- Option source references: 8/8
+- Missing option references: none
 - Known gaps: Backed by fixture/manual catalog data rather than real upstream registry resolution.
 
 ## `upgrade`
 
 - Description: Upgrade lockfile
 - Declared natively: yes
-- Option source references: 7/8
-- Missing option references: `log-level`
+- Option source references: 8/8
+- Missing option references: none
 - Known gaps: Backed by fixture/manual catalog data rather than real upstream registry resolution.
 
 ## `features`
