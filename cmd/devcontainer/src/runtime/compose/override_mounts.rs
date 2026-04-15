@@ -5,6 +5,7 @@ use serde_json::{Map, Number, Value};
 use crate::runtime::context::{
     additional_mounts_for_workspace_target, workspace_mount_for_args, ResolvedConfig,
 };
+use crate::runtime::mounts::cli_mount_values;
 use crate::runtime::mounts::split_mount_options;
 
 pub(super) enum ComposeVolumeEntry {
@@ -35,13 +36,8 @@ pub(super) fn compose_workspace_volume(
 pub(super) fn compose_additional_volumes(
     resolved: &ResolvedConfig,
     args: &[String],
-) -> Vec<ComposeVolumeEntry> {
-    let mut volumes: Vec<ComposeVolumeEntry> = resolved
-        .configuration
-        .get("mounts")
-        .and_then(Value::as_array)
-        .map(|mounts| mounts.iter().filter_map(compose_mount_definition).collect())
-        .unwrap_or_default();
+) -> Result<Vec<ComposeVolumeEntry>, String> {
+    let mut volumes = Vec::new();
     if resolved.configuration.get("workspaceMount").is_none() {
         let remote_workspace_folder =
             crate::runtime::context::remote_workspace_folder_for_args(resolved, args);
@@ -52,7 +48,26 @@ pub(super) fn compose_additional_volumes(
                 .map(ComposeVolumeEntry::Long),
         );
     }
-    volumes
+    volumes.extend(
+        resolved
+            .configuration
+            .get("mounts")
+            .and_then(Value::as_array)
+            .map(|mounts| {
+                mounts
+                    .iter()
+                    .filter_map(compose_mount_definition)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+    );
+    volumes.extend(
+        cli_mount_values(args)?
+            .iter()
+            .filter_map(|mount| compose_mount_definition_from_str(mount))
+            .map(ComposeVolumeEntry::Long),
+    );
+    Ok(volumes)
 }
 
 fn compose_mount_definition(value: &Value) -> Option<ComposeVolumeEntry> {

@@ -69,10 +69,6 @@ pub(super) fn start_container(
         engine_args.push("--label".to_string());
         engine_args.push(label);
     }
-    for mount in common::parse_option_values(args, "--mount") {
-        engine_args.push("--mount".to_string());
-        engine_args.push(mount);
-    }
     if let Some(mounts) = resolved
         .configuration
         .get("mounts")
@@ -82,6 +78,10 @@ pub(super) fn start_container(
             engine_args.push("--mount".to_string());
             engine_args.push(mount);
         }
+    }
+    for mount in crate::runtime::mounts::cli_mount_values(args)? {
+        engine_args.push("--mount".to_string());
+        engine_args.push(mount);
     }
     if let Some(run_args) = resolved
         .configuration

@@ -68,7 +68,7 @@ pub(super) fn compose_metadata_override_file(
     if let Some(volume) = compose_workspace_volume(resolved, args, remote_workspace_folder) {
         volumes.push(volume);
     }
-    volumes.extend(compose_additional_volumes(resolved, args));
+    volumes.extend(compose_additional_volumes(resolved, args)?);
     if !volumes.is_empty() {
         content.push_str("\n    volumes:\n");
         for volume in volumes {

@@ -241,10 +241,11 @@ fn up_rejects_invalid_cli_mount_before_engine_invocation() {
         "{stderr}"
     );
 
-    let invocations = harness.read_invocations();
+    let invocation_log = harness.log_dir.join("invocations.log");
     assert!(
-        !invocations.contains("run "),
-        "unexpected engine run: {invocations}"
+        !invocation_log.exists(),
+        "unexpected engine invocation log: {}",
+        fs::read_to_string(&invocation_log).unwrap_or_default()
     );
 }
 
