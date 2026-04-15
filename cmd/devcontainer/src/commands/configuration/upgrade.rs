@@ -13,9 +13,13 @@ use super::catalog::{
 use super::load::load_config;
 use super::{FeatureReference, Lockfile, LockfileEntry};
 use crate::commands::common;
+use crate::output::{CommandLogLevel, CommandLogger, LogFormat, TerminalDimensions};
 
 pub(super) fn run_outdated(args: &[String]) -> ExitCode {
-    match validate_outdated_options(args).and_then(|()| build_outdated_payload(args)) {
+    let logger = outdated_logger(args);
+    match validate_outdated_options(args)
+        .and_then(|()| build_outdated_payload_with_logger(args, Some(&logger)))
+    {
         Ok(payload) => {
             let output_format = common::parse_option_value(args, "--output-format")
                 .unwrap_or_else(|| "json".to_string());
@@ -27,14 +31,17 @@ pub(super) fn run_outdated(args: &[String]) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("{error}");
+            logger.error(error);
             ExitCode::from(1)
         }
     }
 }
 
 pub(super) fn run_upgrade(args: &[String]) -> ExitCode {
-    match validate_upgrade_command_options(args).and_then(|()| run_upgrade_lockfile(args)) {
+    let logger = upgrade_logger(args);
+    match validate_upgrade_command_options(args)
+        .and_then(|()| run_upgrade_lockfile_with_logger(args, Some(&logger)))
+    {
         Ok(lockfile) => {
             if common::has_flag(args, "--dry-run") {
                 println!(
@@ -54,7 +61,7 @@ pub(super) fn run_upgrade(args: &[String]) -> ExitCode {
             ExitCode::SUCCESS
         }
         Err(error) => {
-            eprintln!("{error}");
+            logger.error(error);
             ExitCode::from(1)
         }
     }
@@ -95,15 +102,47 @@ pub(super) fn ensure_native_lockfile(
     Ok(())
 }
 
+#[cfg(test)]
 pub(super) fn build_outdated_payload(args: &[String]) -> Result<Value, String> {
+    build_outdated_payload_with_logger(args, None)
+}
+
+fn build_outdated_payload_with_logger(
+    args: &[String],
+    logger: Option<&CommandLogger>,
+) -> Result<Value, String> {
+    if let Some(logger) = logger {
+        logger.debug("Loading dev container configuration");
+        logger.trace_terminal_dimensions();
+    }
     let loaded = load_config(args)?;
-    let lockfile = read_lockfile(lockfile_path(&loaded.config_file))?;
+    if let Some(logger) = logger {
+        logger.debug(format!(
+            "Loading dev container configuration from {}",
+            loaded.config_file.display()
+        ));
+    }
+    let lockfile_path = lockfile_path(&loaded.config_file);
+    let lockfile = read_lockfile(lockfile_path.clone())?;
+    if let Some(logger) = logger {
+        if lockfile.is_some() {
+            logger.debug(format!("Loaded lockfile from {}", lockfile_path.display()));
+        } else {
+            logger.debug(format!("No lockfile found at {}", lockfile_path.display()));
+        }
+    }
     let features = loaded
         .configuration
         .get("features")
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_default();
+    if let Some(logger) = logger {
+        logger.trace(format!(
+            "Enumerating {} configured feature definition(s)",
+            features.len()
+        ));
+    }
 
     let mut payload_features = Map::new();
     for feature_id in features.keys() {
@@ -121,38 +160,97 @@ pub(super) fn build_outdated_payload(args: &[String]) -> Result<Value, String> {
         payload_features.insert(feature_id.clone(), feature_info);
     }
 
+    if let Some(logger) = logger {
+        logger.debug(format!(
+            "Generated outdated payload for {} feature(s)",
+            payload_features.len()
+        ));
+    }
     Ok(json!({
         "features": payload_features,
     }))
 }
 
+#[cfg(test)]
 pub(super) fn run_upgrade_lockfile(args: &[String]) -> Result<Lockfile, String> {
+    run_upgrade_lockfile_with_logger(args, None)
+}
+
+fn run_upgrade_lockfile_with_logger(
+    args: &[String],
+    logger: Option<&CommandLogger>,
+) -> Result<Lockfile, String> {
+    if let Some(logger) = logger {
+        logger.debug("Loading dev container configuration");
+    }
     let mut loaded = load_config(args)?;
+    if let Some(logger) = logger {
+        logger.debug(format!(
+            "Loading dev container configuration from {}",
+            loaded.config_file.display()
+        ));
+    }
     if let (Some(feature), Some(target_version)) = (
         common::parse_option_value(args, "--feature"),
         common::parse_option_value(args, "--target-version"),
     ) {
+        if let Some(logger) = logger {
+            logger.info(format!(
+                "Updating '{feature}' to '{target_version}' in devcontainer.json"
+            ));
+        }
         update_feature_version_in_config(
             &loaded.config_file,
             &loaded.raw_text,
             &loaded.configuration,
             &feature,
             &target_version,
+            logger,
         )?;
+        if let Some(logger) = logger {
+            logger.debug("Reloading dev container configuration after feature update");
+        }
         loaded = load_config(args)?;
+        if let Some(logger) = logger {
+            logger.debug(format!(
+                "Loading dev container configuration from {}",
+                loaded.config_file.display()
+            ));
+        }
     }
 
+    let feature_count = loaded
+        .configuration
+        .get("features")
+        .and_then(Value::as_object)
+        .map_or(0, Map::len);
+    if let Some(logger) = logger {
+        logger.debug(format!(
+            "Generating lockfile for {feature_count} feature(s)"
+        ));
+    }
     let generated = generate_lockfile(
         &loaded.configuration,
         Some(loaded.workspace_folder.as_path()),
     )?;
     if !common::has_flag(args, "--dry-run") {
         let lockfile_path = lockfile_path(&loaded.config_file);
+        if let Some(logger) = logger {
+            logger.info(format!("Writing lockfile: '{}'", lockfile_path.display()));
+        }
         fs::write(
             &lockfile_path,
             serde_json::to_string_pretty(&generated).map_err(|error| error.to_string())?,
         )
         .map_err(|error| error.to_string())?;
+        if let Some(logger) = logger {
+            logger.debug(format!(
+                "Lockfile write complete: '{}'",
+                lockfile_path.display()
+            ));
+        }
+    } else if let Some(logger) = logger {
+        logger.debug("Dry-run lockfile generation complete");
     }
 
     Ok(generated)
@@ -324,6 +422,7 @@ fn update_feature_version_in_config(
     configuration: &Value,
     target_feature: &str,
     target_version: &str,
+    logger: Option<&CommandLogger>,
 ) -> Result<(), String> {
     let target_base = feature_id_without_version(target_feature);
     let current_key = configuration
@@ -337,12 +436,29 @@ fn update_feature_version_in_config(
         .cloned();
 
     let Some(current_key) = current_key else {
+        if let Some(logger) = logger {
+            logger.trace(format!(
+                "No changes to config file: {}",
+                config_path.display()
+            ));
+        }
         return Ok(());
     };
 
     let updated = raw_text.replace(&current_key, &format!("{target_base}:{target_version}"));
+    if let Some(logger) = logger {
+        logger.trace(updated.as_str());
+    }
     if updated != raw_text {
+        if let Some(logger) = logger {
+            logger.info(format!("Updating config file: '{}'", config_path.display()));
+        }
         fs::write(config_path, updated).map_err(|error| error.to_string())?;
+    } else if let Some(logger) = logger {
+        logger.trace(format!(
+            "No changes to config file: {}",
+            config_path.display()
+        ));
     }
     Ok(())
 }
@@ -384,6 +500,52 @@ fn render_outdated_text(payload: &Value) -> String {
 
 fn cell(value: Option<&Value>) -> String {
     value.and_then(Value::as_str).unwrap_or("-").to_string()
+}
+
+fn outdated_logger(args: &[String]) -> CommandLogger {
+    CommandLogger::new(
+        parse_requested_log_format(args),
+        parse_outdated_log_level(args),
+    )
+    .with_terminal_dimensions(parse_terminal_dimensions(args))
+}
+
+fn upgrade_logger(args: &[String]) -> CommandLogger {
+    CommandLogger::new(LogFormat::Text, parse_upgrade_log_level(args))
+}
+
+fn parse_requested_log_format(args: &[String]) -> LogFormat {
+    match common::parse_option_value(args, "--log-format").as_deref() {
+        Some("json") => LogFormat::Json,
+        _ => LogFormat::Text,
+    }
+}
+
+fn parse_outdated_log_level(args: &[String]) -> CommandLogLevel {
+    match common::parse_option_value(args, "--log-level").as_deref() {
+        Some("trace") => CommandLogLevel::Trace,
+        Some("debug") => CommandLogLevel::Debug,
+        _ => CommandLogLevel::Info,
+    }
+}
+
+fn parse_upgrade_log_level(args: &[String]) -> CommandLogLevel {
+    match common::parse_option_value(args, "--log-level").as_deref() {
+        Some("error") => CommandLogLevel::Error,
+        Some("trace") => CommandLogLevel::Trace,
+        Some("debug") => CommandLogLevel::Debug,
+        _ => CommandLogLevel::Info,
+    }
+}
+
+fn parse_terminal_dimensions(args: &[String]) -> Option<TerminalDimensions> {
+    let columns = common::parse_option_value(args, "--terminal-columns")?
+        .parse::<usize>()
+        .ok()?;
+    let rows = common::parse_option_value(args, "--terminal-rows")?
+        .parse::<usize>()
+        .ok()?;
+    Some(TerminalDimensions { columns, rows })
 }
 
 pub(super) fn parse_feature_reference(feature_id: &str) -> Option<FeatureReference> {

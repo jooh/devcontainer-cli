@@ -2,6 +2,7 @@
 
 use std::fs;
 use std::path::Path;
+use std::process::Output;
 
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
@@ -21,6 +22,17 @@ fn copied_lockfile_fixture(name: &str) -> std::path::PathBuf {
     let workspace = unique_temp_dir("devcontainer-cli-smoke");
     copy_recursive(&fixture, &workspace);
     workspace
+}
+
+fn utf8_stderr(output: &Output) -> String {
+    String::from_utf8(output.stderr.clone()).expect("utf8 stderr")
+}
+
+fn stderr_json_logs(output: &Output) -> Vec<Value> {
+    utf8_stderr(output)
+        .lines()
+        .map(|line| serde_json::from_str(line).expect("json log line"))
+        .collect()
 }
 
 #[test]
@@ -93,7 +105,49 @@ fn outdated_supports_text_output_fixture() {
 }
 
 #[test]
-fn outdated_accepts_log_level_and_terminal_dimensions() {
+fn outdated_emits_json_logs_when_requested() {
+    let workspace = copied_lockfile_fixture("lockfile-outdated-command");
+
+    let output = devcontainer_command(None)
+        .args([
+            "outdated",
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--output-format",
+            "json",
+            "--log-format",
+            "json",
+            "--log-level",
+            "trace",
+        ])
+        .output()
+        .expect("outdated should run");
+
+    assert!(output.status.success(), "{output:?}");
+    let payload: Value = serde_json::from_slice(&output.stdout).expect("json payload");
+    assert_eq!(
+        payload["features"]["ghcr.io/devcontainers/features/git:1.0"]["latest"],
+        "1.2.0"
+    );
+
+    let logs = stderr_json_logs(&output);
+    assert!(!logs.is_empty(), "{logs:?}");
+    assert!(
+        logs.iter().any(|entry| entry["level"] == "trace"),
+        "{logs:?}"
+    );
+    assert!(
+        logs.iter().any(|entry| entry["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("Generated outdated payload"))),
+        "{logs:?}"
+    );
+
+    let _ = fs::remove_dir_all(workspace);
+}
+
+#[test]
+fn outdated_trace_logs_include_terminal_dimensions() {
     let workspace = copied_lockfile_fixture("lockfile-outdated-command");
 
     let output = devcontainer_command(None)
@@ -119,6 +173,10 @@ fn outdated_accepts_log_level_and_terminal_dimensions() {
         payload["features"]["ghcr.io/devcontainers/features/git:1.0"]["latest"],
         "1.2.0"
     );
+    let stderr = utf8_stderr(&output);
+    assert!(stderr.contains("terminal dimensions"), "{stderr}");
+    assert!(stderr.contains("120"), "{stderr}");
+    assert!(stderr.contains("40"), "{stderr}");
 
     let _ = fs::remove_dir_all(workspace);
 }
@@ -141,7 +199,7 @@ fn outdated_rejects_unpaired_terminal_dimensions() {
         .expect("outdated should run");
 
     assert!(!output.status.success(), "{output:?}");
-    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    let stderr = utf8_stderr(&output);
     assert!(stderr.contains("--terminal-columns"), "{stderr}");
     assert!(stderr.contains("--terminal-rows"), "{stderr}");
 
@@ -168,7 +226,7 @@ fn outdated_rejects_non_numeric_terminal_dimensions() {
         .expect("outdated should run");
 
     assert!(!output.status.success(), "{output:?}");
-    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    let stderr = utf8_stderr(&output);
     assert!(stderr.contains("--terminal-columns"), "{stderr}");
     assert!(stderr.contains("number"), "{stderr}");
 
@@ -193,7 +251,7 @@ fn outdated_rejects_invalid_log_level() {
         .expect("outdated should run");
 
     assert!(!output.status.success(), "{output:?}");
-    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    let stderr = utf8_stderr(&output);
     assert!(stderr.contains("--log-level"), "{stderr}");
     assert!(stderr.contains("warning"), "{stderr}");
 
@@ -229,7 +287,7 @@ fn upgrade_matches_upstream_lockfile_fixture() {
 }
 
 #[test]
-fn upgrade_accepts_log_level_in_dry_run_mode() {
+fn upgrade_trace_logs_cover_dry_run_milestones() {
     let workspace = copied_lockfile_fixture("lockfile-upgrade-command");
 
     let output = devcontainer_command(None)
@@ -252,6 +310,16 @@ fn upgrade_accepts_log_level_in_dry_run_mode() {
     )
     .expect("expected lockfile json");
     assert_eq!(payload, expected);
+    let stderr = utf8_stderr(&output);
+    assert!(
+        stderr.contains("Loading dev container configuration"),
+        "{stderr}"
+    );
+    assert!(stderr.contains("Generating lockfile"), "{stderr}");
+    assert!(
+        stderr.contains("Dry-run lockfile generation complete"),
+        "{stderr}"
+    );
 
     let _ = fs::remove_dir_all(workspace);
 }
@@ -273,7 +341,7 @@ fn upgrade_rejects_invalid_log_level() {
         .expect("upgrade should run");
 
     assert!(!output.status.success(), "{output:?}");
-    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    let stderr = utf8_stderr(&output);
     assert!(stderr.contains("--log-level"), "{stderr}");
     assert!(stderr.contains("warning"), "{stderr}");
 
