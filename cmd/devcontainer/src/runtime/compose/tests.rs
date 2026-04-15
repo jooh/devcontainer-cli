@@ -436,6 +436,62 @@ fn metadata_override_file_preserves_extended_mount_keys() {
 }
 
 #[test]
+fn metadata_override_file_appends_cli_mounts_after_config_mounts() {
+    let root = unique_temp_dir("devcontainer-compose-test");
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "mounts": [{
+                "type": "bind",
+                "source": "/tmp/config-src",
+                "target": "/tmp/config-dst"
+            }]
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(
+        &resolved,
+        &[
+            "--mount".to_string(),
+            "type=bind,source=/tmp/cli-src,target=/tmp/cli-dst,readonly".to_string(),
+            "--mount".to_string(),
+            "type=volume,source=cli-cache,target=/cli-cache".to_string(),
+        ],
+        "/workspaces/project",
+        None,
+    )
+    .expect("override result")
+    .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("source: '/tmp/config-src'"));
+    assert!(override_content.contains("target: '/tmp/config-dst'"));
+    assert!(override_content.contains("source: '/tmp/cli-src'"));
+    assert!(override_content.contains("target: '/tmp/cli-dst'"));
+    assert!(override_content.contains("read_only: true"));
+    assert!(override_content.contains("source: 'cli-cache'"));
+    assert!(override_content.contains("target: '/cli-cache'"));
+
+    let config_position = override_content
+        .find("source: '/tmp/config-src'")
+        .expect("config mount");
+    let cli_position = override_content
+        .find("source: '/tmp/cli-src'")
+        .expect("cli mount");
+    assert!(
+        config_position < cli_position,
+        "expected config mounts before CLI mounts: {override_content}"
+    );
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn metadata_override_file_does_not_promote_remote_user_to_service_user() {
     let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");
