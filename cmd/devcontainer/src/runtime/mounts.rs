@@ -103,6 +103,7 @@ pub(crate) fn validate_cli_mount_values(mounts: &[String]) -> Result<(), String>
 }
 
 pub(crate) fn validate_cli_mount_value(mount: &str) -> Result<(), String> {
+    let mut is_volume_mount = false;
     let mut has_mount_type = false;
     let mut has_source = false;
     let mut has_target = false;
@@ -117,7 +118,10 @@ pub(crate) fn validate_cli_mount_value(mount: &str) -> Result<(), String> {
         };
         let value = value.trim_matches('"');
         match key {
-            "type" if matches!(value, "bind" | "volume") => has_mount_type = true,
+            "type" if matches!(value, "bind" | "volume") => {
+                has_mount_type = true;
+                is_volume_mount = value == "volume";
+            }
             "type" => return Err(invalid_cli_mount_error(mount)),
             "source" | "src" if !value.is_empty() => has_source = true,
             "target" | "destination" | "dst" if !value.is_empty() => has_target = true,
@@ -125,7 +129,9 @@ pub(crate) fn validate_cli_mount_value(mount: &str) -> Result<(), String> {
         }
     }
 
-    if !has_mount_type || !has_source || !has_target {
+    let requires_source = !is_volume_mount;
+
+    if !has_mount_type || !has_target || (requires_source && !has_source) {
         return Err(invalid_cli_mount_error(mount));
     }
 
@@ -143,7 +149,7 @@ fn mount_option_value(value: &Value) -> Option<String> {
 
 fn invalid_cli_mount_error(mount: &str) -> String {
     format!(
-        "Invalid value for option --mount: {mount}. Expected type=<bind|volume>,source=<source>,target=<target>[,...]"
+        "Invalid value for option --mount: {mount}. Expected type=<bind|volume>,target=<target>[,...], with source=<source> required for bind mounts"
     )
 }
 
@@ -202,6 +208,11 @@ mod tests {
             "type=bind,source=/tmp/src,target=/tmp/dst,consistency=delegated,bind.propagation=rshared,readonly",
         )
         .expect("valid mount");
+    }
+
+    #[test]
+    fn validate_cli_mount_value_accepts_anonymous_volume_mounts() {
+        validate_cli_mount_value("type=volume,target=/cache").expect("valid mount");
     }
 
     #[test]

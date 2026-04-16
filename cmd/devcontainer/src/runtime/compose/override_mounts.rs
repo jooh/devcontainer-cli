@@ -175,7 +175,7 @@ fn compose_mount_definition(value: &Value) -> Option<ComposeVolumeEntry> {
                 ) {
                     continue;
                 }
-                fields.insert(key.clone(), value.clone());
+                merge_mount_value(&mut fields, key, value.clone());
             }
             Some(ComposeVolumeEntry::Long(ComposeMountDefinition { fields }))
         }
@@ -321,6 +321,26 @@ fn insert_nested_mount_value(
     }
     let child = entry.as_object_mut().expect("object mount option");
     insert_nested_mount_value(child, &parents[1..], leaf, value);
+}
+
+fn merge_mount_value(fields: &mut Map<String, Value>, key: &str, value: Value) {
+    if let Some(existing) = fields.get_mut(key) {
+        merge_mount_scalar_or_object(existing, value);
+        return;
+    }
+
+    fields.insert(key.to_string(), value);
+}
+
+fn merge_mount_scalar_or_object(existing: &mut Value, incoming: Value) {
+    match (existing, incoming) {
+        (Value::Object(existing), Value::Object(incoming)) => {
+            for (key, value) in incoming {
+                merge_mount_value(existing, &key, value);
+            }
+        }
+        (existing, incoming) => *existing = incoming,
+    }
 }
 
 pub(super) fn compose_environment(configuration: &Value) -> Option<Vec<(String, String)>> {

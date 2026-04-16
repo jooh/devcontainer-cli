@@ -523,6 +523,40 @@ fn metadata_override_file_preserves_extended_mount_keys() {
     assert!(override_content.contains("propagation: 'rshared'"));
     assert!(override_content.contains("volume:"));
     assert!(override_content.contains("nocopy: true"));
+    assert!(override_content.contains("external: true"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_allows_anonymous_cli_volume_mounts() {
+    let root = unique_temp_dir("devcontainer-compose-test");
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app"
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(
+        &resolved,
+        &[
+            "--mount".to_string(),
+            "type=volume,target=/cache".to_string(),
+        ],
+        "/workspaces/project",
+        None,
+    )
+    .expect("override result")
+    .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("type: 'volume'"));
+    assert!(override_content.contains("target: '/cache'"));
 
     let _ = fs::remove_file(override_file);
     let _ = fs::remove_dir_all(root);
