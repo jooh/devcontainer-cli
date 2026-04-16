@@ -41,7 +41,11 @@ pub(crate) fn load_compose_spec(resolved: &ResolvedConfig) -> Result<Option<Comp
         .config_file
         .parent()
         .unwrap_or(resolved.workspace_folder.as_path());
-    let files = service::compose_files(&resolved.configuration, config_root)?;
+    let files = service::compose_files(
+        &resolved.configuration,
+        config_root,
+        &resolved.workspace_folder,
+    )?;
     let service = resolved
         .configuration
         .get("service")
@@ -137,6 +141,7 @@ pub(crate) fn up_service(
     args: &[String],
     remote_workspace_folder: &str,
     image_name: &str,
+    no_recreate: bool,
 ) -> Result<(), String> {
     let spec = load_compose_spec(resolved)?
         .ok_or_else(|| "Compose configuration was expected but not found".to_string())?;
@@ -150,14 +155,28 @@ pub(crate) fn up_service(
             None
         },
     )?;
+    let mut up_args = vec!["-d".to_string()];
+    if no_recreate {
+        up_args.push("--no-recreate".to_string());
+    }
+    if let Some(run_services) = resolved
+        .configuration
+        .get("runServices")
+        .and_then(Value::as_array)
+        .filter(|services| !services.is_empty())
+    {
+        let mut has_primary_service = false;
+        for service in run_services.iter().filter_map(Value::as_str) {
+            has_primary_service |= service == spec.service;
+            up_args.push(service.to_string());
+        }
+        if !has_primary_service {
+            up_args.push(spec.service.clone());
+        }
+    }
     let result = engine::run_compose(
         args,
-        args::compose_args_with_override(
-            &spec,
-            "up",
-            &["-d", &spec.service],
-            override_file.as_ref(),
-        ),
+        args::compose_args_owned(&spec, "up", override_file.as_ref(), up_args),
     )?;
     if let Some(override_file) = override_file {
         let _ = std::fs::remove_file(override_file);

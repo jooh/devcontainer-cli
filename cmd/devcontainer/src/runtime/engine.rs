@@ -39,11 +39,17 @@ pub(crate) fn compose_request(args: &[String], compose_args: Vec<String>) -> Pro
         let request_args = request.args.clone();
         apply_buildkit_env(args, &request_args, &mut request);
         request
-    } else {
+    } else if default_compose_subcommand_available(args) {
         let mut args_with_subcommand = vec!["compose".to_string()];
         args_with_subcommand.extend(compose_args);
         let mut request =
             common::runtime_process_request(args, engine_program(args), args_with_subcommand, None);
+        let request_args = request.args.clone();
+        apply_buildkit_env(args, &request_args, &mut request);
+        request
+    } else {
+        let mut request =
+            common::runtime_process_request(args, "docker-compose".to_string(), compose_args, None);
         let request_args = request.args.clone();
         apply_buildkit_env(args, &request_args, &mut request);
         request
@@ -71,6 +77,22 @@ fn engine_program(args: &[String]) -> String {
     common::parse_option_value(args, "--docker-path").unwrap_or_else(|| "docker".to_string())
 }
 
+fn default_compose_subcommand_available(args: &[String]) -> bool {
+    let request = common::runtime_process_request(
+        args,
+        engine_program(args),
+        vec![
+            "compose".to_string(),
+            "version".to_string(),
+            "--short".to_string(),
+        ],
+        None,
+    );
+    process_runner::run_process(&request)
+        .map(|result| result.status_code == 0)
+        .unwrap_or(false)
+}
+
 fn normalize_process_error(args: &[String], request: &ProcessRequest, error: io::Error) -> String {
     if error.kind() != io::ErrorKind::NotFound {
         return error.to_string();
@@ -80,6 +102,10 @@ fn normalize_process_error(args: &[String], request: &ProcessRequest, error: io:
     if common::parse_option_value(args, "--docker-compose-path")
         .as_deref()
         .is_some_and(|program| program == executable)
+        || Path::new(executable)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .is_some_and(|name| name.eq_ignore_ascii_case("docker-compose"))
     {
         return format!(
             "Container compose executable not found: {executable}. Verify --docker-compose-path or install the requested compose CLI."
@@ -147,7 +173,9 @@ fn is_build_request(request_args: &[String]) -> bool {
 mod tests {
     use crate::process_runner::ProcessLogLevel;
 
-    use super::{compose_request, engine_request, is_build_request};
+    use super::{
+        compose_request, default_compose_subcommand_available, engine_request, is_build_request,
+    };
 
     #[test]
     fn engine_request_applies_terminal_env_and_log_level() {
@@ -213,5 +241,13 @@ mod tests {
             request.env.get("DOCKER_BUILDKIT").map(String::as_str),
             Some("0")
         );
+    }
+
+    #[test]
+    fn default_compose_subcommand_probe_fails_without_engine() {
+        assert!(!default_compose_subcommand_available(&[
+            "--docker-path".to_string(),
+            "/path/that/does/not/exist".to_string(),
+        ]));
     }
 }

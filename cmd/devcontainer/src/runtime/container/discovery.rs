@@ -121,7 +121,7 @@ fn create_compose_container(
     image_name: &str,
     remote_workspace_folder: &str,
 ) -> Result<UpContainer, String> {
-    compose::up_service(resolved, args, remote_workspace_folder, image_name)?;
+    compose::up_service(resolved, args, remote_workspace_folder, image_name, false)?;
     let container_id = compose::resolve_container_id(resolved, args)?
         .ok_or_else(|| "Dev container not found.".to_string())?;
     Ok(UpContainer {
@@ -138,7 +138,7 @@ fn refresh_compose_container(
     previous_container_id: &str,
     unchanged_mode: LifecycleMode,
 ) -> Result<UpContainer, String> {
-    compose::up_service(resolved, args, remote_workspace_folder, image_name)?;
+    compose::up_service(resolved, args, remote_workspace_folder, image_name, true)?;
     let updated_container_id = compose::resolve_container_id(resolved, args)?
         .ok_or_else(|| "Dev container not found.".to_string())?;
     Ok(UpContainer {

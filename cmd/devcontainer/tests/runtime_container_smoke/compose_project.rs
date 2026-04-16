@@ -163,11 +163,22 @@ fn up_uses_default_compose_files_when_docker_compose_file_array_is_empty() {
 
     assert!(output.status.success(), "{output:?}");
     let invocations = harness.read_invocations();
-    assert!(invocations.contains(&format!(
-        " -f {} -f {} up",
-        workspace.join("docker-compose.yml").display(),
-        workspace.join("docker-compose.override.yml").display()
-    )));
+    let compose_file = workspace
+        .join("docker-compose.yml")
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.join("docker-compose.yml"));
+    let override_file = workspace
+        .join("docker-compose.override.yml")
+        .canonicalize()
+        .unwrap_or_else(|_| workspace.join("docker-compose.override.yml"));
+    assert!(
+        invocations.contains(&format!(
+            " -f {} -f {} ",
+            compose_file.display(),
+            override_file.display()
+        )),
+        "{invocations}"
+    );
 }
 
 #[test]

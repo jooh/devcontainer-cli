@@ -1,5 +1,7 @@
 //! Compose service inspection and build metadata helpers.
 
+use std::ffi::OsString;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
@@ -18,10 +20,11 @@ pub(super) struct ServiceDefinition {
 pub(super) fn compose_files(
     configuration: &Value,
     config_root: &Path,
+    workspace_root: &Path,
 ) -> Result<Vec<PathBuf>, String> {
     match configuration.get("dockerComposeFile") {
         Some(Value::String(value)) => Ok(vec![resolve_relative(config_root, value)]),
-        Some(Value::Array(values)) => values
+        Some(Value::Array(values)) if !values.is_empty() => values
             .iter()
             .map(|value| {
                 value
@@ -30,9 +33,56 @@ pub(super) fn compose_files(
                     .ok_or_else(|| "dockerComposeFile entries must be strings".to_string())
             })
             .collect(),
+        Some(Value::Array(_)) => default_compose_files(workspace_root),
         Some(_) => Err("dockerComposeFile must be a string or array of strings".to_string()),
         None => Err("Compose configuration must define dockerComposeFile".to_string()),
     }
+}
+
+fn default_compose_files(workspace_root: &Path) -> Result<Vec<PathBuf>, String> {
+    if let Some(compose_files) =
+        compose_files_from_env(std::env::var_os("COMPOSE_FILE"), workspace_root)
+    {
+        return Ok(compose_files);
+    }
+
+    let env_file = workspace_root.join(".env");
+    if let Ok(raw) = fs::read_to_string(&env_file) {
+        if let Some(value) = raw.lines().find_map(|line| {
+            line.trim()
+                .strip_prefix("COMPOSE_FILE=")
+                .map(str::trim)
+                .filter(|value| !value.is_empty())
+                .map(str::to_string)
+        }) {
+            if let Some(compose_files) =
+                compose_files_from_env(Some(OsString::from(value)), workspace_root)
+            {
+                return Ok(compose_files);
+            }
+        }
+    }
+
+    let mut files = vec![workspace_root.join("docker-compose.yml")];
+    let override_file = workspace_root.join("docker-compose.override.yml");
+    if override_file.is_file() {
+        files.push(override_file);
+    }
+    Ok(files)
+}
+
+fn compose_files_from_env(value: Option<OsString>, workspace_root: &Path) -> Option<Vec<PathBuf>> {
+    let value = value?;
+    let files = std::env::split_paths(&value)
+        .map(|path| {
+            if path.is_absolute() {
+                path
+            } else {
+                workspace_root.join(path)
+            }
+        })
+        .collect::<Vec<_>>();
+    (!files.is_empty()).then_some(files)
 }
 
 pub(super) fn inspect_service_definition(
