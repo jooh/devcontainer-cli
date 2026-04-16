@@ -391,6 +391,38 @@ fn metadata_override_file_wraps_entrypoints_with_a_keepalive_entrypoint() {
 }
 
 #[test]
+fn metadata_override_file_merges_config_entrypoint_into_wrapper_without_duplicates() {
+    let root = unique_temp_dir("devcontainer-compose-test");
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "entrypoint": "echo config-entrypoint"
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspace", None)
+        .expect("override result")
+        .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+    let entrypoint_count = override_content
+        .lines()
+        .filter(|line| line.trim_start().starts_with("entrypoint:"))
+        .count();
+
+    assert_eq!(entrypoint_count, 1, "{override_content}");
+    assert!(override_content.contains("Container started"));
+    assert!(override_content.contains("echo config-entrypoint"));
+    assert!(!override_content.contains("entrypoint: 'echo config-entrypoint'"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn metadata_override_file_declares_named_volumes_top_level() {
     let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");

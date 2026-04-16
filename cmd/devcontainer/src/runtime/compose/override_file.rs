@@ -173,16 +173,6 @@ pub(super) fn compose_metadata_override_file(
             content.push_str(&format!("      - '{}'\n", escape_compose_scalar(option)));
         }
     }
-    if let Some(entrypoint) = resolved
-        .configuration
-        .get("entrypoint")
-        .and_then(Value::as_str)
-    {
-        content.push_str(&format!(
-            "    entrypoint: '{}'\n",
-            escape_compose_scalar(entrypoint)
-        ));
-    }
     if container::should_add_gpu_capability(&resolved.configuration, args)? {
         content.push_str(
             "    deploy:\n      resources:\n        reservations:\n          devices:\n            - capabilities: [gpu]\n",
@@ -208,11 +198,11 @@ fn compose_override_context(
         .config_file
         .parent()
         .unwrap_or(resolved.workspace_folder.as_path());
-    let Ok(compose_files) = service::compose_files(
-        &resolved.configuration,
-        config_root,
-        &resolved.workspace_folder,
-    ) else {
+    let default_compose_root =
+        std::env::current_dir().unwrap_or_else(|_| resolved.workspace_folder.clone());
+    let Ok(compose_files) =
+        service::compose_files(&resolved.configuration, config_root, &default_compose_root)
+    else {
         return (String::new(), None);
     };
     let version_prefix = service::read_version_prefix(&compose_files).unwrap_or_default();

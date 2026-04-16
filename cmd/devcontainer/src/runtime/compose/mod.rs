@@ -41,11 +41,10 @@ pub(crate) fn load_compose_spec(resolved: &ResolvedConfig) -> Result<Option<Comp
         .config_file
         .parent()
         .unwrap_or(resolved.workspace_folder.as_path());
-    let files = service::compose_files(
-        &resolved.configuration,
-        config_root,
-        &resolved.workspace_folder,
-    )?;
+    let default_compose_root =
+        std::env::current_dir().unwrap_or_else(|_| resolved.workspace_folder.clone());
+    let files =
+        service::compose_files(&resolved.configuration, config_root, &default_compose_root)?;
     let service = resolved
         .configuration
         .get("service")

@@ -182,6 +182,49 @@ fn up_uses_default_compose_files_when_docker_compose_file_array_is_empty() {
 }
 
 #[test]
+fn up_resolves_compose_file_env_paths_relative_to_caller_cwd_when_array_is_empty() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    let outside = harness.root.join("outside");
+    let compose_dir = outside.join("relative-compose");
+    fs::create_dir_all(&compose_dir).expect("compose dir");
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        compose_dir.join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": [],\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run_in_dir(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[("COMPOSE_FILE", "relative-compose/docker-compose.yml")],
+        Some(&outside),
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = harness.read_invocations();
+    let compose_file = compose_dir
+        .join("docker-compose.yml")
+        .canonicalize()
+        .unwrap_or_else(|_| compose_dir.join("docker-compose.yml"));
+    assert!(
+        invocations.contains(&format!(" -f {} ", compose_file.display())),
+        "{invocations}"
+    );
+}
+
+#[test]
 fn up_falls_back_to_docker_compose_when_docker_compose_subcommand_is_unavailable() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
