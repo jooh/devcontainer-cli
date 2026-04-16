@@ -39,6 +39,22 @@ ${2:-}"
     shift || true
     case "$SUBCOMMAND" in
       build)
+        compose_file_contents="$LOG_DIR/compose-file-contents.log"
+        : > "$compose_file_contents"
+        if [ -n "$COMPOSE_FILES" ]; then
+          old_ifs="${IFS- }"
+          IFS='
+'
+          for compose_file in $COMPOSE_FILES; do
+            [ -f "$compose_file" ] || continue
+            {
+              printf '%s\n' "BEGIN $compose_file"
+              cat "$compose_file"
+              printf '%s\n' "END $compose_file"
+            } >> "$compose_file_contents"
+          done
+          IFS="$old_ifs"
+        fi
         exit 0
         ;;
       version)

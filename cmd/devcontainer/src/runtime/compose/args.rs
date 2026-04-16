@@ -47,10 +47,19 @@ pub(super) fn compose_args_owned(
 }
 
 pub(super) fn reject_unsupported_build_options(args: &[String]) -> Result<(), String> {
-    for flag in ["--cache-from", "--cache-to", "--platform", "--label"] {
-        if compose_build_option_is_present(args, flag) {
-            return Err(format!("{flag} not supported for compose builds."));
-        }
+    if compose_build_option_is_present(args, "--cache-to") {
+        return Err("--cache-to not supported for compose builds.".to_string());
+    }
+    if compose_build_option_is_present(args, "--platform")
+        || compose_build_option_is_present(args, "--push")
+    {
+        return Err("--platform or --push not supported.".to_string());
+    }
+    if compose_build_option_is_present(args, "--output") {
+        return Err("--output not supported.".to_string());
+    }
+    if compose_build_option_is_present(args, "--label") {
+        return Err("--label not supported for compose builds.".to_string());
     }
     Ok(())
 }

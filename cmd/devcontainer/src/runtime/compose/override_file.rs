@@ -16,6 +16,7 @@ use super::super::context::ResolvedConfig;
 use super::super::metadata::serialized_container_metadata;
 use super::super::paths::unique_temp_path;
 use super::service::{self, ServiceDefinition};
+use super::ComposeSpec;
 use override_mounts::{
     compose_additional_volumes, compose_environment, compose_named_volumes,
     compose_workspace_volume,
@@ -24,6 +25,29 @@ use override_yaml::{
     escape_compose_label, escape_compose_scalar, render_compose_string_sequence,
     render_compose_volume_entry, render_named_volume_entry,
 };
+
+pub(super) fn compose_build_override_file(
+    spec: &ComposeSpec,
+    args: &[String],
+) -> Result<Option<PathBuf>, String> {
+    let cache_from = common::parse_option_values(args, "--cache-from");
+    if cache_from.is_empty() {
+        return Ok(None);
+    }
+
+    let mut content = service::read_version_prefix(&spec.files).unwrap_or_default();
+    content.push_str(&format!(
+        "services:\n  '{}':\n    build:\n      cache_from:\n",
+        spec.service
+    ));
+    for value in cache_from {
+        content.push_str(&format!("        - '{}'\n", escape_compose_scalar(&value)));
+    }
+
+    let override_file = unique_temp_path("devcontainer-compose-build-override", Some("yml"));
+    std::fs::write(&override_file, content).map_err(|error| error.to_string())?;
+    Ok(Some(override_file))
+}
 
 pub(super) fn compose_metadata_override_file(
     resolved: &ResolvedConfig,

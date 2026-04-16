@@ -77,6 +77,7 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
     )?;
 
     if spec.has_build {
+        let build_override_file = override_file::compose_build_override_file(&spec, args)?;
         let mut build_args = vec!["--pull".to_string()];
         if common::has_flag(args, "--no-cache") || common::has_flag(args, "--build-no-cache") {
             build_args.push("--no-cache".to_string());
@@ -84,8 +85,12 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
         build_args.push(spec.service.clone());
         let result = engine::run_compose(
             args,
-            args::compose_args_owned(&spec, "build", None, build_args),
-        )?;
+            args::compose_args_owned(&spec, "build", build_override_file.as_ref(), build_args),
+        );
+        if let Some(build_override_file) = build_override_file {
+            let _ = std::fs::remove_file(build_override_file);
+        }
+        let result = result?;
         if result.status_code != 0 {
             return Err(engine::stderr_or_stdout(&result));
         }
@@ -117,17 +122,6 @@ pub(crate) fn build_service(resolved: &ResolvedConfig, args: &[String]) -> Resul
             &resolved.configuration,
         )?;
         return Ok(built_image);
-    }
-
-    if common::has_flag(args, "--push") {
-        if let Some(image) = &spec.image {
-            let push_result = engine::run_engine(args, vec!["push".to_string(), image.clone()])?;
-            if push_result.status_code != 0 {
-                return Err(engine::stderr_or_stdout(&push_result));
-            }
-        } else {
-            return Err("Compose build push requires the service to declare an image".to_string());
-        }
     }
 
     Ok(spec
