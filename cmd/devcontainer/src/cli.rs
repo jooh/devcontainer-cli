@@ -168,10 +168,7 @@ pub fn resolve_command_help<'a>(
     let mut current = command_help(command)?;
     let mut consumed_args = 0;
 
-    loop {
-        let Some(next_arg) = args.get(consumed_args) else {
-            break;
-        };
+    while let Some(next_arg) = args.get(consumed_args) {
         let Some(child) = child_command(&current.path, next_arg) else {
             break;
         };
