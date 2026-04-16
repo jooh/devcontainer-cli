@@ -89,6 +89,11 @@ impl RuntimeHarness {
         fs::read_to_string(self.log_dir.join("exec-argv.log")).expect("exec argv log")
     }
 
+    pub fn read_compose_file_log(&self) -> String {
+        fs::read_to_string(self.log_dir.join("compose-file-contents.log"))
+            .expect("compose file log")
+    }
+
     pub fn parse_stdout_json(&self, output: &Output) -> Value {
         serde_json::from_slice(&output.stdout).expect("json payload")
     }

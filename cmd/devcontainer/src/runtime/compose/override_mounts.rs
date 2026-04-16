@@ -13,6 +13,11 @@ pub(super) enum ComposeVolumeEntry {
     Long(ComposeMountDefinition),
 }
 
+pub(super) struct ComposeNamedVolume {
+    pub(super) name: String,
+    pub(super) external: bool,
+}
+
 pub(super) struct ComposeMountDefinition {
     pub(super) fields: Map<String, Value>,
 }
@@ -68,6 +73,45 @@ pub(super) fn compose_additional_volumes(
             .map(ComposeVolumeEntry::Long),
     );
     Ok(volumes)
+}
+
+pub(super) fn compose_named_volumes(volumes: &[ComposeVolumeEntry]) -> Vec<ComposeNamedVolume> {
+    let mut named_volumes: Vec<ComposeNamedVolume> = Vec::new();
+    for volume in volumes {
+        let ComposeVolumeEntry::Long(definition) = volume else {
+            continue;
+        };
+        if definition.mount_type().unwrap_or("bind") != "volume" {
+            continue;
+        }
+        let Some(name) = definition
+            .fields
+            .get("source")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+        let external = definition
+            .fields
+            .get("volume")
+            .and_then(Value::as_object)
+            .and_then(|volume| volume.get("external"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if let Some(existing) = named_volumes
+            .iter_mut()
+            .find(|existing| existing.name == name)
+        {
+            existing.external |= external;
+            continue;
+        }
+        named_volumes.push(ComposeNamedVolume {
+            name: name.to_string(),
+            external,
+        });
+    }
+    named_volumes
 }
 
 fn compose_mount_definition(value: &Value) -> Option<ComposeVolumeEntry> {

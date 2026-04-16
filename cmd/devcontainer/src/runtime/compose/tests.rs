@@ -362,6 +362,67 @@ fn metadata_override_file_can_pin_image_and_runtime_settings() {
 }
 
 #[test]
+fn metadata_override_file_wraps_entrypoints_with_a_keepalive_entrypoint() {
+    let root = unique_temp_dir("devcontainer-compose-test");
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "overrideCommand": true,
+            "entrypoints": ["echo feature-entry", "echo feature-post-start"]
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspace", None)
+        .expect("override result")
+        .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("entrypoint:"));
+    assert!(override_content.contains("Container started"));
+    assert!(override_content.contains("echo feature-entry"));
+    assert!(override_content.contains("echo feature-post-start"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn metadata_override_file_declares_named_volumes_top_level() {
+    let root = unique_temp_dir("devcontainer-compose-test");
+    fs::create_dir_all(&root).expect("workspace root");
+    let resolved = crate::runtime::context::ResolvedConfig {
+        workspace_folder: root.clone(),
+        config_file: root.join(".devcontainer.json"),
+        configuration: json!({
+            "dockerComposeFile": "docker-compose.yml",
+            "service": "app",
+            "mounts": [{
+                "type": "volume",
+                "source": "feature-cache",
+                "target": "/cache",
+                "external": true
+            }]
+        }),
+    };
+
+    let override_file = compose_metadata_override_file(&resolved, &[], "/workspace", None)
+        .expect("override result")
+        .expect("override path");
+    let override_content = fs::read_to_string(&override_file).expect("override content");
+
+    assert!(override_content.contains("\nvolumes:\n"));
+    assert!(override_content.contains("feature-cache:"));
+    assert!(override_content.contains("external: true"));
+
+    let _ = fs::remove_file(override_file);
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
 fn metadata_override_file_preserves_workspace_mount_options() {
     let root = unique_temp_dir("devcontainer-compose-test");
     fs::create_dir_all(&root).expect("workspace root");

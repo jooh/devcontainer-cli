@@ -2,14 +2,14 @@
 
 use serde_json::{Map, Value};
 
-use super::override_mounts::ComposeVolumeEntry;
+use super::override_mounts::{ComposeNamedVolume, ComposeVolumeEntry};
 
 pub(super) fn escape_compose_label(label: &str) -> String {
     label.replace('\'', "''").replace('$', "$$")
 }
 
 pub(super) fn escape_compose_scalar(value: &str) -> String {
-    value.replace('\'', "''")
+    value.replace('\'', "''").replace('$', "$$")
 }
 
 pub(super) fn render_compose_volume_entry(entry: &ComposeVolumeEntry) -> String {
@@ -19,6 +19,18 @@ pub(super) fn render_compose_volume_entry(entry: &ComposeVolumeEntry) -> String 
         }
         ComposeVolumeEntry::Long(definition) => render_yaml_mapping_list_entry(&definition.fields),
     }
+}
+
+pub(super) fn render_compose_string_sequence(values: &[String]) -> Result<String, String> {
+    serde_json::to_string(values).map_err(|error| error.to_string())
+}
+
+pub(super) fn render_named_volume_entry(entry: &ComposeNamedVolume) -> String {
+    let mut rendered = format!("  {}:\n", entry.name);
+    if entry.external {
+        rendered.push_str("    external: true\n");
+    }
+    rendered
 }
 
 fn render_yaml_mapping_list_entry(entries: &Map<String, Value>) -> String {

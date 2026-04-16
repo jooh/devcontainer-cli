@@ -15,8 +15,15 @@ use super::super::container;
 use super::super::context::ResolvedConfig;
 use super::super::metadata::serialized_container_metadata;
 use super::super::paths::unique_temp_path;
-use override_mounts::{compose_additional_volumes, compose_environment, compose_workspace_volume};
-use override_yaml::{escape_compose_label, escape_compose_scalar, render_compose_volume_entry};
+use super::service::{self, ServiceDefinition};
+use override_mounts::{
+    compose_additional_volumes, compose_environment, compose_named_volumes,
+    compose_workspace_volume,
+};
+use override_yaml::{
+    escape_compose_label, escape_compose_scalar, render_compose_string_sequence,
+    render_compose_volume_entry, render_named_volume_entry,
+};
 
 pub(super) fn compose_metadata_override_file(
     resolved: &ResolvedConfig,
@@ -24,6 +31,11 @@ pub(super) fn compose_metadata_override_file(
     remote_workspace_folder: &str,
     image_name: Option<&str>,
 ) -> Result<Option<PathBuf>, String> {
+    let service_name = resolved
+        .configuration
+        .get("service")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "Compose configuration must define service".to_string())?;
     let metadata = serialized_container_metadata(
         &resolved.configuration,
         remote_workspace_folder,
@@ -45,14 +57,12 @@ pub(super) fn compose_metadata_override_file(
         return Ok(None);
     }
 
-    let mut content = String::from("services:\n");
+    let (version_prefix, service_definition) = compose_override_context(resolved, service_name);
+    let mut content = version_prefix;
+    content.push_str("services:\n");
     content.push_str(&format!(
         "  '{}':\n    labels:{}\n",
-        resolved
-            .configuration
-            .get("service")
-            .and_then(Value::as_str)
-            .ok_or_else(|| "Compose configuration must define service".to_string())?,
+        service_name,
         labels
             .iter()
             .map(|label| format!("\n      - '{}'", escape_compose_label(label)))
@@ -64,15 +74,23 @@ pub(super) fn compose_metadata_override_file(
             escape_compose_scalar(image_name)
         ));
     }
+    content.push_str(&format!(
+        "    entrypoint: {}\n",
+        compose_wrapper_entrypoint(resolved, service_definition.as_ref())?
+    ));
+    if let Some(command) = compose_wrapper_command(resolved, service_definition.as_ref())? {
+        content.push_str(&format!("    command: {command}\n"));
+    }
     let mut volumes = Vec::new();
     if let Some(volume) = compose_workspace_volume(resolved, args, remote_workspace_folder) {
         volumes.push(volume);
     }
     volumes.extend(compose_additional_volumes(resolved, args)?);
+    let named_volumes = compose_named_volumes(&volumes);
     if !volumes.is_empty() {
         content.push_str("\n    volumes:\n");
-        for volume in volumes {
-            content.push_str(&render_compose_volume_entry(&volume));
+        for volume in &volumes {
+            content.push_str(&render_compose_volume_entry(volume));
         }
     }
     if let Some(environment) = compose_environment(&resolved.configuration) {
@@ -146,10 +164,115 @@ pub(super) fn compose_metadata_override_file(
             "    deploy:\n      resources:\n        reservations:\n          devices:\n            - capabilities: [gpu]\n",
         );
     }
+    if !named_volumes.is_empty() {
+        content.push_str("\nvolumes:\n");
+        for named_volume in &named_volumes {
+            content.push_str(&render_named_volume_entry(named_volume));
+        }
+    }
 
     let override_file = unique_override_file_path();
     std::fs::write(&override_file, content).map_err(|error| error.to_string())?;
     Ok(Some(override_file))
+}
+
+fn compose_override_context(
+    resolved: &ResolvedConfig,
+    service_name: &str,
+) -> (String, Option<ServiceDefinition>) {
+    let config_root = resolved
+        .config_file
+        .parent()
+        .unwrap_or(resolved.workspace_folder.as_path());
+    let Ok(compose_files) = service::compose_files(
+        &resolved.configuration,
+        config_root,
+        &resolved.workspace_folder,
+    ) else {
+        return (String::new(), None);
+    };
+    let version_prefix = service::read_version_prefix(&compose_files).unwrap_or_default();
+    let service_definition = service::inspect_service_definition(&compose_files, service_name).ok();
+    (version_prefix, service_definition)
+}
+
+fn compose_wrapper_entrypoint(
+    resolved: &ResolvedConfig,
+    service_definition: Option<&ServiceDefinition>,
+) -> Result<String, String> {
+    let override_command = resolved
+        .configuration
+        .get("overrideCommand")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let compose_entrypoint =
+        service_definition.and_then(|definition| definition.entrypoint.clone());
+    let user_entrypoint = if override_command {
+        Vec::new()
+    } else {
+        compose_entrypoint.unwrap_or_default()
+    };
+    let custom_entrypoints = merged_entrypoints(resolved).join("\n\n");
+    let script = format!(
+        "echo Container started\ntrap \"exit 0\" 15\n{custom_entrypoints}\nexec \"$$@\"\nwhile sleep 1 & wait $$!; do :; done"
+    );
+    let mut entrypoint = vec![
+        "/bin/sh".to_string(),
+        "-c".to_string(),
+        script,
+        "-".to_string(),
+    ];
+    entrypoint.extend(user_entrypoint);
+    render_compose_string_sequence(&entrypoint)
+}
+
+fn compose_wrapper_command(
+    resolved: &ResolvedConfig,
+    service_definition: Option<&ServiceDefinition>,
+) -> Result<Option<String>, String> {
+    let override_command = resolved
+        .configuration
+        .get("overrideCommand")
+        .and_then(Value::as_bool)
+        .unwrap_or(false);
+    let compose_entrypoint =
+        service_definition.and_then(|definition| definition.entrypoint.clone());
+    let compose_command = service_definition.and_then(|definition| definition.command.clone());
+    let user_command = if override_command {
+        Some(Vec::new())
+    } else if let Some(command) = compose_command.clone() {
+        Some(command)
+    } else if compose_entrypoint.is_some() {
+        Some(Vec::new())
+    } else {
+        None
+    };
+    if user_command == compose_command {
+        return Ok(None);
+    }
+    user_command
+        .map(|command| render_compose_string_sequence(&command))
+        .transpose()
+}
+
+fn merged_entrypoints(resolved: &ResolvedConfig) -> Vec<String> {
+    if let Some(values) = resolved
+        .configuration
+        .get("entrypoints")
+        .and_then(Value::as_array)
+    {
+        return values
+            .iter()
+            .filter_map(Value::as_str)
+            .map(ToString::to_string)
+            .collect();
+    }
+    resolved
+        .configuration
+        .get("entrypoint")
+        .and_then(Value::as_str)
+        .map(|value| vec![value.to_string()])
+        .unwrap_or_default()
 }
 
 fn unique_override_file_path() -> PathBuf {
