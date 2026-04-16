@@ -101,13 +101,20 @@ pub(crate) fn load_resolved_config(args: &[String]) -> Result<(PathBuf, PathBuf,
         })
         .or_else(|| {
             Some(
-                crate::runtime::context::derived_workspace_mount(&workspace_folder, args)
-                    .map(|derived| derived.remote_workspace_folder)
-                    .unwrap_or_else(|| {
-                        crate::runtime::context::default_remote_workspace_folder(Some(
-                            &workspace_folder,
-                        ))
-                    }),
+                if crate::runtime::compose::uses_compose_config(&parsed)
+                    && parsed.get("workspaceFolder").is_none()
+                    && parsed.get("workspaceMount").is_none()
+                {
+                    "/".to_string()
+                } else {
+                    crate::runtime::context::derived_workspace_mount(&workspace_folder, args)
+                        .map(|derived| derived.remote_workspace_folder)
+                        .unwrap_or_else(|| {
+                            crate::runtime::context::default_remote_workspace_folder(Some(
+                                &workspace_folder,
+                            ))
+                        })
+                },
             )
         });
     let substituted = config::substitute_local_context(

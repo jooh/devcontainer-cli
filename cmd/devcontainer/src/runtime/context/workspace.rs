@@ -8,6 +8,7 @@ use std::process::Command;
 use serde_json::Value;
 
 use crate::commands::common;
+use crate::runtime::compose;
 
 use super::{DerivedWorkspaceMount, ResolvedConfig};
 
@@ -45,6 +46,13 @@ pub(crate) fn remote_workspace_folder_for_args(
     resolved: &ResolvedConfig,
     args: &[String],
 ) -> String {
+    if compose::uses_compose_config(&resolved.configuration)
+        && resolved.configuration.get("workspaceFolder").is_none()
+        && resolved.configuration.get("workspaceMount").is_none()
+    {
+        return "/".to_string();
+    }
+
     resolved
         .configuration
         .get("workspaceFolder")

@@ -2,6 +2,8 @@
 
 use serde_json::{Map, Value};
 
+use crate::commands::common;
+
 pub(crate) fn mount_option_target(mount: &str) -> Option<String> {
     split_mount_options(mount).into_iter().find_map(|option| {
         for key in ["target", "destination", "dst"] {
@@ -86,6 +88,56 @@ fn mount_object_to_engine_arg(entries: &Map<String, Value>) -> Option<String> {
     (!options.is_empty()).then(|| options.join(","))
 }
 
+pub(crate) fn cli_mount_values(args: &[String]) -> Result<Vec<String>, String> {
+    common::validate_option_values(args, &["--mount"])?;
+    let mounts = common::parse_option_values(args, "--mount");
+    validate_cli_mount_values(&mounts)?;
+    Ok(mounts)
+}
+
+pub(crate) fn validate_cli_mount_values(mounts: &[String]) -> Result<(), String> {
+    for mount in mounts {
+        validate_cli_mount_value(mount)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn validate_cli_mount_value(mount: &str) -> Result<(), String> {
+    let mut is_volume_mount = false;
+    let mut has_mount_type = false;
+    let mut has_source = false;
+    let mut has_target = false;
+
+    for option in split_mount_options(mount) {
+        if matches!(option.as_str(), "readonly" | "ro") {
+            continue;
+        }
+
+        let Some((key, value)) = option.split_once('=') else {
+            return Err(invalid_cli_mount_error(mount));
+        };
+        let value = value.trim_matches('"');
+        match key {
+            "type" if matches!(value, "bind" | "volume") => {
+                has_mount_type = true;
+                is_volume_mount = value == "volume";
+            }
+            "type" => return Err(invalid_cli_mount_error(mount)),
+            "source" | "src" if !value.is_empty() => has_source = true,
+            "target" | "destination" | "dst" if !value.is_empty() => has_target = true,
+            _ => {}
+        }
+    }
+
+    let requires_source = !is_volume_mount;
+
+    if !has_mount_type || !has_target || (requires_source && !has_source) {
+        return Err(invalid_cli_mount_error(mount));
+    }
+
+    Ok(())
+}
+
 fn mount_option_value(value: &Value) -> Option<String> {
     match value {
         Value::Bool(boolean) => Some(boolean.to_string()),
@@ -95,11 +147,19 @@ fn mount_option_value(value: &Value) -> Option<String> {
     }
 }
 
+fn invalid_cli_mount_error(mount: &str) -> String {
+    format!(
+        "Invalid value for option --mount: {mount}. Expected type=<bind|volume>,target=<target>[,...], with source=<source> required for bind mounts"
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::json;
 
-    use super::{mount_option_target, mount_value_to_engine_arg};
+    use super::{
+        cli_mount_values, mount_option_target, mount_value_to_engine_arg, validate_cli_mount_value,
+    };
 
     #[test]
     fn mount_option_target_reads_quoted_targets() {
@@ -140,5 +200,33 @@ mod tests {
             mount,
             "type=volume,source=devcontainer-cache,target=/cache,consistency=delegated,external=true"
         );
+    }
+
+    #[test]
+    fn validate_cli_mount_value_accepts_extended_scalar_options() {
+        validate_cli_mount_value(
+            "type=bind,source=/tmp/src,target=/tmp/dst,consistency=delegated,bind.propagation=rshared,readonly",
+        )
+        .expect("valid mount");
+    }
+
+    #[test]
+    fn validate_cli_mount_value_accepts_anonymous_volume_mounts() {
+        validate_cli_mount_value("type=volume,target=/cache").expect("valid mount");
+    }
+
+    #[test]
+    fn validate_cli_mount_value_rejects_missing_required_keys() {
+        let error =
+            validate_cli_mount_value("type=bind,source=/tmp/src").expect_err("missing target");
+
+        assert!(error.contains("Invalid value for option --mount"));
+    }
+
+    #[test]
+    fn cli_mount_values_require_option_values() {
+        let error = cli_mount_values(&["--mount".to_string()]).expect_err("missing mount value");
+
+        assert_eq!(error, "Missing value for option: --mount");
     }
 }

@@ -4,6 +4,30 @@ use std::fs;
 
 use crate::support::runtime_harness::{write_devcontainer_config, RuntimeHarness};
 
+fn generated_override_contents(harness: &RuntimeHarness) -> String {
+    let log = harness.read_compose_file_log();
+    let mut capture = false;
+    let mut content = String::new();
+    for line in log.lines() {
+        if let Some(path) = line.strip_prefix("BEGIN ") {
+            capture = path.contains("devcontainer-compose-override");
+            continue;
+        }
+        if line.starts_with("END ") {
+            if capture {
+                break;
+            }
+            capture = false;
+            continue;
+        }
+        if capture {
+            content.push_str(line);
+            content.push('\n');
+        }
+    }
+    content
+}
+
 #[test]
 fn up_starts_compose_services_and_exec_uses_compose_container_lookup() {
     let harness = RuntimeHarness::new();
@@ -58,7 +82,8 @@ fn up_starts_compose_services_and_exec_uses_compose_container_lookup() {
 
     let invocations = harness.read_invocations();
     assert!(invocations.contains("compose --project-name workspace_devcontainer -f "));
-    assert!(invocations.contains(" up -d app"));
+    assert!(invocations.contains(" up -d"));
+    assert!(!invocations.contains(" up -d app"));
     assert!(invocations.contains(" ps -q app"));
     assert!(invocations.contains(
         "exec --workdir /workspace --user vscode fake-compose-container-id /bin/echo hello-from-compose"
@@ -66,6 +91,105 @@ fn up_starts_compose_services_and_exec_uses_compose_container_lookup() {
 
     let exec_log = harness.read_exec_log();
     assert!(exec_log.contains("/bin/sh -lc echo ready"));
+}
+
+#[test]
+fn up_generated_override_preserves_compose_version_prefix() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "version: '3.8'\nservices:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let override_content = generated_override_contents(&harness);
+    assert!(
+        override_content.starts_with("version: '3.8'\n"),
+        "{override_content}"
+    );
+}
+
+#[test]
+fn up_uses_root_remote_workspace_folder_when_compose_workspace_folder_is_omitted() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let payload = harness.parse_stdout_json(&output);
+    assert_eq!(payload["remoteWorkspaceFolder"], "/");
+}
+
+#[test]
+fn up_honors_run_services_and_includes_the_primary_service() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n  worker:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\",\n  \"runServices\": [\"worker\"]\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(" up -d worker app"));
 }
 
 #[test]
@@ -251,7 +375,8 @@ fn up_resumes_stopped_compose_services_without_rerunning_create_hooks() {
     let invocations = harness.read_invocations();
     assert!(invocations.contains(" ps -q app"));
     assert!(invocations.contains(" ps -q -a app"));
-    assert!(invocations.contains(" up -d app"));
+    assert!(invocations.contains(" up -d --no-recreate"));
+    assert!(!invocations.contains(" up -d app"));
 
     let exec_log = harness.read_exec_log();
     assert!(!exec_log.contains("/bin/sh -lc echo on-create"));
@@ -259,4 +384,69 @@ fn up_resumes_stopped_compose_services_without_rerunning_create_hooks() {
     assert!(!exec_log.contains("/bin/sh -lc echo post-create"));
     assert!(exec_log.contains("/bin/sh -lc echo post-start"));
     assert!(exec_log.contains("/bin/sh -lc echo post-attach"));
+}
+
+#[test]
+fn up_reuses_existing_compose_container_with_no_recreate() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+        ],
+        &[("FAKE_PODMAN_COMPOSE_PS_OUTPUT", "fake-compose-container-id")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(" up -d --no-recreate"));
+}
+
+#[test]
+fn up_expect_existing_compose_container_uses_no_recreate() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
+    fs::write(
+        workspace.join(".devcontainer").join("docker-compose.yml"),
+        "services:\n  app:\n    image: alpine:3.20\n",
+    )
+    .expect("compose");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"dockerComposeFile\": \"docker-compose.yml\",\n  \"service\": \"app\",\n  \"workspaceFolder\": \"/workspace\"\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--expect-existing-container",
+        ],
+        &[("FAKE_PODMAN_COMPOSE_PS_OUTPUT", "fake-compose-container-id")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+    let invocations = harness.read_invocations();
+    assert!(invocations.contains(" up -d --no-recreate"));
 }

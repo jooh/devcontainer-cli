@@ -5,11 +5,17 @@ use serde_json::{Map, Number, Value};
 use crate::runtime::context::{
     additional_mounts_for_workspace_target, workspace_mount_for_args, ResolvedConfig,
 };
+use crate::runtime::mounts::cli_mount_values;
 use crate::runtime::mounts::split_mount_options;
 
 pub(super) enum ComposeVolumeEntry {
     Short(String),
     Long(ComposeMountDefinition),
+}
+
+pub(super) struct ComposeNamedVolume {
+    pub(super) name: String,
+    pub(super) external: bool,
 }
 
 pub(super) struct ComposeMountDefinition {
@@ -35,13 +41,8 @@ pub(super) fn compose_workspace_volume(
 pub(super) fn compose_additional_volumes(
     resolved: &ResolvedConfig,
     args: &[String],
-) -> Vec<ComposeVolumeEntry> {
-    let mut volumes: Vec<ComposeVolumeEntry> = resolved
-        .configuration
-        .get("mounts")
-        .and_then(Value::as_array)
-        .map(|mounts| mounts.iter().filter_map(compose_mount_definition).collect())
-        .unwrap_or_default();
+) -> Result<Vec<ComposeVolumeEntry>, String> {
+    let mut volumes = Vec::new();
     if resolved.configuration.get("workspaceMount").is_none() {
         let remote_workspace_folder =
             crate::runtime::context::remote_workspace_folder_for_args(resolved, args);
@@ -52,7 +53,65 @@ pub(super) fn compose_additional_volumes(
                 .map(ComposeVolumeEntry::Long),
         );
     }
-    volumes
+    volumes.extend(
+        resolved
+            .configuration
+            .get("mounts")
+            .and_then(Value::as_array)
+            .map(|mounts| {
+                mounts
+                    .iter()
+                    .filter_map(compose_mount_definition)
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default(),
+    );
+    volumes.extend(
+        cli_mount_values(args)?
+            .iter()
+            .filter_map(|mount| compose_mount_definition_from_str(mount))
+            .map(ComposeVolumeEntry::Long),
+    );
+    Ok(volumes)
+}
+
+pub(super) fn compose_named_volumes(volumes: &[ComposeVolumeEntry]) -> Vec<ComposeNamedVolume> {
+    let mut named_volumes: Vec<ComposeNamedVolume> = Vec::new();
+    for volume in volumes {
+        let ComposeVolumeEntry::Long(definition) = volume else {
+            continue;
+        };
+        if definition.mount_type().unwrap_or("bind") != "volume" {
+            continue;
+        }
+        let Some(name) = definition
+            .fields
+            .get("source")
+            .and_then(Value::as_str)
+            .filter(|value| !value.is_empty())
+        else {
+            continue;
+        };
+        let external = definition
+            .fields
+            .get("volume")
+            .and_then(Value::as_object)
+            .and_then(|volume| volume.get("external"))
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
+        if let Some(existing) = named_volumes
+            .iter_mut()
+            .find(|existing| existing.name == name)
+        {
+            existing.external |= external;
+            continue;
+        }
+        named_volumes.push(ComposeNamedVolume {
+            name: name.to_string(),
+            external,
+        });
+    }
+    named_volumes
 }
 
 fn compose_mount_definition(value: &Value) -> Option<ComposeVolumeEntry> {
@@ -116,7 +175,7 @@ fn compose_mount_definition(value: &Value) -> Option<ComposeVolumeEntry> {
                 ) {
                     continue;
                 }
-                fields.insert(key.clone(), value.clone());
+                merge_mount_value(&mut fields, key, value.clone());
             }
             Some(ComposeVolumeEntry::Long(ComposeMountDefinition { fields }))
         }
@@ -262,6 +321,26 @@ fn insert_nested_mount_value(
     }
     let child = entry.as_object_mut().expect("object mount option");
     insert_nested_mount_value(child, &parents[1..], leaf, value);
+}
+
+fn merge_mount_value(fields: &mut Map<String, Value>, key: &str, value: Value) {
+    if let Some(existing) = fields.get_mut(key) {
+        merge_mount_scalar_or_object(existing, value);
+        return;
+    }
+
+    fields.insert(key.to_string(), value);
+}
+
+fn merge_mount_scalar_or_object(existing: &mut Value, incoming: Value) {
+    match (existing, incoming) {
+        (Value::Object(existing), Value::Object(incoming)) => {
+            for (key, value) in incoming {
+                merge_mount_value(existing, &key, value);
+            }
+        }
+        (existing, incoming) => *existing = incoming,
+    }
 }
 
 pub(super) fn compose_environment(configuration: &Value) -> Option<Vec<(String, String)>> {

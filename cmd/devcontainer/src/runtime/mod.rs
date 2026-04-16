@@ -55,6 +55,7 @@ pub fn run_build(args: &[String]) -> Result<Value, String> {
 }
 
 pub fn run_up(args: &[String]) -> Result<Value, String> {
+    let _ = mounts::cli_mount_values(args)?;
     let resolved = context::load_required_config(args)?;
     let feature_support = configuration::resolve_feature_support(
         args,

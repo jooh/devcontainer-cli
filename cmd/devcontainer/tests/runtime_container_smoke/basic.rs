@@ -176,6 +176,80 @@ fn up_applies_feature_runtime_metadata_to_container_creation() {
 }
 
 #[test]
+fn up_emits_config_mounts_before_cli_mounts() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(
+        &workspace,
+        "{\n  \"image\": \"alpine:3.20\",\n  \"mounts\": [{\n    \"type\": \"bind\",\n    \"source\": \"/tmp/config-src\",\n    \"target\": \"/tmp/config-dst\"\n  }]\n}\n",
+    );
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--mount",
+            "type=volume,source=cli-cache,target=/cli-cache",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(output.status.success(), "{output:?}");
+
+    let invocations = harness.read_invocations();
+    let config_mount = "--mount type=bind,source=/tmp/config-src,target=/tmp/config-dst";
+    let cli_mount = "--mount type=volume,source=cli-cache,target=/cli-cache";
+    let config_position = invocations.find(config_mount).expect("config mount");
+    let cli_position = invocations.find(cli_mount).expect("cli mount");
+
+    assert!(
+        config_position < cli_position,
+        "expected config mounts before CLI mounts: {invocations}"
+    );
+}
+
+#[test]
+fn up_rejects_invalid_cli_mount_before_engine_invocation() {
+    let harness = RuntimeHarness::new();
+    let workspace = harness.workspace();
+    fs::create_dir_all(&workspace).expect("workspace dir");
+    write_devcontainer_config(&workspace, "{\n  \"image\": \"alpine:3.20\"\n}\n");
+
+    let fake_podman = harness.fake_podman.to_string_lossy().to_string();
+    let output = harness.run(
+        &[
+            "up",
+            "--docker-path",
+            fake_podman.as_str(),
+            "--workspace-folder",
+            workspace.to_string_lossy().as_ref(),
+            "--mount",
+            "invalid-mount",
+        ],
+        &[("FAKE_PODMAN_PS_DISABLE_DEFAULT", "1")],
+    );
+
+    assert!(!output.status.success(), "{output:?}");
+    let stderr = String::from_utf8(output.stderr).expect("utf8 stderr");
+    assert!(
+        stderr.contains("Invalid value for option --mount"),
+        "{stderr}"
+    );
+
+    let invocation_log = harness.log_dir.join("invocations.log");
+    assert!(
+        !invocation_log.exists(),
+        "unexpected engine invocation log: {}",
+        fs::read_to_string(&invocation_log).unwrap_or_default()
+    );
+}
+
+#[test]
 fn up_adds_gpu_flags_when_required_and_gpu_availability_is_all() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
