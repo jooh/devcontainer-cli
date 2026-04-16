@@ -150,7 +150,7 @@ fn up_uses_default_compose_files_when_docker_compose_file_array_is_empty() {
     );
 
     let fake_podman = harness.fake_podman.to_string_lossy().to_string();
-    let output = harness.run(
+    let output = harness.run_in_dir(
         &[
             "up",
             "--docker-path",
@@ -159,6 +159,7 @@ fn up_uses_default_compose_files_when_docker_compose_file_array_is_empty() {
             workspace.to_string_lossy().as_ref(),
         ],
         &[],
+        Some(&workspace),
     );
 
     assert!(output.status.success(), "{output:?}");
@@ -182,11 +183,10 @@ fn up_uses_default_compose_files_when_docker_compose_file_array_is_empty() {
 }
 
 #[test]
-fn up_resolves_compose_file_env_paths_relative_to_caller_cwd_when_array_is_empty() {
+fn up_resolves_compose_file_env_paths_relative_to_workspace_when_array_is_empty() {
     let harness = RuntimeHarness::new();
     let workspace = harness.workspace();
-    let outside = harness.root.join("outside");
-    let compose_dir = outside.join("relative-compose");
+    let compose_dir = workspace.join("relative-compose");
     fs::create_dir_all(&compose_dir).expect("compose dir");
     fs::create_dir_all(workspace.join(".devcontainer")).expect("workspace config dir");
     fs::write(
@@ -209,7 +209,7 @@ fn up_resolves_compose_file_env_paths_relative_to_caller_cwd_when_array_is_empty
             workspace.to_string_lossy().as_ref(),
         ],
         &[("COMPOSE_FILE", "relative-compose/docker-compose.yml")],
-        Some(&outside),
+        Some(&workspace),
     );
 
     assert!(output.status.success(), "{output:?}");

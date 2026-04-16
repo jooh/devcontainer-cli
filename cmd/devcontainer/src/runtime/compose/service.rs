@@ -22,7 +22,7 @@ pub(super) struct ServiceDefinition {
 pub(super) fn compose_files(
     configuration: &Value,
     config_root: &Path,
-    default_files_root: &Path,
+    workspace_root: &Path,
 ) -> Result<Vec<PathBuf>, String> {
     match configuration.get("dockerComposeFile") {
         Some(Value::String(value)) => Ok(vec![resolve_relative(config_root, value)]),
@@ -35,20 +35,20 @@ pub(super) fn compose_files(
                     .ok_or_else(|| "dockerComposeFile entries must be strings".to_string())
             })
             .collect(),
-        Some(Value::Array(_)) => default_compose_files(default_files_root),
+        Some(Value::Array(_)) => default_compose_files(workspace_root),
         Some(_) => Err("dockerComposeFile must be a string or array of strings".to_string()),
         None => Err("Compose configuration must define dockerComposeFile".to_string()),
     }
 }
 
-fn default_compose_files(default_files_root: &Path) -> Result<Vec<PathBuf>, String> {
+fn default_compose_files(workspace_root: &Path) -> Result<Vec<PathBuf>, String> {
     if let Some(compose_files) =
-        compose_files_from_env(std::env::var_os("COMPOSE_FILE"), default_files_root)
+        compose_files_from_env(std::env::var_os("COMPOSE_FILE"), workspace_root)
     {
         return Ok(compose_files);
     }
 
-    let env_file = default_files_root.join(".env");
+    let env_file = workspace_root.join(".env");
     if let Ok(raw) = fs::read_to_string(&env_file) {
         if let Some(value) = raw.lines().find_map(|line| {
             line.trim()
@@ -58,32 +58,29 @@ fn default_compose_files(default_files_root: &Path) -> Result<Vec<PathBuf>, Stri
                 .map(str::to_string)
         }) {
             if let Some(compose_files) =
-                compose_files_from_env(Some(OsString::from(value)), default_files_root)
+                compose_files_from_env(Some(OsString::from(value)), workspace_root)
             {
                 return Ok(compose_files);
             }
         }
     }
 
-    let mut files = vec![default_files_root.join("docker-compose.yml")];
-    let override_file = default_files_root.join("docker-compose.override.yml");
+    let mut files = vec![workspace_root.join("docker-compose.yml")];
+    let override_file = workspace_root.join("docker-compose.override.yml");
     if override_file.is_file() {
         files.push(override_file);
     }
     Ok(files)
 }
 
-fn compose_files_from_env(
-    value: Option<OsString>,
-    default_files_root: &Path,
-) -> Option<Vec<PathBuf>> {
+fn compose_files_from_env(value: Option<OsString>, workspace_root: &Path) -> Option<Vec<PathBuf>> {
     let value = value?;
     let files = std::env::split_paths(&value)
         .map(|path| {
             if path.is_absolute() {
                 path
             } else {
-                default_files_root.join(path)
+                workspace_root.join(path)
             }
         })
         .collect::<Vec<_>>();
