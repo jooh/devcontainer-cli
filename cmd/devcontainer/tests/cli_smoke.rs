@@ -4,6 +4,8 @@ mod support;
 
 #[path = "cli_smoke/collections.rs"]
 mod collections;
+#[path = "cli_smoke/devcontainer_context.rs"]
+mod devcontainer_context;
 #[path = "cli_smoke/help.rs"]
 mod help;
 #[path = "cli_smoke/lockfile.rs"]

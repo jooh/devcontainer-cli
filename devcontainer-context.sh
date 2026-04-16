@@ -57,6 +57,7 @@ CONTAINER_CONFIG_DIR="/root/.config"
 CONTAINER_LOCAL_DIR="/root/.local"
 CONTAINER_SHELL="/bin/bash"
 CONTAINER_WORKSPACE_FOLDER=""
+COMPOSE_PROJECT_NAME_OVERRIDE=""
 LOCAL_VOLUME_NAME=""
 PODMAN_DETACH_KEYS="ctrl-]"
 
@@ -167,6 +168,61 @@ validate_compose_files() {
             fail "Compose file '$compose_file' configured in $DEVCONTAINER_CONFIG was not found"
         fi
     done
+}
+
+trim_whitespace() {
+    sed 's/^[[:space:]]*//; s/[[:space:]]*$//'
+}
+
+sanitize_project_name() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9_-'
+}
+
+resolve_compose_project_name() {
+    local candidate=""
+    local env_file
+    local compose_file
+    local line
+    local index
+    local sanitized
+
+    if [[ -n "${COMPOSE_PROJECT_NAME:-}" ]]; then
+        candidate="$COMPOSE_PROJECT_NAME"
+    else
+        env_file="$(dirname "${COMPOSE_FILES[0]}")/.env"
+        if [[ -f "$env_file" ]]; then
+            while IFS= read -r line; do
+                case "$line" in
+                    COMPOSE_PROJECT_NAME=*)
+                        candidate="$(printf '%s' "${line#COMPOSE_PROJECT_NAME=}" | trim_whitespace)"
+                        break
+                        ;;
+                esac
+            done < "$env_file"
+        fi
+
+        if [[ -z "$candidate" ]]; then
+            for ((index=${#COMPOSE_FILES[@]} - 1; index >= 0; index--)); do
+                compose_file="${COMPOSE_FILES[index]}"
+                while IFS= read -r line; do
+                    if [[ "$line" == [[:space:]]* ]]; then
+                        continue
+                    fi
+                    case "$line" in
+                        name:*)
+                            candidate="$(printf '%s' "${line#name:}" | trim_whitespace)"
+                            break 2
+                            ;;
+                    esac
+                done < "$compose_file"
+            done
+        fi
+    fi
+
+    sanitized="$(sanitize_project_name "$candidate")"
+    if [[ -n "$sanitized" ]]; then
+        COMPOSE_PROJECT_NAME_OVERRIDE="$sanitized"
+    fi
 }
 
 resolve_host_git_config() {
@@ -308,13 +364,15 @@ exec_in_devcontainer() {
 compose_reset() {
     local compose_args=()
     local compose_file
+    local project_name
 
     echo "Tearing down dev container..."
     for compose_file in "${COMPOSE_FILES[@]}"; do
         compose_args+=( -f "$compose_file" )
     done
 
-    podman compose "${compose_args[@]}" --project-name "$PROJECT_NAME" down -v --remove-orphans
+    project_name="${COMPOSE_PROJECT_NAME_OVERRIDE:-$PROJECT_NAME}"
+    podman compose "${compose_args[@]}" --project-name "$project_name" down -v --remove-orphans
 }
 
 start_devcontainer() {
@@ -379,6 +437,7 @@ if [[ "$DEVCONTAINER_KIND" == "compose" ]]; then
     # Export UID for compose file interpolation (bash special variable, not exported by default)
     export UID
     validate_compose_files
+    resolve_compose_project_name
     require_command "podman-compose" "podman-compose is required for compose-based dev containers"
     COMPOSE_PATH="$(command -v podman-compose)"
     DEVCONTAINER_RUNTIME_ARGS+=(--docker-compose-path "$COMPOSE_PATH")
