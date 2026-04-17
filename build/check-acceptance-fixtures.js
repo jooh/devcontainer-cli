@@ -13,6 +13,9 @@ const repositoryRoot = path.join(__dirname, '..');
 const acceptanceRoot = path.join(repositoryRoot, 'acceptance');
 const manifestPath = path.join(acceptanceRoot, 'scenarios.json');
 const readmePath = path.join(acceptanceRoot, 'README.md');
+const repoReadmePath = path.join(repositoryRoot, 'README.md');
+const architecturePath = path.join(repositoryRoot, 'docs', 'architecture.md');
+const makefilePath = path.join(repositoryRoot, 'Makefile');
 
 const expectedScenarioIds = [
 	'image-lifecycle',
@@ -180,8 +183,15 @@ function main() {
 	assertExists(acceptanceRoot, 'acceptance/ must exist');
 	assertExists(readmePath, 'acceptance/README.md must exist');
 	assertExists(manifestPath, 'acceptance/scenarios.json must exist');
+	assertExists(repoReadmePath, 'README.md must exist');
+	assertExists(architecturePath, 'docs/architecture.md must exist');
+	assertExists(makefilePath, 'Makefile must exist');
 
 	const manifest = readJson(manifestPath);
+	const acceptanceReadme = fs.readFileSync(readmePath, 'utf8');
+	const repoReadme = fs.readFileSync(repoReadmePath, 'utf8');
+	const architecture = fs.readFileSync(architecturePath, 'utf8');
+	const makefile = fs.readFileSync(makefilePath, 'utf8');
 	assert(Array.isArray(manifest), 'acceptance/scenarios.json must contain a JSON array');
 	assert.deepStrictEqual(
 		manifest.map((scenario) => scenario.id),
@@ -195,6 +205,34 @@ function main() {
 	const networkScenarios = manifest.filter((scenario) => scenario.requiresNetwork);
 	assert.equal(networkScenarios.length, 1, 'acceptance suite must include exactly one network scenario');
 	assert.equal(networkScenarios[0].id, 'published-feature', 'published-feature must be the only network scenario');
+
+	for (const scenarioId of expectedScenarioIds) {
+		assert(
+			acceptanceReadme.includes(scenarioId),
+			`acceptance/README.md must describe ${scenarioId}`,
+		);
+	}
+	assert(
+		acceptanceReadme.includes('devcontainer templates apply'),
+		'acceptance/README.md must document the template apply command',
+	);
+	assert(
+		acceptanceReadme.includes('ghcr.io/devcontainers/templates/node-mongo:latest'),
+		'acceptance/README.md must mention the embedded node-mongo template id',
+	);
+	assert(
+		acceptanceReadme.includes('acceptance/template-node-mongo/workspace'),
+		'acceptance/README.md must mention the generated template workspace path',
+	);
+	assert(repoReadme.includes('acceptance/'), 'README.md must mention acceptance/');
+	assert(
+		architecture.includes('acceptance/'),
+		'docs/architecture.md must mention acceptance/',
+	);
+	assert(
+		/^tests:.*acceptance-fixtures-check/m.test(makefile),
+		'Makefile tests target must include acceptance-fixtures-check',
+	);
 
 	for (const scenario of manifest) {
 		validateScenarioCommon(scenario);
