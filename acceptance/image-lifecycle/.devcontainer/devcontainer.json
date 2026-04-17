@@ -1,0 +1,17 @@
+{
+  "name": "acceptance-image-lifecycle",
+  "image": "alpine:3.20",
+  "workspaceFolder": "/workspace",
+  "updateRemoteUserUID": false,
+  "containerEnv": {
+    "ACCEPTANCE_SCENARIO": "image-lifecycle"
+  },
+  "remoteEnv": {
+    "MANUAL_CHECK": "image-lifecycle-ready"
+  },
+  "onCreateCommand": "mkdir -p /workspace/.acceptance && printf on-create > /workspace/.acceptance/on-create",
+  "updateContentCommand": "printf update-content > /workspace/.acceptance/update-content",
+  "postCreateCommand": "printf post-create > /workspace/.acceptance/post-create",
+  "postStartCommand": "printf post-start > /workspace/.acceptance/post-start",
+  "postAttachCommand": "printf post-attach > /workspace/.acceptance/post-attach"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "acceptance-dockerfile-build",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "args": {
+      "MESSAGE": "from-build-arg"
+    }
+  },
+  "workspaceFolder": "/workspace",
+  "updateRemoteUserUID": false,
+  "postCreateCommand": "mkdir -p /workspace/.acceptance && cat /usr/local/etc/acceptance-dockerfile-message > /workspace/.acceptance/dockerfile-message"
+}

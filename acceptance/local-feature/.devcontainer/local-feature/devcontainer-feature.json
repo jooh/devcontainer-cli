@@ -1,0 +1,12 @@
+{
+  "id": "local-feature",
+  "name": "Local Feature",
+  "version": "1.0.0",
+  "description": "Adds a deterministic marker command for acceptance checks.",
+  "options": {
+    "message": {
+      "type": "string",
+      "default": "local-feature-default"
+    }
+  }
+}
