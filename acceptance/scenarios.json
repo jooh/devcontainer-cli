@@ -1,0 +1,68 @@
+[
+  {
+    "id": "image-lifecycle",
+    "kind": "workspace",
+    "path": "acceptance/image-lifecycle",
+    "workspacePath": "acceptance/image-lifecycle",
+    "requiresNetwork": false,
+    "checks": [
+      "read-configuration",
+      "up",
+      "exec",
+      "run-user-commands",
+      "set-up"
+    ]
+  },
+  {
+    "id": "dockerfile-build",
+    "kind": "workspace",
+    "path": "acceptance/dockerfile-build",
+    "workspacePath": "acceptance/dockerfile-build",
+    "requiresNetwork": false,
+    "checks": [
+      "read-configuration",
+      "build",
+      "up",
+      "exec"
+    ]
+  },
+  {
+    "id": "template-node-mongo",
+    "kind": "template",
+    "path": "acceptance/template-node-mongo",
+    "workspacePath": "acceptance/template-node-mongo/workspace",
+    "requiresNetwork": false,
+    "checks": [
+      "templates-apply",
+      "read-configuration",
+      "up",
+      "exec"
+    ]
+  },
+  {
+    "id": "local-feature",
+    "kind": "workspace",
+    "path": "acceptance/local-feature",
+    "workspacePath": "acceptance/local-feature",
+    "requiresNetwork": false,
+    "checks": [
+      "read-configuration",
+      "build",
+      "up",
+      "exec"
+    ]
+  },
+  {
+    "id": "published-feature",
+    "kind": "workspace",
+    "path": "acceptance/published-feature",
+    "workspacePath": "acceptance/published-feature",
+    "requiresNetwork": true,
+    "checks": [
+      "read-configuration",
+      "build",
+      "up",
+      "exec"
+    ]
+  }
+]

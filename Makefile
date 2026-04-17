@@ -6,6 +6,7 @@
 	build-release \
 	standalone-artifact-smoke \
 	native-only-startup-contract \
+	acceptance-fixtures-check \
 	command-matrix-drift-check \
 	schema-drift-check \
 	parity-harness \
@@ -41,6 +42,9 @@ standalone-artifact-smoke: build-release
 
 native-only-startup-contract:
 	node build/check-native-only.js
+
+acceptance-fixtures-check:
+	node build/check-acceptance-fixtures.js
 
 command-matrix-drift-check:
 	node build/generate-command-matrix.js --check
