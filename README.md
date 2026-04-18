@@ -8,6 +8,7 @@ The shipped runtime is the Rust binary in `cmd/devcontainer`. Node is kept only 
 
 - `cmd/devcontainer/`: native Rust CLI crate.
 - `cmd/devcontainer/src/runtime/`: native runtime subsystems for container-backed commands.
+- `acceptance/`: repo-owned manual acceptance scenarios and suite manifest.
 - `upstream/`: canonical upstream `devcontainers/cli` baseline.
 - `spec/`: canonical upstream `devcontainers/spec` schemas and docs.
 - `build/`: repo-owned compatibility guard scripts.
@@ -42,6 +43,12 @@ Compatibility/tooling validation:
 
 ```bash
 npm test
+```
+
+Manual acceptance suite shape:
+
+```bash
+make acceptance-fixtures-check
 ```
 
 The Node-based checks do not require installing project dependencies; they use built-in Node modules only. Node 20+ is still required to run them.

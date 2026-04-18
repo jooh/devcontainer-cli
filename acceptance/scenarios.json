@@ -1,0 +1,105 @@
+[
+  {
+    "id": "image-lifecycle",
+    "kind": "workspace",
+    "description": "Image-based workspace that exercises lifecycle hooks and follow-up commands.",
+    "path": "acceptance/image-lifecycle",
+    "workspacePath": "acceptance/image-lifecycle",
+    "requiresNetwork": false,
+    "expectedFiles": [
+      "README.md",
+      ".devcontainer/devcontainer.json"
+    ],
+    "checks": [
+      "read-configuration",
+      "up",
+      "exec",
+      "run-user-commands",
+      "set-up"
+    ]
+  },
+  {
+    "id": "dockerfile-build",
+    "kind": "workspace",
+    "description": "Dockerfile-based workspace with a build argument and a post-create marker.",
+    "path": "acceptance/dockerfile-build",
+    "workspacePath": "acceptance/dockerfile-build",
+    "requiresNetwork": false,
+    "expectedFiles": [
+      "README.md",
+      ".devcontainer/devcontainer.json",
+      ".devcontainer/Dockerfile"
+    ],
+    "checks": [
+      "read-configuration",
+      "build",
+      "up",
+      "exec"
+    ]
+  },
+  {
+    "id": "template-node-mongo",
+    "kind": "template",
+    "description": "Template-driven compose workspace generated from the embedded node-mongo template.",
+    "path": "acceptance/template-node-mongo",
+    "workspacePath": "acceptance/template-node-mongo/workspace",
+    "requiresNetwork": false,
+    "expectedFiles": [
+      "README.md",
+      "workspace/.gitignore"
+    ],
+    "postApplyFiles": [
+      ".devcontainer/devcontainer.json",
+      ".devcontainer/docker-compose.yml"
+    ],
+    "template": {
+      "id": "ghcr.io/devcontainers/templates/node-mongo:latest",
+      "args": {},
+      "features": []
+    },
+    "checks": [
+      "templates-apply",
+      "read-configuration",
+      "up",
+      "exec"
+    ]
+  },
+  {
+    "id": "local-feature",
+    "kind": "workspace",
+    "description": "Image-based workspace with a repo-local Feature that installs a deterministic marker command.",
+    "path": "acceptance/local-feature",
+    "workspacePath": "acceptance/local-feature",
+    "requiresNetwork": false,
+    "expectedFiles": [
+      "README.md",
+      ".devcontainer/devcontainer.json",
+      ".devcontainer/local-feature/devcontainer-feature.json",
+      ".devcontainer/local-feature/install.sh"
+    ],
+    "checks": [
+      "read-configuration",
+      "build",
+      "up",
+      "exec"
+    ]
+  },
+  {
+    "id": "published-feature",
+    "kind": "workspace",
+    "description": "Image-based workspace that keeps one published Feature in the configuration path for manual checks.",
+    "path": "acceptance/published-feature",
+    "workspacePath": "acceptance/published-feature",
+    "requiresNetwork": true,
+    "expectedFiles": [
+      "README.md",
+      ".devcontainer/devcontainer.json"
+    ],
+    "checks": [
+      "read-configuration",
+      "build",
+      "up",
+      "exec"
+    ]
+  }
+]

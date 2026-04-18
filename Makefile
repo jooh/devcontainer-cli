@@ -6,6 +6,7 @@
 	build-release \
 	standalone-artifact-smoke \
 	native-only-startup-contract \
+	acceptance-fixtures-check \
 	command-matrix-drift-check \
 	schema-drift-check \
 	parity-harness \
@@ -19,7 +20,7 @@
 RUST_MANIFEST := cmd/devcontainer/Cargo.toml
 RELEASE_BINARY := ./cmd/devcontainer/target/release/devcontainer
 
-tests: rust-fmt rust-clippy rust-check rust-tests build-release standalone-artifact-smoke native-only-startup-contract command-matrix-drift-check schema-drift-check parity-harness no-node-runtime check-parity-inventory check-cli-metadata check-todo-args check-compatibility-dashboard upstream-compatibility
+tests: rust-fmt rust-clippy rust-check rust-tests build-release standalone-artifact-smoke native-only-startup-contract acceptance-fixtures-check command-matrix-drift-check schema-drift-check parity-harness no-node-runtime check-parity-inventory check-cli-metadata check-todo-args check-compatibility-dashboard upstream-compatibility
 
 rust-fmt:
 	cargo fmt --manifest-path $(RUST_MANIFEST) --all -- --check
@@ -41,6 +42,9 @@ standalone-artifact-smoke: build-release
 
 native-only-startup-contract:
 	node build/check-native-only.js
+
+acceptance-fixtures-check:
+	node build/check-acceptance-fixtures.js
 
 command-matrix-drift-check:
 	node build/generate-command-matrix.js --check

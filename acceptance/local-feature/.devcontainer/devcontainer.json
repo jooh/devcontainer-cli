@@ -1,0 +1,12 @@
+{
+  "name": "acceptance-local-feature",
+  "image": "debian:bookworm",
+  "workspaceFolder": "/workspace",
+  "updateRemoteUserUID": false,
+  "features": {
+    "./local-feature": {
+      "message": "local-feature-ready"
+    }
+  },
+  "postCreateCommand": "mkdir -p /workspace/.acceptance && /usr/local/bin/acceptance-local-feature > /workspace/.acceptance/local-feature"
+}

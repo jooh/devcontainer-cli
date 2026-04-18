@@ -1,0 +1,10 @@
+{
+  "name": "acceptance-published-feature",
+  "image": "debian:bookworm",
+  "workspaceFolder": "/workspace",
+  "updateRemoteUserUID": false,
+  "features": {
+    "ghcr.io/devcontainers/features/git:1.0": {}
+  },
+  "postCreateCommand": "mkdir -p /workspace/.acceptance && printf published-feature > /workspace/.acceptance/published-feature"
+}

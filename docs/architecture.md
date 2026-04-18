@@ -46,6 +46,7 @@ Dependency direction: `commands/*` may depend on `runtime/*`, but `runtime/*` sh
 - Rust integration tests live under `cmd/devcontainer/tests/`.
 - `cmd/devcontainer/tests/support/runtime_harness.rs` is the shared fake-engine harness for runtime integration coverage.
 - The runtime smoke suite is split by concern: build, container lifecycle, context resolution, exec behavior, and lifecycle behavior.
+- `acceptance/` holds repo-owned manual acceptance fixtures and the suite manifest for contributor-guided runtime checks.
 - Repo-owned compatibility fixtures live under `src/test/parity/`.
 - Node guard scripts in `build/` cover upstream/spec drift, command-matrix drift, native-only startup, no-node-runtime regressions, and the parity harness.
 
