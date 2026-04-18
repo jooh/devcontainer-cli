@@ -190,7 +190,7 @@ fn upgrade_lockfile_reads_workspace_oci_layout_digests() {
 }
 
 #[test]
-fn ensure_native_lockfile_writes_trailing_newline() {
+fn ensure_native_lockfile_uses_shared_lockfile_format() {
     let root = unique_temp_dir();
     fs::create_dir_all(&root).expect("failed to create root");
     let config_file = root.join(".devcontainer.json");
@@ -212,7 +212,26 @@ fn ensure_native_lockfile_writes_trailing_newline() {
     .expect("lockfile write");
 
     let lockfile = fs::read_to_string(root.join(".devcontainer-lock.json")).expect("lockfile");
-    assert!(lockfile.ends_with('\n'));
+    assert!(!lockfile.ends_with('\n'));
+    let _ = fs::remove_dir_all(root);
+}
+
+#[test]
+fn upgrade_lockfile_uses_shared_lockfile_format() {
+    let root = unique_temp_dir();
+    fs::create_dir_all(&root).expect("failed to create root");
+    fs::write(
+        root.join(".devcontainer.json"),
+        "{\n  \"image\": \"debian:bookworm\",\n  \"features\": {\n    \"ghcr.io/devcontainers/features/github-cli\": {}\n  }\n}\n",
+    )
+    .expect("failed to write config");
+
+    run_upgrade_lockfile(&["--workspace-folder".to_string(), root.display().to_string()])
+        .expect("lockfile payload");
+
+    let lockfile = fs::read_to_string(root.join(".devcontainer-lock.json")).expect("lockfile");
+    assert!(!lockfile.ends_with('\n'));
+
     let _ = fs::remove_dir_all(root);
 }
 
