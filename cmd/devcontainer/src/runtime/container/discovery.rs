@@ -14,6 +14,12 @@ use super::super::lifecycle::LifecycleMode;
 use super::engine_run::{remove_container, start_container, start_existing_container};
 use super::UpContainer;
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ResolvedTargetContainer {
+    pub(crate) container_id: String,
+    pub(crate) id_labels: Option<HashMap<String, String>>,
+}
+
 pub(crate) fn ensure_up_container(
     resolved: &ResolvedConfig,
     args: &[String],
@@ -85,12 +91,13 @@ fn ensure_engine_up_container(
     )?;
     let remove_existing = common::has_flag(args, "--remove-existing-container");
     match running {
-        Some(container_id) if remove_existing => {
-            remove_container(args, &container_id)?;
+        Some(target) if remove_existing => {
+            remove_container(args, &target.container_id)?;
             create_engine_container(resolved, args, image_name, remote_workspace_folder)
         }
-        Some(container_id) => Ok(UpContainer {
-            container_id,
+        Some(target) => Ok(UpContainer {
+            container_id: target.container_id,
+            matched_id_labels: target.id_labels,
             lifecycle_mode: LifecycleMode::UpReused,
         }),
         None => match find_target_container(
@@ -99,14 +106,15 @@ fn ensure_engine_up_container(
             Some(resolved.config_file.as_path()),
             true,
         )? {
-            Some(container_id) if remove_existing => {
-                remove_container(args, &container_id)?;
+            Some(target) if remove_existing => {
+                remove_container(args, &target.container_id)?;
                 create_engine_container(resolved, args, image_name, remote_workspace_folder)
             }
-            Some(container_id) => {
-                start_existing_container(args, &container_id)?;
+            Some(target) => {
+                start_existing_container(args, &target.container_id)?;
                 Ok(UpContainer {
-                    container_id,
+                    container_id: target.container_id,
+                    matched_id_labels: target.id_labels,
                     lifecycle_mode: LifecycleMode::UpStarted,
                 })
             }
@@ -129,6 +137,7 @@ fn create_compose_container(
         .ok_or_else(|| "Dev container not found.".to_string())?;
     Ok(UpContainer {
         container_id,
+        matched_id_labels: None,
         lifecycle_mode: LifecycleMode::UpCreated,
     })
 }
@@ -151,6 +160,7 @@ fn refresh_compose_container(
             LifecycleMode::UpCreated
         },
         container_id: updated_container_id,
+        matched_id_labels: None,
     })
 }
 
@@ -163,22 +173,26 @@ fn create_engine_container(
     start_container(resolved, args, image_name, remote_workspace_folder).map(|container_id| {
         UpContainer {
             container_id,
+            matched_id_labels: None,
             lifecycle_mode: LifecycleMode::UpCreated,
         }
     })
 }
 
-pub(crate) fn resolve_target_container(
+pub(crate) fn resolve_target_container_match(
     args: &[String],
     workspace_folder: Option<&Path>,
     config_file: Option<&Path>,
-) -> Result<String, String> {
+) -> Result<ResolvedTargetContainer, String> {
     if let Some(container_id) = common::parse_option_value(args, "--container-id") {
-        return Ok(container_id);
+        return Ok(ResolvedTargetContainer {
+            container_id,
+            id_labels: None,
+        });
     }
 
     match find_target_container(args, workspace_folder, config_file, false)? {
-        Some(container_id) => Ok(container_id),
+        Some(target) => Ok(target),
         None => Err("Dev container not found.".to_string()),
     }
 }
@@ -188,7 +202,7 @@ fn find_target_container(
     workspace_folder: Option<&Path>,
     config_file: Option<&Path>,
     include_stopped: bool,
-) -> Result<Option<String>, String> {
+) -> Result<Option<ResolvedTargetContainer>, String> {
     let labels = target_container_labels(args, workspace_folder, config_file);
     if labels.is_empty() {
         return Err(
@@ -214,13 +228,19 @@ fn query_target_container(
     args: &[String],
     labels: &[String],
     include_stopped: bool,
-) -> Result<Option<String>, String> {
+) -> Result<Option<ResolvedTargetContainer>, String> {
     let result = engine::run_engine(args, ps_engine_args(labels, include_stopped))?;
     if result.status_code != 0 {
         return Err(engine::stderr_or_stdout(&result));
     }
 
-    Ok(parse_container_ids(&result.stdout).into_iter().next())
+    Ok(parse_container_ids(&result.stdout)
+        .into_iter()
+        .next()
+        .map(|container_id| ResolvedTargetContainer {
+            container_id,
+            id_labels: None,
+        }))
 }
 
 fn ps_engine_args(labels: &[String], include_stopped: bool) -> Vec<String> {
@@ -240,7 +260,7 @@ fn find_normalized_default_label_match(
     workspace_folder: Option<&Path>,
     config_file: Option<&Path>,
     include_stopped: bool,
-) -> Result<Option<String>, String> {
+) -> Result<Option<ResolvedTargetContainer>, String> {
     let Some(workspace_folder) = workspace_folder else {
         return Ok(None);
     };
@@ -266,9 +286,21 @@ fn find_normalized_default_label_match(
             common::DEVCONTAINER_LOCAL_FOLDER_LABEL,
             common::DEVCONTAINER_CONFIG_FILE_LABEL,
         ) {
-            Some(DefaultLabelMatch::Current) => return Ok(Some(container_id)),
+            Some(DefaultLabelMatch::Current) => {
+                return Ok(Some(ResolvedTargetContainer {
+                    container_id,
+                    id_labels: None,
+                }))
+            }
             Some(DefaultLabelMatch::Legacy) if legacy_match.is_none() => {
-                legacy_match = Some(container_id);
+                legacy_match = Some(ResolvedTargetContainer {
+                    container_id,
+                    id_labels: Some(legacy_default_id_labels(
+                        &labels,
+                        common::DEVCONTAINER_LOCAL_FOLDER_LABEL,
+                        common::DEVCONTAINER_CONFIG_FILE_LABEL,
+                    )),
+                });
             }
             _ => {}
         }
@@ -361,6 +393,19 @@ fn normalized_default_label_match(
     }
 }
 
+fn legacy_default_id_labels(
+    labels: &HashMap<String, String>,
+    workspace_key: &str,
+    _config_key: &str,
+) -> HashMap<String, String> {
+    labels
+        .get(workspace_key)
+        .map(|workspace_value| {
+            HashMap::from([(workspace_key.to_string(), workspace_value.to_string())])
+        })
+        .unwrap_or_default()
+}
+
 fn target_container_labels(
     args: &[String],
     workspace_folder: Option<&Path>,
@@ -386,7 +431,7 @@ fn target_container_labels(
 mod tests {
     use std::collections::HashMap;
 
-    use super::{normalized_default_label_match, DefaultLabelMatch};
+    use super::{legacy_default_id_labels, normalized_default_label_match, DefaultLabelMatch};
     use crate::commands::common;
 
     #[test]
@@ -429,5 +474,27 @@ mod tests {
         );
 
         assert_eq!(label_match, Some(DefaultLabelMatch::Legacy));
+    }
+
+    #[test]
+    fn legacy_default_id_labels_preserve_workspace_only_label_set() {
+        let mut labels = HashMap::new();
+        labels.insert(
+            common::DEVCONTAINER_LOCAL_FOLDER_LABEL.to_string(),
+            "C:\\CodeBlocks\\remill".to_string(),
+        );
+        labels.insert("unrelated".to_string(), "ignored".to_string());
+
+        assert_eq!(
+            legacy_default_id_labels(
+                &labels,
+                common::DEVCONTAINER_LOCAL_FOLDER_LABEL,
+                common::DEVCONTAINER_CONFIG_FILE_LABEL,
+            ),
+            HashMap::from([(
+                common::DEVCONTAINER_LOCAL_FOLDER_LABEL.to_string(),
+                "C:\\CodeBlocks\\remill".to_string(),
+            )])
+        );
     }
 }

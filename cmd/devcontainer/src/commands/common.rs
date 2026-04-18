@@ -13,7 +13,8 @@ pub(crate) use args::{
     validate_paired_options,
 };
 pub(crate) use config_resolution::{
-    load_resolved_config, resolve_override_config_path, resolve_read_configuration_path,
+    load_resolved_config, load_resolved_config_with_id_labels, resolve_override_config_path,
+    resolve_read_configuration_path,
 };
 pub(crate) use fs::{copy_directory_recursive, package_collection_target};
 pub(crate) use labels::{
