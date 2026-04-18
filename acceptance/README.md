@@ -51,7 +51,7 @@ out of version control.
 devcontainer templates apply --workspace-folder acceptance/template-node-mongo/workspace --template-id ghcr.io/devcontainers/templates/node-mongo:latest
 devcontainer read-configuration --workspace-folder acceptance/template-node-mongo/workspace
 devcontainer up --workspace-folder acceptance/template-node-mongo/workspace
-devcontainer exec --workspace-folder acceptance/template-node-mongo/workspace /bin/sh -lc 'ls /workspace/.devcontainer'
+devcontainer exec --workspace-folder acceptance/template-node-mongo/workspace /bin/sh -lc 'ls /workspaces/workspace/.devcontainer'
 ```
 
 ## local-feature

@@ -179,6 +179,16 @@ function validateTemplateScenario(scenario) {
 	);
 }
 
+function validateTemplateReadmeCommands(scenario, acceptanceReadme) {
+	const workspaceBasename = path.basename(scenario.workspacePath);
+	const workspaceFolder = `/workspaces/${workspaceBasename}`;
+	const expectedExecCommand = `devcontainer exec --workspace-folder ${scenario.workspacePath} /bin/sh -lc 'ls ${workspaceFolder}/.devcontainer'`;
+	assert(
+		acceptanceReadme.includes(expectedExecCommand),
+		`acceptance/README.md must use ${workspaceFolder} for the ${scenario.id} exec check`,
+	);
+}
+
 function main() {
 	assertExists(acceptanceRoot, 'acceptance/ must exist');
 	assertExists(readmePath, 'acceptance/README.md must exist');
@@ -241,6 +251,7 @@ function main() {
 	validateWorkspaceScenario(manifest[0], { image: true, lifecycle: true });
 	validateWorkspaceScenario(manifest[1], { build: true });
 	validateTemplateScenario(manifest[2]);
+	validateTemplateReadmeCommands(manifest[2], acceptanceReadme);
 	validateWorkspaceScenario(manifest[3], { image: true, localFeature: true });
 	validateWorkspaceScenario(manifest[4], { image: true, publishedFeature: true });
 
