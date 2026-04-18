@@ -3,6 +3,7 @@
 mod args;
 mod config_resolution;
 mod fs;
+mod labels;
 mod manifest;
 
 pub(crate) use args::{
@@ -15,4 +16,9 @@ pub(crate) use config_resolution::{
     load_resolved_config, resolve_override_config_path, resolve_read_configuration_path,
 };
 pub(crate) use fs::{copy_directory_recursive, package_collection_target};
+pub(crate) use labels::{
+    default_devcontainer_id_label_pairs, default_devcontainer_id_labels,
+    normalize_devcontainer_label_path, normalize_devcontainer_label_path_for_platform,
+    DEVCONTAINER_CONFIG_FILE_LABEL, DEVCONTAINER_LOCAL_FOLDER_LABEL,
+};
 pub(crate) use manifest::{generate_manifest_docs, parse_manifest, ManifestDocOptions};

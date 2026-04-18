@@ -1,6 +1,5 @@
 //! Workspace and config resolution helpers shared across commands.
 
-use std::collections::HashMap;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -10,7 +9,8 @@ use serde_json::Value;
 use crate::config::{self, ConfigContext};
 use crate::runtime::mounts::mount_option_target;
 
-use super::args::{parse_option_value, parse_option_values, validate_option_values};
+use super::args::{parse_option_value, validate_option_values};
+use super::labels::id_label_map;
 
 pub(crate) fn resolve_read_configuration_path(
     args: &[String],
@@ -148,30 +148,4 @@ pub(crate) fn resolve_override_config_path(args: &[String]) -> Result<Option<Pat
         ));
     }
     Ok(Some(fs::canonicalize(&resolved).unwrap_or(resolved)))
-}
-
-pub(crate) fn id_label_map(
-    args: &[String],
-    workspace_folder: &Path,
-    config_file: &Path,
-) -> HashMap<String, String> {
-    let mut labels = parse_option_values(args, "--id-label")
-        .into_iter()
-        .filter_map(|entry| {
-            entry
-                .split_once('=')
-                .map(|(key, value)| (key.to_string(), value.to_string()))
-        })
-        .collect::<HashMap<_, _>>();
-    if labels.is_empty() {
-        labels.insert(
-            "devcontainer.local_folder".to_string(),
-            workspace_folder.display().to_string(),
-        );
-        labels.insert(
-            "devcontainer.config_file".to_string(),
-            config_file.display().to_string(),
-        );
-    }
-    labels
 }
